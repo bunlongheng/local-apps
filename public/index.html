@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apps Monitor</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/icon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Monitor">
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3e;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --up: #22c55e;
+    --down: #ef4444;
+    --starting: #f59e0b;
+    --stopped: #64748b;
+    --accent: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+  header { padding: 18px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+  .subtitle { color: var(--muted); font-size: 12px; }
+  .badge { background: #fff; color: #0f1117; font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  main { padding: 24px; }
+  .info-bar { display: flex; gap: 24px; margin-bottom: 20px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  .info-item { display: flex; flex-direction: column; gap: 2px; }
+  .info-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .info-val { font-size: 13px; font-weight: 600; }
+  a.info-val { color: var(--accent); text-decoration: none; }
+  a.info-val:hover { text-decoration: underline; }
+  .notify-btn { margin-left: auto; background: #fff; color: #0f1117; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; }
+  .notify-btn:hover { opacity: 0.85; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { border-bottom: 2px solid var(--border); }
+  th { text-align: left; padding: 8px 12px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+  td { padding: 12px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .status-dot { display: inline-flex; align-items: center; gap: 7px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .dot.up { background: var(--up); box-shadow: 0 0 6px var(--up); }
+  .dot.down { background: var(--down); box-shadow: 0 0 6px var(--down); animation: pulse 1.5s infinite; }
+  .dot.starting { background: var(--starting); box-shadow: 0 0 6px var(--starting); animation: pulse 1s infinite; }
+  .dot.stopped { background: var(--stopped); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .status-text.up { color: var(--up); }
+  .status-text.down { color: var(--down); }
+  .status-text.starting { color: var(--starting); }
+  .status-text.stopped { color: var(--stopped); }
+  .btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); width: 28px; height: 28px; border-radius: 5px; cursor: pointer; font-size: 13px; font-family: inherit; transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; }
+  .btn:hover { border-color: #fff; color: #fff; }
+  .btn.danger:hover { border-color: var(--down); color: var(--down); }
+  .btn-group { display: flex; gap: 6px; }
+  .link { color: var(--accent); text-decoration: none; font-size: 11px; }
+  .link:hover { text-decoration: underline; }
+  .pid { color: var(--muted); font-size: 11px; }
+  .restarts { color: var(--muted); font-size: 11px; }
+  .restarts.warn { color: var(--starting); }
+  .log-panel { display: none; background: #0a0c12; border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-top: 16px; max-height: 220px; overflow-y: auto; font-size: 11px; line-height: 1.6; color: #94a3b8; }
+  .log-panel.open { display: block; }
+  .no-apps { text-align: center; padding: 60px; color: var(--muted); }
+  .checked { color: var(--muted); font-size: 10px; }
+  .toast-container { position: fixed; top: 16px; right: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
+  .toast { background: var(--surface); border: 1px solid var(--down); color: var(--text); padding: 10px 16px; border-radius: 8px; font-size: 12px; animation: slideIn 0.2s ease; max-width: 320px; }
+  @keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:none;opacity:1} }
+  .disabled-row td { opacity: 0.4; }
+  tbody tr { cursor: pointer; }
+
+  /* Modal */
+  .modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); z-index:200; align-items:center; justify-content:center; }
+  .modal-backdrop.open { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border); border-radius:12px; width:580px; max-width:94vw; padding:24px; position:relative; }
+  .modal-header { display:flex; align-items:center; gap:10px; margin-bottom:20px; }
+  .modal-title { font-size:16px; font-weight:700; }
+  .modal-close { position:absolute; top:16px; right:16px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:18px; line-height:1; }
+  .modal-close:hover { color:#fff; }
+  .modal-rows { display:flex; flex-direction:column; gap:0; }
+  .modal-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); gap:16px; }
+  .modal-row:last-child { border-bottom:none; }
+  .modal-key { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:0.08em; white-space:nowrap; flex-shrink:0; }
+  .modal-val { font-size:12px; text-align:right; word-break:break-all; }
+  .modal-val a { color:#fff; text-decoration:none; }
+  .modal-val a:hover { text-decoration:underline; }
+  .modal-val .copy-btn { background:none; border:none; color:var(--muted); cursor:pointer; font-size:11px; margin-left:6px; }
+  .modal-val .copy-btn:hover { color:#fff; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Apps Monitor</h1>
+    <div class="subtitle">Process supervisor &amp; health dashboard</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="badge" id="upCount">—</span>
+    <button id="globalBell" onclick="toggleGlobalAlert()" title="Toggle all alerts" style="background:none;border:none;cursor:pointer;font-size:18px;opacity:1;transition:opacity 0.2s;padding:0">🔔</button>
+  </div>
+</header>
+
+<main>
+
+  <div id="tableWrap">
+    <table>
+      <thead>
+        <tr>
+          <th>App</th>
+          <th>LaunchAgent</th>
+          <th>Last Checked</th>
+        </tr>
+      </thead>
+      <tbody id="appTable"><tr><td colspan="3" class="no-apps">Loading...</td></tr></tbody>
+    </table>
+  </div>
+
+
+</main>
+
+<div class="toast-container" id="toasts"></div>
+
+<div class="modal-backdrop" id="modalBackdrop" onclick="closeModal(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-header">
+      <span class="dot" id="modalDot"></span>
+      <span class="modal-title" id="modalTitle"></span>
+    </div>
+    <div class="modal-rows" id="modalRows"></div>
+  </div>
+</div>
+
+<script>
+let apps = [];
+let alertsOn = localStorage.getItem('alertsOn') !== 'false';
+
+function updateBell() {
+  document.getElementById('globalBell').style.opacity = alertsOn ? '1' : '0.25';
+}
+
+function toggleGlobalAlert() {
+  if (!alertsOn) {
+    Notification.requestPermission().then(p => {
+      if (p === 'granted') { alertsOn = true; localStorage.setItem('alertsOn', 'true'); updateBell(); }
+      else showToast('Permission denied');
+    });
+  } else {
+    alertsOn = false;
+    localStorage.setItem('alertsOn', 'false');
+    updateBell();
+  }
+}
+
+async function load() {
+  const res = await fetch('/api/status');
+  const data = await res.json();
+  apps = data.apps;
+  renderTable();
+}
+
+function renderTable() {
+  const tbody = document.getElementById('appTable');
+  const up = apps.filter(a => a.status === 'up').length;
+  document.getElementById('upCount').textContent = `${up}/${apps.length} up`;
+
+  tbody.innerHTML = apps.map(app => `
+    <tr id="row-${app.id}" onclick="openModal(apps.find(a=>a.id==='${app.id}'))">
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="dot ${app.status}"></span>
+          <div><a href="${app.localUrl}" target="_blank" style="color:inherit;text-decoration:none;font-weight:700;" onclick="event.stopPropagation()" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${app.name}</a></div>
+        </div>
+      </td>
+
+      <td><span class="pid">${app.launchAgent || '—'}</span></td>
+      <td><span class="checked">${app.lastChecked ? new Date(app.lastChecked).toLocaleTimeString() : '—'}</span></td>
+    </tr>
+  `).join('');
+
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// --- SSE real-time updates ---
+const es = new EventSource('/api/events');
+es.onmessage = e => {
+  const msg = JSON.parse(e.data);
+
+  if (msg.type === 'update') {
+    const app = apps.find(a => a.id === msg.id);
+    if (app) {
+      app.status = msg.status;
+      renderTable();
+    }
+  }
+
+  if (msg.type === 'reload') {
+    location.reload();
+    return;
+  }
+
+  if (msg.type === 'alert') {
+    if (alertsOn) {
+      showToast(`${msg.name} went DOWN`);
+      sendChromeNotification(msg.name);
+    }
+  }
+};
+
+// --- Notifications ---
+function sendChromeNotification(appName) {
+  if (Notification.permission !== 'granted') return;
+  new Notification('App Down!', {
+    body: `${appName} is no longer responding`,
+    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="%23ef4444"/><text x="16" y="22" text-anchor="middle" font-size="18" fill="white">!</text></svg>'
+  });
+}
+
+function showToast(msg) {
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+// --- Modal ---
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓';
+    setTimeout(() => btn.textContent = orig, 1500);
+  });
+}
+
+function pathVal(p) {
+  if (!p) return null;
+  return `<span style="font-size:11px;word-break:break-all;font-family:'SF Mono',monospace">${escHtml(p)}</span>
+    <button class="copy-btn" onclick="copyText('${p}', this)" title="Copy path">⎘</button>`;
+}
+
+function openModal(app) {
+  document.getElementById('modalDot').className = 'dot ' + app.status;
+  document.getElementById('modalTitle').textContent = app.name;
+
+  const statusLabel = { up: '🟢 Up', down: '🔴 Down', unknown: '⚪ Unknown' }[app.status] || app.status;
+  const port = app.localUrl ? new URL(app.localUrl).port : null;
+
+  const rows = [
+    ['Status', `<span class="status-text ${app.status}">${statusLabel}</span>`],
+    app.lastChecked ? ['Last Checked', new Date(app.lastChecked).toLocaleString()] : null,
+    port ? ['Port', port] : null,
+    app.hostname ? ['Hostname', app.hostname] : null,
+    app.repo ? ['GitHub', `<a href="${app.repo}" target="_blank">⇗ ${app.repo.replace('https://github.com/','')}</a>`] : null,
+    app.localUrl ? ['Local URL', `<a href="${app.localUrl}" target="_blank">${app.localUrl}</a>`] : null,
+    app.lanUrl ? ['LAN URL', `<a href="${app.lanUrl}" target="_blank">${app.lanUrl}</a>`] : null,
+    app.localPath ? ['Local Path', pathVal(app.localPath)] : null,
+    app.logPath ? ['Log Path', pathVal(app.logPath)] : null,
+    app.launchAgent ? ['LaunchAgent', `<span style="font-family:'SF Mono',monospace;font-size:11px">${app.launchAgent}</span>`] : null,
+    app.launchAgentPath ? ['Plist Path', pathVal(app.launchAgentPath)] : null,
+  ].filter(Boolean);
+
+  document.getElementById('modalRows').innerHTML = rows.map(([k, v]) => `
+    <div class="modal-row">
+      <span class="modal-key">${k}</span>
+      <span class="modal-val">${v}</span>
+    </div>
+  `).join('');
+
+  document.getElementById('modalBackdrop').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modalBackdrop')) return;
+  document.getElementById('modalBackdrop').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('modalBackdrop').classList.remove('open');
+});
+
+// --- Init ---
+load();
+updateBell();
+setInterval(load, 15000);
+</script>
+</body>
+</html>

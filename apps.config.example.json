@@ -1,0 +1,25 @@
+[
+  {
+    "id": "my-app",
+    "name": "my-app",
+    "healthUrl": "http://localhost:3000",
+    "localUrl": "http://localhost:3000",
+    "repo": "https://github.com/username/my-app",
+    "localPath": "/Users/username/Sites/my-app",
+    "logPath": "/tmp/my-app.log",
+    "launchAgent": "com.username.my-app",
+    "launchAgentPath": "/Users/username/Library/LaunchAgents/com.username.my-app.plist"
+  },
+  {
+    "id": "my-electron-app",
+    "name": "my-electron-app",
+    "healthUrl": null,
+    "localUrl": null,
+    "repo": "https://github.com/username/my-electron-app",
+    "localPath": "/Users/username/Sites/my-electron-app",
+    "logPath": "/tmp/my-electron-app.log",
+    "processCheck": "Electron",
+    "launchAgent": "com.username.my-electron-app",
+    "launchAgentPath": "/Users/username/Library/LaunchAgents/com.username.my-electron-app.plist"
+  }
+]
