@@ -108,64 +108,8 @@
   .sys-banner-inner.red    { background:rgba(239,68,68,0.12);  border:1px solid rgba(239,68,68,0.3);  color:#ef4444; }
   .sys-banner-inner.critical { background:rgba(239,68,68,0.2); border:1px solid rgba(239,68,68,0.5); color:#ff6b6b; }
 
-  /* Memory summary strip */
-  .mem-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:22px; }
-  @media(max-width:600px){ .mem-strip{grid-template-columns:repeat(2,1fr);} }
-  .mem-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
-  .mem-card-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px; }
-  .mem-card-val { font-size:16px; font-weight:700; letter-spacing:-0.5px; }
-  .mem-card-sub { font-size:10px; color:var(--muted); margin-top:2px; }
-  .mem-bar-wrap { height:4px; background:rgba(255,255,255,0.08); border-radius:2px; margin-top:8px; overflow:hidden; }
-  .mem-bar { height:100%; border-radius:2px; transition:width 0.4s ease; }
-  .mem-bar.green    { background:#22c55e; }
-  .mem-bar.yellow   { background:#f59e0b; }
-  .mem-bar.red      { background:#ef4444; }
-  .mem-bar.critical { background:#ff4444; box-shadow:0 0 8px rgba(255,68,68,0.6); }
-
-  /* Claude session cards */
+  /* Services section title */
   .section-title { font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); font-weight:600; margin-bottom:12px; margin-top:28px; }
-  .claude-cards { display:flex; flex-direction:column; gap:8px; margin-bottom:24px; }
-  .claude-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; display:flex; align-items:center; gap:14px; }
-  .claude-card.yellow { border-color:rgba(245,158,11,0.35); }
-  .claude-card.red    { border-color:rgba(239,68,68,0.4); }
-  .claude-card.critical { border-color:rgba(255,68,68,0.6); background:rgba(239,68,68,0.06); }
-  .zone-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
-  .zone-dot.green    { background:#22c55e; box-shadow:0 0 5px #22c55e; }
-  .zone-dot.yellow   { background:#f59e0b; box-shadow:0 0 5px #f59e0b; }
-  .zone-dot.red      { background:#ef4444; box-shadow:0 0 5px #ef4444; animation:pulse 1.5s infinite; }
-  .zone-dot.critical { background:#ff4444; box-shadow:0 0 8px #ff4444; animation:pulse 0.8s infinite; }
-  .claude-card-info { flex:1; min-width:0; }
-  .claude-card-name { font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .claude-card-meta { font-size:10px; color:var(--muted); margin-top:2px; }
-  .claude-card-mem  { font-size:14px; font-weight:700; letter-spacing:-0.5px; flex-shrink:0; }
-  .claude-card-mem.yellow  { color:#f59e0b; }
-  .claude-card-mem.red     { color:#ef4444; }
-  .claude-card-mem.critical{ color:#ff6b6b; }
-  .no-claude { color:var(--muted); font-size:12px; padding:10px 0; }
-
-  /* Process table */
-  .proc-table-wrap { margin-bottom:32px; }
-  .proc-table { width:100%; border-collapse:collapse; }
-  .proc-table th { padding:7px 10px; color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:0.07em; font-weight:600; text-align:left; border-bottom:1px solid var(--border); }
-  .proc-table th.right { text-align:right; }
-  .proc-table td { padding:9px 10px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:11px; vertical-align:middle; }
-  .proc-table tbody tr:last-child td { border-bottom:none; }
-  .proc-table tbody tr:hover td { background:rgba(255,255,255,0.02); }
-  .proc-table td.right { text-align:right; }
-  .type-badge { display:inline-block; font-size:9px; padding:2px 6px; border-radius:4px; font-weight:600; letter-spacing:0.04em; }
-  .type-badge.claude { background:rgba(124,58,237,0.2); color:#a78bfa; border:1px solid rgba(124,58,237,0.3); }
-  .type-badge.chrome { background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.25); }
-  .type-badge.node   { background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.25); }
-  .type-badge.iterm  { background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.25); }
-  .type-badge.other  { background:rgba(100,116,139,0.15); color:var(--muted); border:1px solid rgba(100,116,139,0.2); }
-  .proc-mem.yellow { color:#f59e0b; }
-  .proc-mem.red    { color:#ef4444; }
-  .proc-mem.critical { color:#ff6b6b; font-weight:700; }
-  .kill-btn { background:none; border:1px solid rgba(239,68,68,0.25); color:rgba(239,68,68,0.6); font-family:inherit; font-size:10px; padding:2px 7px; border-radius:4px; cursor:pointer; transition:all 0.15s; }
-  .kill-btn:hover { background:rgba(239,68,68,0.15); border-color:#ef4444; color:#ef4444; }
-  .pid-btn { background:none; border:none; color:var(--muted); font-family:inherit; font-size:11px; cursor:pointer; padding:0; }
-  .pid-btn:hover { color:#fff; }
-  .proc-filter-bar { display:flex; align-items:center; gap:6px; margin-bottom:14px; }
 </style>
 </head>
 <body>
@@ -405,41 +349,27 @@ load();
 setInterval(load, 15000);
 
 // --- System / memory monitoring ---
-let sysProcs = [];
-
 function fmtMem(mb) {
   if (mb >= 1024) return (mb / 1024).toFixed(1) + ' GB';
   return Math.round(mb) + ' MB';
 }
 
-function memZone(mb, type) {
-  if (type === 'claude') {
-    if (mb > 8192) return 'critical';
-    if (mb > 4096) return 'red';
-    if (mb > 1536) return 'yellow';
-    return 'green';
-  }
+function memZone(mb) {
+  if (mb > 8192) return 'critical';
+  if (mb > 4096) return 'red';
+  if (mb > 1536) return 'yellow';
   return 'green';
 }
-
-function barClass(pct) {
-  if (pct > 85) return 'critical';
-  if (pct > 75) return 'red';
-  if (pct > 50) return 'yellow';
-  return 'green';
-}
-
 
 function renderSystem(data) {
   const { stats, procs } = data;
-  sysProcs = procs;
 
   // --- Header indicators ---
   const claudeProcsH = procs.filter(p => p.type === 'claude');
   const chromeProcsH = procs.filter(p => p.type === 'chrome');
   const claudeMbH = claudeProcsH.reduce((s, p) => s + p.memMb, 0);
   const chromeMbH = chromeProcsH.reduce((s, p) => s + p.memMb, 0);
-  const claudeZoneH = memZone(claudeMbH, 'claude');
+  const claudeZoneH = memZone(claudeMbH);
   const chromeZoneH = chromeMbH > 4096 ? 'red' : chromeMbH > 2048 ? 'yellow' : 'green';
   document.getElementById('headerIndicators').innerHTML = `
     <div class="hdr-ind">
@@ -451,43 +381,9 @@ function renderSystem(data) {
       <span class="hdr-ind-val" style="color:${chromeZoneH==='green'?'var(--text)':chromeZoneH==='yellow'?'#f59e0b':'#ef4444'}">${fmtMem(chromeMbH)}</span>
     </div>`;
 
-  // --- RAM card (macOS: show available, not used — cache fills RAM aggressively) ---
-  const availMb = stats.ram.availMb;
-  const availPct = (availMb / stats.ram.totalMb) * 100;
-  // bar shows "used" visually but label shows available
-  const usedPct = 100 - availPct;
-  const pressure = stats.ram.pressure; // normal | warn | critical
-  const ramZone = pressure === 'critical' ? 'critical' : pressure === 'warn' ? 'yellow' : 'green';
-  document.getElementById('ramVal').textContent = fmtMem(availMb) + ' free';
-  document.getElementById('ramSub').textContent =
-    'of ' + (stats.ram.totalMb / 1024).toFixed(0) + ' GB · pressure: ' + pressure;
-  const ramBar = document.getElementById('ramBar');
-  ramBar.style.width = Math.min(usedPct, 100).toFixed(1) + '%';
-  ramBar.className = 'mem-bar ' + ramZone;
-
-  // --- Swap card ---
-  const swapPct = stats.swap.totalMb > 0 ? (stats.swap.usedMb / stats.swap.totalMb) * 100 : 0;
-  const swapZone = stats.swap.climbing ? 'critical' : (stats.swap.usedMb > 2048 ? 'red' : stats.swap.usedMb > 512 ? 'yellow' : 'green');
-  document.getElementById('swapVal').textContent = fmtMem(stats.swap.usedMb);
-  document.getElementById('swapSub').textContent = stats.swap.totalMb > 0 ? 'of ' + (stats.swap.totalMb / 1024).toFixed(0) + ' GB' : 'swap';
-  const swapBar = document.getElementById('swapBar');
-  swapBar.style.width = (Math.min(swapPct, 100)).toFixed(1) + '%';
-  swapBar.className = 'mem-bar ' + swapZone;
-
-  // --- Aggregate by type ---
-  const claudeProcs = procs.filter(p => p.type === 'claude');
-  const chromeProcs = procs.filter(p => p.type === 'chrome');
-  const claudeMb = claudeProcs.reduce((s, p) => s + p.memMb, 0);
-  const chromeMb = chromeProcs.reduce((s, p) => s + p.memMb, 0);
-  const claudeZone = memZone(claudeMb, 'claude');
-
-  document.getElementById('claudeTotal').textContent = fmtMem(claudeMb);
-  document.getElementById('claudeTotal').className = 'mem-card-val ' + (claudeZone !== 'green' ? claudeZone : '');
-  document.getElementById('claudeCount').textContent = claudeProcs.length + ' session' + (claudeProcs.length !== 1 ? 's' : '');
-  document.getElementById('chromeTotal').textContent = fmtMem(chromeMb);
-  document.getElementById('chromeCount').textContent = chromeProcs.length + ' process' + (chromeProcs.length !== 1 ? 'es' : '');
-
   // --- System warning banner ---
+  const availMb = stats.ram.availMb;
+  const pressure = stats.ram.pressure;
   const banner = document.getElementById('sysBanner');
   const bannerInner = document.getElementById('sysBannerInner');
   const bannerMsg = document.getElementById('sysBannerMsg');
@@ -515,55 +411,8 @@ function renderSystem(data) {
   } else {
     banner.classList.remove('show');
   }
-
-  // --- Claude session cards ---
-  const cards = document.getElementById('claudeCards');
-  if (!claudeProcs.length) {
-    cards.innerHTML = '<div class="no-claude">No Claude processes detected</div>';
-  } else {
-    cards.innerHTML = claudeProcs.map(p => {
-      const zone = memZone(p.memMb, 'claude');
-      return `
-        <div class="claude-card ${zone}">
-          <div class="zone-dot ${zone}"></div>
-          <div class="claude-card-info">
-            <div class="claude-card-name">${escHtml(p.comm)}</div>
-          </div>
-          <div class="claude-card-mem ${zone}">${fmtMem(p.memMb)}</div>
-        </div>`;
-    }).join('');
-  }
-
-  renderWorst();
 }
 
-function renderWorst() {
-  const top3 = [...sysProcs].sort((a, b) => b.memMb - a.memMb).slice(0, 3);
-  const el = document.getElementById('worstProcs');
-  if (!top3.length) { el.innerHTML = '<div style="color:var(--muted);font-size:12px">No data</div>'; return; }
-  el.innerHTML = top3.map(p => {
-    const name = p.args.split('/').pop().split(' ')[0] || p.comm;
-    return `
-      <div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px">
-        <span class="type-badge ${p.type}">${p.type}</span>
-        <span style="flex:1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(name)}</span>
-        <span style="font-size:13px;font-weight:700;flex-shrink:0">${fmtMem(p.memMb)}</span>
-        <button class="kill-btn" onclick="killProc(${p.pid},this)">kill</button>
-      </div>`;
-  }).join('');
-}
-
-async function killProc(pid, btn) {
-  if (!confirm(`Kill PID ${pid}?`)) return;
-  btn.textContent = '…';
-  btn.disabled = true;
-  try {
-    await fetch('/api/kill/' + pid, { method: 'POST' });
-    setTimeout(loadSystem, 800);
-  } catch {
-    btn.textContent = 'err';
-  }
-}
 
 async function loadSystem() {
   try {
