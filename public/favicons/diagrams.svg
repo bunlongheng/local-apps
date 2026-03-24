@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"  stop-color="#0f051e"/>
+      <stop offset="55%" stop-color="#2e0f6b"/>
+      <stop offset="100%" stop-color="#0c2340"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="115" fill="url(#bg)"/>
+
+  <!-- Participant boxes -->
+  <rect x="48"  y="80" width="130" height="72" rx="16" fill="#fb7185"/>
+  <rect x="191" y="80" width="130" height="72" rx="16" fill="#a78bfa"/>
+  <rect x="334" y="80" width="130" height="72" rx="16" fill="#34d399"/>
+
+  <!-- Lifelines -->
+  <line x1="113" y1="152" x2="113" y2="432" stroke="#fb7185" stroke-width="4" stroke-dasharray="20 12" opacity="0.3"/>
+  <line x1="256" y1="152" x2="256" y2="432" stroke="#a78bfa" stroke-width="4" stroke-dasharray="20 12" opacity="0.3"/>
+  <line x1="399" y1="152" x2="399" y2="432" stroke="#34d399" stroke-width="4" stroke-dasharray="20 12" opacity="0.3"/>
+
+  <!-- Arrow 1: P1 → P2 (amber) -->
+  <line x1="125" y1="210" x2="242" y2="210" stroke="#fbbf24" stroke-width="12" stroke-linecap="round"/>
+  <polygon points="268,210 240,196 240,224" fill="#fbbf24"/>
+
+  <!-- Arrow 2: P2 → P3 (sky) -->
+  <line x1="268" y1="275" x2="385" y2="275" stroke="#38bdf8" stroke-width="12" stroke-linecap="round"/>
+  <polygon points="411,275 383,261 383,289" fill="#38bdf8"/>
+
+  <!-- Arrow 3: P3 → P2 return (violet dashed) -->
+  <line x1="268" y1="340" x2="385" y2="340" stroke="#a78bfa" stroke-width="12" stroke-linecap="round" stroke-dasharray="28 14"/>
+  <polygon points="242,340 270,326 270,354" fill="#a78bfa"/>
+
+  <!-- Arrow 4: P2 → P1 return (rose dashed) -->
+  <line x1="125" y1="405" x2="242" y2="405" stroke="#fb7185" stroke-width="12" stroke-linecap="round" stroke-dasharray="28 14"/>
+  <polygon points="99,405 127,391 127,419" fill="#fb7185"/>
+</svg>
