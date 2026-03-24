@@ -110,6 +110,9 @@
 
   /* Services section title */
   .section-title { font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); font-weight:600; margin-bottom:12px; margin-top:28px; }
+  .start-btn { background:none; border:1px solid rgba(34,197,94,0.35); color:rgba(34,197,94,0.8); font-family:inherit; font-size:10px; padding:3px 10px; border-radius:4px; cursor:pointer; transition:all 0.15s; }
+  .start-btn:hover { background:rgba(34,197,94,0.15); border-color:#22c55e; color:#22c55e; }
+  .down-detail { font-size:10px; color:var(--muted); margin-top:3px; }
 </style>
 </head>
 <body>
@@ -210,19 +213,25 @@ function renderTable() {
     tbody.innerHTML = `<tr><td colspan="3" class="no-apps">No apps</td></tr>`;
     return;
   }
-  tbody.innerHTML = visible.map(app => `
+  tbody.innerHTML = visible.map(app => {
+    const isDown = app.status === 'down';
+    const port = app.localUrl ? new URL(app.localUrl).port : null;
+    return `
     <tr id="row-${app.id}" onclick="openModal(apps.find(a=>a.id==='${app.id}'))">
       <td>
         <div style="display:flex;align-items:center;gap:12px">
           <span class="dot ${app.status}"></span>
           ${faviconImg(app.id)}
-          <a class="app-name" href="${app.lanUrl || app.localUrl || '#'}" target="_blank" onclick="event.stopPropagation()">${app.name}</a>
+          <div>
+            <a class="app-name" href="${app.lanUrl || app.localUrl || '#'}" target="_blank" onclick="event.stopPropagation()">${app.name}</a>
+            ${isDown ? `<div class="down-detail">port ${port || '?'} not responding — click to start</div>` : ''}
+          </div>
         </div>
       </td>
       <td style="text-align:center"><a href="${app.lanUrl || app.localUrl || '#'}" target="_blank" onclick="event.stopPropagation()" style="color:var(--text);font-size:11px;text-decoration:none">${(app.lanUrl || app.localUrl || '').replace(/^https?:\/\//, '') || '—'}</a></td>
       <td style="text-align:right;color:var(--muted);font-size:11px">${app.lastChecked ? new Date(app.lastChecked).toLocaleTimeString() : '—'}</td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 }
 
 const FAVICONS = {
@@ -243,6 +252,19 @@ function faviconImg(id) {
   const src = FAVICONS[id];
   if (!src) return '';
   return `<img src="${src}" width="24" height="24" style="border-radius:5px;object-fit:contain;flex-shrink:0" onerror="this.style.display='none'">`;
+}
+
+async function startApp(id, btn) {
+  btn.textContent = '…';
+  btn.disabled = true;
+  try {
+    await fetch('/api/start/' + id, { method: 'POST' });
+    btn.textContent = '✓ Started';
+    setTimeout(() => load(), 3000);
+  } catch {
+    btn.textContent = 'err';
+    btn.disabled = false;
+  }
 }
 
 function escHtml(s) {
@@ -282,20 +304,17 @@ function openModal(app) {
   const statusLabel = { up: '🟢 Up', down: '🔴 Down', unknown: '⚪ Unknown' }[app.status] || app.status;
   const port = app.localUrl ? new URL(app.localUrl).port : null;
 
+  const isDown = app.status === 'down';
   const rows = [
-    ['⬤ Status',          `<span class="status-text ${app.status}">${statusLabel}</span>`],
+    ['⬤ Status', `<span class="status-text ${app.status}">${statusLabel}</span>${isDown && app.launchAgent ? ` &nbsp;<button class="start-btn" onclick="startApp('${app.id}',this);closeModal()">▶ Start</button>` : ''}`],
     app.lastChecked ?     ['🕐 Checked',     new Date(app.lastChecked).toLocaleString()] : null,
     port ?                ['🔌 Port',         port] : null,
-    app.hostname ?        ['🖥 Hostname',     app.hostname] : null,
     app.repo ?            ['🐙 GitHub',       `<a href="${app.repo}" target="_blank" onclick="event.stopPropagation()">⇗ ${app.repo.replace('https://github.com/','')}</a>`] : null,
-    app.localUrl ?        ['🌐 Local URL',    `<a href="${app.localUrl}" target="_blank" onclick="event.stopPropagation()">${app.localUrl}</a>`] : null,
-    app.lanUrl ?          ['📡 LAN URL',      `<a href="${app.lanUrl}" target="_blank" onclick="event.stopPropagation()">${app.lanUrl}</a>`] : null,
-    app.caddyUrl ?        ['🔗 Caddy URL',    `<a href="${app.caddyUrl}" target="_blank" onclick="event.stopPropagation()">${app.caddyUrl}</a>`] : null,
-    app.prodUrl ?         ['🚀 Prod URL',     `<a href="${app.prodUrl}" target="_blank" onclick="event.stopPropagation()">${app.prodUrl}</a>`] : null,
-    app.localPath ?       ['📁 Local Path',   pathVal(app.localPath)] : null,
-    app.logPath ?         ['📄 Log Path',     pathVal(app.logPath)] : null,
-    app.launchAgent ?     ['⚙️ LaunchAgent',  `<span style="font-family:'SF Mono',monospace;font-size:11px">${app.launchAgent}</span>`] : null,
-    app.launchAgentPath ? ['📋 Plist',        pathVal(app.launchAgentPath)] : null,
+    app.prodUrl ?         ['🚀 Prod',         `<a href="${app.prodUrl}" target="_blank" onclick="event.stopPropagation()">${app.prodUrl.replace('https://','')}</a>`] : null,
+    app.localUrl ?        ['🌐 Local',        `<a href="${app.localUrl}" target="_blank" onclick="event.stopPropagation()">${app.localUrl}</a>`] : null,
+    app.caddyUrl ?        ['🔗 Caddy',        `<a href="${app.caddyUrl}" target="_blank" onclick="event.stopPropagation()">${app.caddyUrl}</a>`] : null,
+    app.localPath ?       ['📁 Path',         pathVal(app.localPath)] : null,
+    app.logPath ?         ['📄 Log',          pathVal(app.logPath)] : null,
   ].filter(Boolean);
 
   document.getElementById('modalRows').innerHTML = rows.map(([k, v]) => `

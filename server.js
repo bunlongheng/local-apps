@@ -238,6 +238,24 @@ app.get('/api/system', (req, res) => {
   res.json({ stats, procs });
 });
 
+app.post('/api/start/:id', (req, res) => {
+  const config = loadConfig();
+  const app = config.find(a => a.id === req.params.id);
+  if (!app) return res.status(404).json({ error: 'not found' });
+  try {
+    if (app.launchAgentPath) {
+      execSync(`launchctl load -w "${app.launchAgentPath}" 2>/dev/null || launchctl start "${app.launchAgent}" 2>/dev/null || true`);
+    } else if (app.launchAgent) {
+      execSync(`launchctl start "${app.launchAgent}" 2>/dev/null || true`);
+    } else {
+      return res.status(400).json({ error: 'no launchAgent configured' });
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/api/kill/:pid', (req, res) => {
   const pid = parseInt(req.params.pid);
   if (!pid || pid < 2) return res.status(400).json({ error: 'invalid pid' });
