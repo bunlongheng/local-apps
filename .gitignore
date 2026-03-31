@@ -1,5 +1,6 @@
 node_modules/
 apps.config.json
+apps-monitor.db
 *.log
 .DS_Store
 public/screenshots/

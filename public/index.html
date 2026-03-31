@@ -97,6 +97,17 @@
   .start-btn:hover { background:rgba(34,197,94,0.15); border-color:#22c55e; color:#22c55e; }
   .start-btn:disabled { opacity:0.5; cursor:default; }
   .log-block { margin-top:8px; background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:6px; padding:8px 10px; font-size:10px; font-family:'SF Mono','Fira Code',monospace; color:var(--muted); max-height:160px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; }
+
+  /* Help modal */
+  .help-btn { background:none; border:1px solid var(--border); color:var(--muted); width:28px; height:28px; border-radius:50%; cursor:pointer; font-size:13px; font-weight:700; font-family:inherit; display:flex; align-items:center; justify-content:center; transition:all 0.15s; }
+  .help-btn:hover { border-color:var(--text); color:var(--text); }
+  .help-modal { background:var(--surface); border:1px solid var(--border); border-radius:12px; width:680px; max-width:94vw; max-height:85vh; overflow-y:auto; padding:24px; position:relative; }
+  .help-section { margin-bottom:16px; }
+  .help-label { font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); font-weight:600; margin-bottom:8px; }
+  .help-code { background:rgba(0,0,0,0.4); border:1px solid var(--border); border-radius:8px; padding:12px 14px; font-size:11px; font-family:'SF Mono','Fira Code',monospace; color:#a5b4fc; white-space:pre-wrap; word-break:break-all; position:relative; line-height:1.5; }
+  .help-code .copy-all { position:absolute; top:8px; right:8px; background:rgba(255,255,255,0.08); border:1px solid var(--border); color:var(--muted); font-family:inherit; font-size:10px; padding:3px 10px; border-radius:4px; cursor:pointer; transition:all 0.15s; }
+  .help-code .copy-all:hover { background:rgba(255,255,255,0.15); color:#fff; }
+  .help-desc { font-size:11px; color:var(--muted); line-height:1.6; margin-bottom:6px; }
 </style>
 </head>
 <body>
@@ -106,7 +117,9 @@
     <div>
       <h1>Apps Monitor</h1>
     </div>
-    <div style="position:relative">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="help-btn" onclick="toggleHelp()" title="API Instructions">?</button>
+      <div style="position:relative">
       <button id="qrBtn" onclick="toggleQR()" title="Show LAN QR code" style="background:none;border:none;outline:none;cursor:pointer;padding:0;line-height:1;opacity:0.35;transition:opacity 0.15s;-webkit-tap-highlight-color:transparent;user-select:none" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity=document.getElementById('qrPopover').style.display!=='none'?'1':'0.35'">
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect x="1" y="1" width="8" height="8" rx="1" stroke="white" stroke-width="1.5" fill="none"/>
@@ -126,8 +139,79 @@
         <div id="qrUrl" style="font-size:10px;color:var(--muted);margin-top:10px;word-break:break-all;width:168px"></div>
       </div>
     </div>
+    </div>
   </div>
 </header>
+
+<!-- Help Modal -->
+<div class="modal-backdrop" id="helpBackdrop" onclick="if(event.target===this)toggleHelp()">
+  <div class="help-modal">
+    <button class="modal-close" onclick="toggleHelp()">✕</button>
+    <h2 style="font-size:15px;font-weight:700;margin-bottom:4px">API — Register an App</h2>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:20px">Copy and give to AI or run in terminal. One POST auto-creates: port, Caddy proxy, LaunchAgent, health check, and log path.</p>
+
+    <div class="help-section">
+      <div class="help-label">Minimal (just id + path)</div>
+      <div class="help-code" id="helpMin">curl -X POST http://localhost:9876/api/apps \
+  -H "Content-Type: application/json" \
+  -d '{"id":"APP_NAME","localPath":"/Users/USERNAME/Sites/APP_NAME"}'<button class="copy-all" onclick="copyBlock('helpMin',this)">Copy</button></div>
+    </div>
+
+    <div class="help-section">
+      <div class="help-label">Full (override port, start command, repo)</div>
+      <div class="help-code" id="helpFull">curl -X POST http://localhost:9876/api/apps \
+  -H "Content-Type: application/json" \
+  -d '{
+  "id": "APP_NAME",
+  "name": "APP_NAME",
+  "localUrl": "http://localhost:PORT",
+  "localPath": "/Users/USERNAME/Sites/APP_NAME",
+  "repo": "https://github.com/USERNAME/APP_NAME",
+  "startCommand": "npm run dev"
+}'<button class="copy-all" onclick="copyBlock('helpFull',this)">Copy</button></div>
+    </div>
+
+    <div class="help-section">
+      <div class="help-label">AI Instruction (copy this to any AI)</div>
+      <div class="help-code" id="helpAI">Register this app with my local apps-monitor by making a POST request:
+
+POST http://localhost:9876/api/apps
+Content-Type: application/json
+
+Required fields:
+- "id": app name (lowercase, kebab-case)
+- "localPath": absolute path to the project root
+
+Optional fields (auto-generated if omitted):
+- "localUrl": defaults to next available port (http://localhost:PORT)
+- "healthUrl": defaults to localUrl
+- "repo": GitHub URL
+- "startCommand": defaults to "npm run dev" (also supports "npm start", "bun dev", etc.)
+- "logPath": defaults to /tmp/{id}.log
+
+The monitor will automatically:
+1. Assign a dedicated port if not provided
+2. Create a Caddy reverse proxy at http://{id}.localhost
+3. Create a macOS LaunchAgent plist
+4. Begin health-checking every 10 seconds
+
+Example:
+curl -X POST http://localhost:9876/api/apps \
+  -H "Content-Type: application/json" \
+  -d '{"id":"my-app","localPath":"/Users/me/Sites/my-app"}'<button class="copy-all" onclick="copyBlock('helpAI',this)">Copy</button></div>
+    </div>
+
+    <div class="help-section">
+      <div class="help-label">Other endpoints</div>
+      <div class="help-desc" style="font-family:'SF Mono','Fira Code',monospace">
+GET &nbsp;&nbsp;&nbsp;/api/apps &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;— list all apps<br>
+GET &nbsp;&nbsp;&nbsp;/api/apps/:id &nbsp;&nbsp;&nbsp;— get one app<br>
+PUT &nbsp;&nbsp;&nbsp;/api/apps/:id &nbsp;&nbsp;&nbsp;— update app<br>
+DELETE /api/apps/:id &nbsp;&nbsp;&nbsp;— remove app + teardown infra
+      </div>
+    </div>
+  </div>
+</div>
 
 <main>
   <div class="wrap">
@@ -378,6 +462,21 @@ document.addEventListener('click', e => {
     btn.style.opacity = '0.35';
   }
 });
+
+// --- Help modal ---
+function toggleHelp() {
+  document.getElementById('helpBackdrop').classList.toggle('open');
+}
+function copyBlock(id, btn) {
+  const el = document.getElementById(id);
+  const text = el.textContent.replace(/Copy$/, '').trim();
+  const orig = btn.textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = orig, 1500); });
+  } else {
+    fallbackCopy(text, () => { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = orig, 1500); });
+  }
+}
 
 load();
 setInterval(load, 15000);

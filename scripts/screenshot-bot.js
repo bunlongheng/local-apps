@@ -15,7 +15,7 @@ const fs   = require('fs');
 const path = require('path');
 
 const ROOT        = path.join(__dirname, '..');
-const CONFIG_FILE = path.join(ROOT, 'apps.config.json');
+const db          = require(path.join(ROOT, 'db'));
 const CREDS_FILE  = path.join(__dirname, 'screenshot-credentials.json');
 const RULES_FILE  = path.join(__dirname, 'screenshot-rules.json');
 const OUT_DIR     = path.join(ROOT, 'public', 'screenshots');
@@ -751,7 +751,7 @@ async function runApp(browser, cfg, creds, rules) {
 // ─── main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+  const config = db.getApps();
   const creds  = fs.existsSync(CREDS_FILE) ? JSON.parse(fs.readFileSync(CREDS_FILE, 'utf8')) : {};
   const rules  = fs.existsSync(RULES_FILE) ? JSON.parse(fs.readFileSync(RULES_FILE, 'utf8')) : {};
 
