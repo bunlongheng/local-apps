@@ -10,9 +10,10 @@
  * Credentials: scripts/screenshot-credentials.json
  */
 
-const { chromium } = require('playwright');
+const { chromium, devices } = require('playwright');
 const fs   = require('fs');
 const path = require('path');
+const sharp = require('sharp');
 
 const ROOT        = path.join(__dirname, '..');
 const db          = require(path.join(ROOT, 'db'));
@@ -20,7 +21,10 @@ const CREDS_FILE  = path.join(__dirname, 'screenshot-credentials.json');
 const RULES_FILE  = path.join(__dirname, 'screenshot-rules.json');
 const OUT_DIR     = path.join(ROOT, 'public', 'screenshots');
 const TEST_STAMP  = `bot-${Date.now()}`;
-const VIEWPORT    = { width: 1920, height: 1080 };
+const VIEWPORT_DESKTOP = { width: 1920, height: 1080 };
+const VIEWPORT_MOBILE  = { width: 390,  height: 844  };
+const SCALE_DESKTOP    = 2;
+const SCALE_MOBILE     = 3;
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -34,10 +38,10 @@ async function unlockScroll(page) {
   });
 }
 
-async function shot(page, dir, filename, rules = {}) {
-  if (rules.fixOverflow) await unlockScroll(page);
+async function shot(page, dir, filename, rules = {}, fullPage = true) {
+  if (rules.fixOverflow && fullPage) await unlockScroll(page);
   const file = path.join(dir, filename);
-  await page.screenshot({ path: file, fullPage: true });
+  await page.screenshot({ path: file, fullPage });
   console.log(`    📸  ${filename}`);
 }
 
@@ -52,6 +56,57 @@ async function waitReady(page) {
 
 async function isVisible(locator) {
   return locator.isVisible({ timeout: 1500 }).catch(() => false);
+}
+
+// ─── device framing ──────────────────────────────────────────────────────────
+
+const FRAMES_DIR   = path.join(__dirname, 'frames');
+const IPHONE_FRAME = path.join(FRAMES_DIR, 'iphone.png');
+const MACBOOK_FRAME= path.join(FRAMES_DIR, 'macbook.png');
+
+// iPhone 15 Pro Max frame: 1490x2996, screen area x=99 y=243 w=1290 h=2653
+const IPHONE_SCREEN = { x: 99, y: 243, w: 1290, h: 2653 };
+// MacBook Air 13 frame: 3260x2164, screen area x=350 y=306 w=2560 h=1608
+const MACBOOK_SCREEN = { x: 350, y: 306, w: 2560, h: 1608 };
+
+async function addIPhoneFrame(inputPath, outputPath) {
+  const { x, y, w, h } = IPHONE_SCREEN;
+  // Resize screenshot to exactly fit the screen area
+  const screen = await sharp(inputPath)
+    .resize(w, h, { fit: 'cover', position: 'top' })
+    .png().toBuffer();
+
+  await sharp(IPHONE_FRAME)
+    .composite([{ input: screen, top: y, left: x }])
+    .png().toFile(outputPath);
+}
+
+async function addMacBookFrame(inputPath, outputPath) {
+  const { x, y, w, h } = MACBOOK_SCREEN;
+  // Resize screenshot to fit screen area (cover from top)
+  const screen = await sharp(inputPath)
+    .resize(w, h, { fit: 'cover', position: 'top' })
+    .png().toBuffer();
+
+  await sharp(MACBOOK_FRAME)
+    .composite([{ input: screen, top: y, left: x }])
+    .png().toFile(outputPath);
+}
+
+async function frameAll(srcDir, dstDir, type) {
+  ensureDir(dstDir);
+  const pngs = fs.readdirSync(srcDir).filter(f => f.endsWith('.png')).sort();
+  for (const f of pngs) {
+    const src = path.join(srcDir, f);
+    const dst = path.join(dstDir, f);
+    try {
+      if (type === 'iphone') await addIPhoneFrame(src, dst);
+      else                   await addMacBookFrame(src, dst);
+    } catch (err) {
+      console.log(`    ✗   frame ${f}: ${err.message.slice(0, 60)}`);
+    }
+  }
+  console.log(`    🖼   ${pngs.length} ${type} frame(s) → ${path.basename(dstDir)}/`);
 }
 
 // ─── login ──────────────────────────────────────────────────────────────────
@@ -657,95 +712,118 @@ async function flow3piPoc(page, appDir) {
 
 // ─── per-app runner ──────────────────────────────────────────────────────────
 
-async function runApp(browser, cfg, creds, rules) {
-  const appDir = path.join(OUT_DIR, cfg.id);
-  ensureDir(appDir);
+async function runMode(browser, cfg, creds, rules, modeDir, isM) {
+  ensureDir(modeDir);
 
-  const viewport = rules?.viewport ? { width: rules.viewport[0], height: rules.viewport[1] } : VIEWPORT;
-  const ctx  = await browser.newContext({ viewport, deviceScaleFactor: 2 });
+  const fullPage = !isM;
+  const viewport = isM ? VIEWPORT_MOBILE
+    : (rules?.viewport ? { width: rules.viewport[0], height: rules.viewport[1] } : VIEWPORT_DESKTOP);
+  const scale    = isM ? SCALE_MOBILE : SCALE_DESKTOP;
+
+  const ctxOpts = { viewport, deviceScaleFactor: scale };
+  if (isM) {
+    ctxOpts.isMobile  = true;
+    ctxOpts.hasTouch  = true;
+    ctxOpts.userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+  }
+
+  const ctx  = await browser.newContext(ctxOpts);
   const page = await ctx.newPage();
-
-  // suppress console noise
   page.on('console', () => {});
 
-  console.log(`\n  ▶  ${cfg.id}  (${cfg.localUrl})`);
-
-  // Custom flows for apps that need special showcase treatment
   const customFlows = { diagrams: flowDiagrams, mindmaps: flowMindmaps, '3pi-poc': flow3piPoc, stickies: flowStickies, 'drop-web': flowDropWeb, '3pi': flow3pi };
 
   try {
     if (customFlows[cfg.id]) {
-      await customFlows[cfg.id](page, appDir, creds);
-      // Write index and return
-      const shotsCustom = fs.readdirSync(appDir).filter(f => f.endsWith('.png')).sort();
-      fs.writeFileSync(
-        path.join(appDir, 'index.json'),
-        JSON.stringify({ id: cfg.id, name: cfg.name, capturedAt: new Date().toISOString(), screenshots: shotsCustom }, null, 2)
-      );
-      console.log(`    ✓   ${shotsCustom.length} screenshot(s) saved`);
-      return;
-    }
+      await customFlows[cfg.id](page, modeDir, creds);
+    } else {
+      // 1. Landing
+      await page.goto(cfg.localUrl, { waitUntil: 'domcontentloaded', timeout: 12000 });
+      await waitReady(page);
+      if (rules?.extraWait) await page.waitForTimeout(rules.extraWait);
+      await shot(page, modeDir, '01-landing.png', rules, fullPage);
 
-    // 1. Landing
-    await page.goto(cfg.localUrl, { waitUntil: 'domcontentloaded', timeout: 12000 });
-    await waitReady(page);
-    if (rules?.extraWait) await page.waitForTimeout(rules.extraWait);
-    await shot(page, appDir, '01-landing.png', rules);
+      // 2. Login
+      const loggedIn = await tryLogin(page, creds, modeDir);
+      if (creds && !loggedIn) console.log('    ⚠️   login form not detected — continuing as guest');
+      if (!loggedIn) await shot(page, modeDir, '03-after-login.png', rules, fullPage);
 
-    // 2. Login
-    const loggedIn = await tryLogin(page, creds, appDir);
-    if (creds && !loggedIn) console.log('    ⚠️   login form not detected — continuing as guest');
+      // 3. Nav crawl + CRUD
+      await page.waitForTimeout(rules?.navWait ?? 1500);
+      const navLinks = await getNavLinks(page, cfg.localUrl, rules?.navSelector);
+      const visited  = new Set([page.url()]);
+      let   navIdx   = 4;
 
-    // 3. Snapshot after-login state if no login detected
-    if (!loggedIn) await shot(page, appDir, '03-after-login.png', rules);
+      console.log(`    🔗  ${navLinks.length} nav link(s) found`);
 
-    // 4. Nav crawl + CRUD
-    await page.waitForTimeout(rules?.navWait ?? 1500);
-    const navLinks  = await getNavLinks(page, cfg.localUrl, rules?.navSelector);
-    const visited   = new Set([page.url()]);
-    let   navIdx    = 4;
+      for (const { href, text } of navLinks) {
+        const canonical = href.split('?')[0];
+        if (visited.has(canonical)) continue;
+        if (rules?.skipPages?.some(p => href.includes(p))) { console.log(`    ⏭   skip: ${text}`); continue; }
+        visited.add(canonical);
 
-    console.log(`    🔗  ${navLinks.length} nav link(s) found`);
+        try {
+          await page.goto(href, { waitUntil: 'domcontentloaded', timeout: rules?.pageTimeout ?? 10000 });
+          await page.waitForLoadState('networkidle', { timeout: 60000 }).catch(() => {});
 
-    for (const { href, text } of navLinks) {
-      const canonical = href.split('?')[0];
-      if (visited.has(canonical)) continue;
-      if (rules?.skipPages?.some(p => href.includes(p))) { console.log(`    ⏭   skip: ${text}`); continue; }
-      visited.add(canonical);
+          const n      = String(navIdx).padStart(2, '0');
+          const prefix = `${n}-nav-${slug(text)}`;
+          await shot(page, modeDir, `${prefix}.png`, rules, fullPage);
 
-      try {
-        await page.goto(href, { waitUntil: 'domcontentloaded', timeout: rules?.pageTimeout ?? 10000 });
-        await page.waitForLoadState('networkidle', { timeout: 60000 }).catch(() => {});
+          if (!isM) {
+            const crud = await tryCRUD(page, modeDir, prefix);
+            if (crud.length) console.log(`    ✱   CRUD on ${text}: [${crud.join(',')}]`);
+          }
 
-        const n      = String(navIdx).padStart(2, '0');
-        const name   = slug(text);
-        const prefix = `${n}-nav-${name}`;
-
-        await shot(page, appDir, `${prefix}.png`, rules);
-
-        const crud = await tryCRUD(page, appDir, prefix);
-        if (crud.length) console.log(`    ✱   CRUD on ${text}: [${crud.join(',')}]`);
-
-        navIdx++;
-      } catch (err) {
-        console.log(`    ✗   ${text}: ${err.message.slice(0, 70)}`);
+          navIdx++;
+        } catch (err) {
+          console.log(`    ✗   ${text}: ${err.message.slice(0, 70)}`);
+        }
       }
     }
 
-    // 5. Write index
-    const shots = fs.readdirSync(appDir).filter(f => f.endsWith('.png')).sort();
-    fs.writeFileSync(
-      path.join(appDir, 'index.json'),
-      JSON.stringify({ id: cfg.id, name: cfg.name, capturedAt: new Date().toISOString(), screenshots: shots }, null, 2)
-    );
-
-    console.log(`    ✓   ${shots.length} screenshot(s) saved`);
+    const shots = fs.readdirSync(modeDir).filter(f => f.endsWith('.png')).sort();
+    console.log(`    ✓   ${shots.length} shot(s) → ${path.basename(modeDir)}/`);
+    return shots;
 
   } catch (err) {
-    console.log(`    ✗   fatal: ${err.message.slice(0, 100)}`);
+    console.log(`    ✗   fatal [${path.basename(modeDir)}]: ${err.message.slice(0, 100)}`);
+    const saved = fs.readdirSync(modeDir).filter(f => f.endsWith('.png')).sort();
+    return saved;
   } finally {
     await ctx.close();
   }
+}
+
+async function runApp(browser, cfg, creds, rules) {
+  const appDir = path.join(OUT_DIR, cfg.id);
+  ensureDir(appDir);
+
+  console.log(`\n  ▶  ${cfg.id}  (${cfg.localUrl})`);
+
+  const desktopDir        = path.join(appDir, 'desktop');
+  const desktopFramedDir  = path.join(appDir, 'desktop-framed');
+  const mobileDir         = path.join(appDir, 'mobile');
+  const mobileFramedDir   = path.join(appDir, 'mobile-framed');
+
+  // Desktop
+  console.log(`    🖥   desktop`);
+  const desktopShots = await runMode(browser, cfg, creds, rules, desktopDir, false);
+  await frameAll(desktopDir, desktopFramedDir, 'macbook');
+
+  // Mobile
+  console.log(`    📱   mobile`);
+  const mobileShots = await runMode(browser, cfg, creds, rules, mobileDir, true);
+  await frameAll(mobileDir, mobileFramedDir, 'iphone');
+
+  // Master index
+  fs.writeFileSync(
+    path.join(appDir, 'index.json'),
+    JSON.stringify({
+      id: cfg.id, name: cfg.name, capturedAt: new Date().toISOString(),
+      desktop: desktopShots, mobile: mobileShots,
+    }, null, 2)
+  );
 }
 
 // ─── main ────────────────────────────────────────────────────────────────────

@@ -254,6 +254,14 @@ async function checkAll() {
 app.get('/api/status', (req, res) => {
   const apps = db.getApps().map(a => {
     const s = getState(a.id);
+    const ssIndex = path.join(__dirname, 'public', 'screenshots', a.id, 'index.json');
+    let hasScreenshots = false;
+    if (fs.existsSync(ssIndex)) {
+      try {
+        const idx = JSON.parse(fs.readFileSync(ssIndex, 'utf8'));
+        hasScreenshots = (idx.desktop?.length > 0) || (idx.mobile?.length > 0);
+      } catch {}
+    }
     return {
       id: a.id,
       name: a.name,
@@ -269,6 +277,7 @@ app.get('/api/status', (req, res) => {
       localPath: a.localPath || null,
       logPath: a.logPath || null,
       hostname: os.hostname(),
+      hasScreenshots,
     };
   });
   res.json({ apps, lanIp: LAN_IP, monitorUrl: `http://${LAN_IP}:${PORT}` });
@@ -368,7 +377,53 @@ app.post('/api/start/:id', (req, res) => {
   }
 });
 
-// --- File watcher (public dir only) ---
+// --- Screenshot management ---
+
+// Delete a screenshot file and remove it from index.json
+app.delete('/api/screenshot', express.json(), (req, res) => {
+  const { appId, mode, filename } = req.body || {}
+  if (!appId || !mode || !filename) return res.status(400).json({ error: 'missing fields' })
+  // Safety: only allow filenames, no path traversal
+  if (filename.includes('/') || filename.includes('..')) return res.status(400).json({ error: 'invalid filename' })
+  const filePath = path.join(__dirname, 'public', 'screenshots', appId, mode, filename)
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+  // Remove from index.json
+  const idxPath = path.join(__dirname, 'public', 'screenshots', appId, 'index.json')
+  if (fs.existsSync(idxPath)) {
+    try {
+      const idx = JSON.parse(fs.readFileSync(idxPath, 'utf8'))
+      if (Array.isArray(idx[mode])) {
+        idx[mode] = idx[mode].filter(f => f !== filename)
+        fs.writeFileSync(idxPath, JSON.stringify(idx, null, 2))
+      }
+    } catch {}
+  }
+  res.json({ ok: true })
+})
+
+// Toggle retake flag — stored in screenshots/<appId>/retake.json
+app.post('/api/retake', express.json(), (req, res) => {
+  const { appId, mode, filename } = req.body || {}
+  if (!appId || !mode || !filename) return res.status(400).json({ error: 'missing fields' })
+  const retakePath = path.join(__dirname, 'public', 'screenshots', appId, 'retake.json')
+  let retake = {}
+  try { if (fs.existsSync(retakePath)) retake = JSON.parse(fs.readFileSync(retakePath, 'utf8')) } catch {}
+  const key = `${mode}/${filename}`
+  if (retake[key]) delete retake[key]; else retake[key] = true
+  fs.writeFileSync(retakePath, JSON.stringify(retake, null, 2))
+  res.json({ marked: !!retake[key] })
+})
+
+// Get retake list for an app
+app.get('/api/retake/:appId', (req, res) => {
+  const retakePath = path.join(__dirname, 'public', 'screenshots', req.params.appId, 'retake.json')
+  try {
+    const data = fs.existsSync(retakePath) ? JSON.parse(fs.readFileSync(retakePath, 'utf8')) : {}
+    res.json(data)
+  } catch { res.json({}) }
+})
+
+// --- File watcher ---
 let reloadTimer = null;
 fs.watch(path.join(__dirname, 'public'), { recursive: true }, () => {
   clearTimeout(reloadTimer);
