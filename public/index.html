@@ -291,7 +291,9 @@ async function load() {
     const hostname = data.apps[0]?.hostname || '—';
     const model = data.machineModel || '';
     // Hostname as title, IP below
-    document.getElementById('machineTitle').textContent = hostname.replace('.local', '');
+    const shortHost = hostname.replace('.local', '');
+    document.getElementById('machineTitle').textContent = shortHost;
+    document.title = shortHost + ' — Local Apps';
     document.getElementById('machineInfo').textContent = data.lanIp;
     // Device icon
     const deviceMap = { 'mac mini': 'mac-mini', 'macbook pro': 'macbook-pro', 'macbook air': 'macbook-air' };
