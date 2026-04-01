@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Screenshots Gallery</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #20243a;
+    --border: #2a2d3e;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --accent: #6366f1;
+    --accent2: #818cf8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Header */
+  header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  header h1 { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+  .back-link { color: var(--muted); text-decoration: none; font-size: 11px; display: flex; align-items: center; gap: 5px; transition: color 0.15s; }
+  .back-link:hover { color: var(--text); }
+
+  /* Layout */
+  .layout { display: flex; flex: 1; overflow: hidden; }
+
+  /* Sidebar */
+  .sidebar { width: 200px; flex-shrink: 0; border-right: 1px solid var(--border); overflow-y: auto; padding: 12px 8px; }
+  .sidebar-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); padding: 6px 8px 4px; font-weight: 600; }
+  .app-item { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 8px; cursor: pointer; transition: background 0.1s; border: 1px solid transparent; }
+  .app-item:hover { background: var(--surface); }
+  .app-item.active { background: var(--surface2); border-color: var(--border); }
+  .app-item img { width: 20px; height: 20px; border-radius: 4px; object-fit: contain; flex-shrink: 0; }
+  .app-item .app-label { font-size: 12px; font-weight: 500; }
+  .app-item .shot-count { font-size: 10px; color: var(--muted); margin-left: auto; }
+  .dot-s { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .dot-s.up { background: #22c55e; box-shadow: 0 0 4px #22c55e; }
+  .dot-s.down { background: #ef4444; }
+  .dot-s.unknown { background: var(--muted); }
+
+  /* Main content */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Mode tabs */
+  .tabs { display: flex; gap: 4px; padding: 12px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; align-items: center; }
+  .tab { background: none; border: 1px solid var(--border); color: var(--muted); font-family: inherit; font-size: 11px; padding: 5px 14px; border-radius: 6px; cursor: pointer; transition: all 0.12s; letter-spacing: 0.02em; }
+  .tab:hover { border-color: var(--text); color: var(--text); }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .tab-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+  .count-badge { font-size: 10px; color: var(--muted); margin-left: auto; }
+
+  /* Grid */
+  .grid-wrap { flex: 1; overflow-y: auto; padding: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .thumb { border-radius: 8px; overflow: hidden; cursor: pointer; border: 1px solid var(--border); transition: all 0.15s; background: var(--surface); position: relative; }
+  .thumb:hover { border-color: var(--accent2); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+  .thumb img { width: 100%; display: block; object-fit: cover; aspect-ratio: 16/10; background: #111; }
+  .thumb.mobile-thumb img { aspect-ratio: 9/19.5; }
+  .thumb.framed-mobile img { aspect-ratio: 9/20; object-fit: contain; background: #0a0a0a; }
+  .thumb.framed-desktop img { aspect-ratio: 16/10; object-fit: contain; background: #fff; }
+  .thumb-label { padding: 8px 10px; font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 1px solid var(--border); }
+  .thumb.retake { border-color: #f59e0b !important; }
+  .thumb-actions { display: none; position: absolute; top: 6px; right: 6px; gap: 5px; flex-direction: column; z-index: 2; }
+  .thumb:hover .thumb-actions { display: flex; }
+  .act-btn { border: none; border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; transition: background .12s; }
+  .act-retake { background: rgba(15,17,23,.82); color: #94a3b8; }
+  .act-retake:hover { background: #78350f; color: #fbbf24; }
+  .act-retake.on { background: #78350f; color: #fbbf24; }
+  .act-delete { background: rgba(15,17,23,.82); color: #94a3b8; }
+  .act-delete:hover { background: #450a0a; color: #f87171; }
+  .retake-badge { display: none; position: absolute; top: 6px; left: 6px; background: #f59e0b; color: #000; font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 5px; letter-spacing: .04em; pointer-events: none; z-index: 2; }
+  .thumb.retake .retake-badge { display: block; }
+
+  /* Empty state */
+  .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: var(--muted); gap: 10px; }
+  .empty .icon { font-size: 40px; opacity: 0.3; }
+
+  /* Lightbox */
+  .lb { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 1000; flex-direction: column; align-items: center; justify-content: center; }
+  .lb.open { display: flex; }
+  .lb-img-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: hidden; width: 100%; position: relative; }
+  .lb-img-wrap img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px; box-shadow: 0 0 80px rgba(0,0,0,0.8); display: block; }
+  .lb-bar { height: 52px; flex-shrink: 0; width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-top: 1px solid rgba(255,255,255,0.08); }
+  .lb-name { font-size: 12px; color: var(--muted); }
+  .lb-counter { font-size: 11px; color: var(--muted); }
+  .lb-close { position: fixed; top: 16px; right: 20px; background: rgba(255,255,255,0.1); border: none; color: #fff; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: background 0.15s; z-index: 10; }
+  .lb-close:hover { background: rgba(255,255,255,0.2); }
+  .lb-arrow { position: fixed; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #fff; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: background 0.15s; z-index: 10; }
+  .lb-arrow:hover { background: rgba(255,255,255,0.18); }
+  .lb-arrow.prev { left: 16px; }
+  .lb-arrow.next { right: 16px; }
+  .lb-arrow:disabled { opacity: 0.2; cursor: default; }
+  .lb-arrow:disabled:hover { background: rgba(255,255,255,0.08); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📸 Screenshots Gallery</h1>
+  <a href="/" class="back-link">← Monitor</a>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-label">Apps</div>
+    <div id="appList"></div>
+  </aside>
+
+  <div class="main">
+    <div class="tabs" id="tabBar">
+      <button class="tab active" data-mode="desktop"         onclick="setMode('desktop')">🖥 Desktop</button>
+      <button class="tab"        data-mode="desktop-framed"  onclick="setMode('desktop-framed')">💻 MacBook</button>
+      <div class="tab-sep"></div>
+      <button class="tab"        data-mode="mobile"          onclick="setMode('mobile')">📱 Mobile</button>
+      <button class="tab"        data-mode="mobile-framed"   onclick="setMode('mobile-framed')">iPhone</button>
+      <span class="count-badge" id="countBadge"></span>
+    </div>
+    <div class="grid-wrap" id="gridWrap">
+      <div class="empty"><div class="icon">🖼</div><div>Select an app to view screenshots</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lb" id="lb">
+  <button class="lb-close" onclick="closeLb()">✕</button>
+  <button class="lb-arrow prev" id="lbPrev" onclick="lbNav(-1)">‹</button>
+  <div class="lb-img-wrap"><img id="lbImg" src="" alt=""></div>
+  <button class="lb-arrow next" id="lbNext" onclick="lbNav(1)">›</button>
+  <div class="lb-bar">
+    <span class="lb-name" id="lbName"></span>
+    <span class="lb-counter" id="lbCounter"></span>
+  </div>
+</div>
+
+<script>
+const FAVICONS = {
+  'bheng':       '/favicons/bheng.png',
+  'diagrams':    '/favicons/diagrams.svg',
+  'stickies':    '/favicons/stickies.png',
+  'mindmaps':    '/favicons/mindmaps.svg',
+  '3pi-poc':     '/favicons/3pi-poc.png',
+  '3pi':         '/favicons/3pi.svg',
+  'drop':        '/favicons/drop.svg',
+  'drop-web':    '/favicons/drop.svg',
+  'claude':      '/favicons/claude-mascot.svg',
+  'claude-live': '/favicons/claude-live.svg',
+  'recap':       '/favicons/recap.svg',
+  'tools':       '/favicons/tools.svg',
+};
+
+let allApps = [];
+let appData = {};   // id → index.json data
+let retakeData = {}; // id → retake.json data  { "mode/filename": true }
+let currentApp = null;
+let currentMode = 'desktop';
+let currentShots = [];
+let lbIdx = 0;
+
+async function init() {
+  // Load master index
+  const idx = await fetch('/screenshots/index.json').then(r => r.json()).catch(() => []);
+  // Load status to get dot colors
+  const status = await fetch('/api/status').then(r => r.json()).catch(() => ({ apps: [] }));
+  const statusMap = {};
+  (status.apps || []).forEach(a => statusMap[a.id] = a.status);
+
+  allApps = Array.isArray(idx) ? idx : [];
+
+  // Load each app's index + retake list
+  await Promise.all(allApps.map(async a => {
+    try {
+      const d = await fetch(`/screenshots/${a.id}/index.json`).then(r => r.json());
+      appData[a.id] = d;
+    } catch {}
+    try {
+      const r = await fetch(`/api/retake/${a.id}`).then(r => r.json());
+      retakeData[a.id] = r;
+    } catch { retakeData[a.id] = {}; }
+  }));
+
+  renderSidebar(statusMap);
+
+  // Auto-select from ?app= param or first app
+  const paramApp = new URLSearchParams(location.search).get('app');
+  const defaultApp = paramApp && allApps.find(a => a.id === paramApp) ? paramApp : (allApps[0]?.id);
+  if (defaultApp) selectApp(defaultApp);
+}
+
+function renderSidebar(statusMap) {
+  const list = document.getElementById('appList');
+  list.innerHTML = allApps.map(a => {
+    const data = appData[a.id] || {};
+    const shots = (data.desktop || data.screenshots || []).length + (data.mobile || []).length;
+    const favicon = FAVICONS[a.id] ? `<img src="${FAVICONS[a.id]}" onerror="this.style.display='none'">` : '';
+    const dot = statusMap[a.id] || 'unknown';
+    return `<div class="app-item" id="app-${a.id}" onclick="selectApp('${a.id}')">
+      ${favicon}
+      <span class="app-label">${a.id}</span>
+      <span class="shot-count">${shots || ''}</span>
+    </div>`;
+  }).join('');
+}
+
+function selectApp(id) {
+  currentApp = id;
+  document.querySelectorAll('.app-item').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById('app-' + id);
+  if (el) { el.classList.add('active'); el.scrollIntoView({ block: 'nearest' }); }
+  renderGrid();
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  renderGrid();
+}
+
+function isNewFormat(id) {
+  const data = appData[id];
+  return data && (data.desktop || data.mobile);
+}
+
+function getShots(id, mode) {
+  const data = appData[id];
+  if (!data) return [];
+  if (isNewFormat(id)) {
+    if (mode === 'desktop')        return data.desktop || [];
+    if (mode === 'mobile')         return data.mobile  || [];
+    if (mode === 'desktop-framed') return data.desktop || [];
+    if (mode === 'mobile-framed')  return data.mobile  || [];
+    return [];
+  }
+  // Flat/legacy format — everything is "desktop"
+  if (mode === 'desktop') return data.screenshots || [];
+  return [];
+}
+
+function shotUrl(id, mode, filename) {
+  if (isNewFormat(id)) return `/screenshots/${id}/${mode}/${filename}`;
+  // Flat format — files are directly in the app folder
+  return `/screenshots/${id}/${filename}`;
+}
+
+function renderGrid() {
+  if (!currentApp) return;
+
+  // Show/hide tabs based on format
+  const newFmt = isNewFormat(currentApp);
+  document.querySelectorAll('.tab[data-mode="mobile"], .tab[data-mode="mobile-framed"], .tab[data-mode="desktop-framed"], .tab-sep').forEach(el => {
+    el.style.display = newFmt ? '' : 'none';
+  });
+  if (!newFmt && currentMode !== 'desktop') { currentMode = 'desktop'; document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.mode === 'desktop')); }
+
+  const shots = getShots(currentApp, currentMode);
+  currentShots = shots;
+
+  document.getElementById('countBadge').textContent = shots.length ? `${shots.length} shots` : '';
+
+  const wrap = document.getElementById('gridWrap');
+  if (!shots.length) {
+    wrap.innerHTML = `<div class="empty"><div class="icon">📂</div><div>No screenshots for this mode</div></div>`;
+    return;
+  }
+
+  const isMobile = currentMode.includes('mobile');
+  const isFramed = currentMode.includes('framed');
+  const cls = isFramed && isMobile ? 'framed-mobile' : isFramed ? 'framed-desktop' : isMobile ? 'mobile-thumb' : '';
+
+  const rt = retakeData[currentApp] || {};
+  wrap.innerHTML = `<div class="grid">${shots.map((f, i) => {
+    const key = `${currentMode}/${f}`;
+    const isRetake = !!rt[key];
+    return `
+    <div class="thumb ${cls}${isRetake ? ' retake' : ''}" id="thumb-${i}">
+      <span class="retake-badge">RETAKE</span>
+      <img src="${shotUrl(currentApp, currentMode, f)}" loading="lazy" alt="${f}"
+        onerror="this.parentElement.style.display='none'"
+        onclick="openLb(${i})" style="cursor:pointer">
+      <div class="thumb-actions">
+        <button class="act-btn act-retake${isRetake ? ' on' : ''}" title="Mark for retake"
+          onclick="toggleRetake(${i},'${f}',this)">↩</button>
+        <button class="act-btn act-delete" title="Delete"
+          onclick="deletShot(${i},'${f}')">✕</button>
+      </div>
+      <div class="thumb-label" onclick="openLb(${i})">${f.replace('.png', '')}</div>
+    </div>`}).join('')}</div>`;
+}
+
+// Lightbox
+function openLb(idx) {
+  lbIdx = idx;
+  updateLb();
+  document.getElementById('lb').classList.add('open');
+}
+
+function updateLb() {
+  const shots = currentShots;
+  const f = shots[lbIdx];
+  document.getElementById('lbImg').src = shotUrl(currentApp, currentMode, f);
+  document.getElementById('lbName').textContent = f;
+  document.getElementById('lbCounter').textContent = `${lbIdx + 1} / ${shots.length}`;
+  document.getElementById('lbPrev').disabled = lbIdx === 0;
+  document.getElementById('lbNext').disabled = lbIdx === shots.length - 1;
+}
+
+function lbNav(dir) {
+  lbIdx = Math.max(0, Math.min(currentShots.length - 1, lbIdx + dir));
+  updateLb();
+}
+
+function closeLb() {
+  document.getElementById('lb').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => {
+  const lb = document.getElementById('lb');
+  if (!lb.classList.contains('open')) return;
+  if (e.key === 'Escape')      closeLb();
+  if (e.key === 'ArrowLeft')   lbNav(-1);
+  if (e.key === 'ArrowRight')  lbNav(1);
+});
+
+async function toggleRetake(i, filename, btn) {
+  const r = await fetch('/api/retake', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ appId: currentApp, mode: currentMode, filename })
+  }).then(r => r.json()).catch(() => ({}));
+  const marked = !!r.marked;
+  if (!retakeData[currentApp]) retakeData[currentApp] = {};
+  const key = `${currentMode}/${filename}`;
+  if (marked) retakeData[currentApp][key] = true; else delete retakeData[currentApp][key];
+  const card = document.getElementById('thumb-' + i);
+  if (card) card.classList.toggle('retake', marked);
+  btn.classList.toggle('on', marked);
+}
+
+async function deletShot(i, filename) {
+  if (!confirm(`Delete ${filename}?`)) return;
+  await fetch('/api/screenshot', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ appId: currentApp, mode: currentMode, filename })
+  }).catch(() => {});
+  // Remove from local shots list and re-render
+  const data = appData[currentApp];
+  if (data && Array.isArray(data[currentMode])) {
+    data[currentMode] = data[currentMode].filter(f => f !== filename);
+  }
+  renderGrid();
+}
+
+init();
+</script>
+</body>
+</html>
