@@ -154,9 +154,9 @@
         <h1 id="machineTitle" style="color:#fff">Local Apps</h1>
         <div id="machineInfo" style="color:rgba(255,255,255,0.55);font-size:11px;margin-top:2px"></div>
       </div>
-      <a href="/gallery.html" style="font-size:11px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:4px 10px;border-radius:6px;transition:all 0.15s" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--text)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">📸 Gallery</a>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
+      <a href="/gallery.html" class="help-btn" title="Gallery" style="text-decoration:none;font-size:13px">📸</a>
       <a href="/docs" class="help-btn" title="API Docs" style="text-decoration:none;font-size:11px">API</a>
       <button class="help-btn" onclick="toggleHelp()" title="Quick Reference">?</button>
       <div style="position:relative">
@@ -191,36 +191,11 @@
 <div class="modal-backdrop" id="helpBackdrop" onclick="if(event.target===this)toggleHelp()">
   <div class="help-modal">
     <button class="modal-close" onclick="toggleHelp()">✕</button>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-      <h2 style="font-size:15px;font-weight:700">API — Register an App</h2>
-      <button onclick="copyAllPanels(this)" style="background:rgba(255,255,255,0.08);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:11px;padding:5px 14px;border-radius:6px;cursor:pointer;transition:all 0.15s;font-weight:600">Copy All</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h2 style="font-size:15px;font-weight:700">AI Instruction</h2>
+      <button onclick="copyBlock('helpAI',this)" style="background:rgba(255,255,255,0.08);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:11px;padding:5px 14px;border-radius:6px;cursor:pointer;transition:all 0.15s;font-weight:600">Copy</button>
     </div>
-    <p style="font-size:11px;color:var(--muted);margin-bottom:20px">Copy and give to AI or run in terminal. One POST auto-creates: port, Caddy proxy, LaunchAgent, health check, and log path.</p>
-
-    <div class="help-section">
-      <div class="help-label">Minimal (just id + path)</div>
-      <div class="help-code" id="helpMin">curl -X POST http://localhost:9876/api/apps \
-  -H "Content-Type: application/json" \
-  -d '{"id":"APP_NAME","localPath":"/Users/USERNAME/Sites/APP_NAME"}'<button class="copy-all" onclick="copyBlock('helpMin',this)">Copy</button></div>
-    </div>
-
-    <div class="help-section">
-      <div class="help-label">Full (override port, start command, repo)</div>
-      <div class="help-code" id="helpFull">curl -X POST http://localhost:9876/api/apps \
-  -H "Content-Type: application/json" \
-  -d '{
-  "id": "APP_NAME",
-  "name": "APP_NAME",
-  "localUrl": "http://localhost:PORT",
-  "localPath": "/Users/USERNAME/Sites/APP_NAME",
-  "repo": "https://github.com/USERNAME/APP_NAME",
-  "startCommand": "npm run dev"
-}'<button class="copy-all" onclick="copyBlock('helpFull',this)">Copy</button></div>
-    </div>
-
-    <div class="help-section">
-      <div class="help-label">AI Instruction (copy this to any AI)</div>
-      <div class="help-code" id="helpAI">Register this app with my local-apps monitor by making a POST request:
+    <div class="help-code" id="helpAI">Register this app with my local-apps monitor by making a POST request:
 
 POST http://localhost:9876/api/apps
 Content-Type: application/json
@@ -245,18 +220,7 @@ The monitor will automatically:
 Example:
 curl -X POST http://localhost:9876/api/apps \
   -H "Content-Type: application/json" \
-  -d '{"id":"my-app","localPath":"/Users/me/Sites/my-app"}'<button class="copy-all" onclick="copyBlock('helpAI',this)">Copy</button></div>
-    </div>
-
-    <div class="help-section">
-      <div class="help-label">Other endpoints</div>
-      <div class="help-desc" style="font-family:'SF Mono','Fira Code',monospace">
-GET &nbsp;&nbsp;&nbsp;/api/apps &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;— list all apps<br>
-GET &nbsp;&nbsp;&nbsp;/api/apps/:id &nbsp;&nbsp;&nbsp;— get one app<br>
-PUT &nbsp;&nbsp;&nbsp;/api/apps/:id &nbsp;&nbsp;&nbsp;— update app<br>
-DELETE /api/apps/:id &nbsp;&nbsp;&nbsp;— remove app + teardown infra
-      </div>
-    </div>
+  -d '{"id":"my-app","localPath":"/Users/me/Sites/my-app"}'</div>
   </div>
 </div>
 
@@ -725,16 +689,6 @@ function copyBlock(id, btn) {
   } else {
     fallbackCopy(text, () => { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = orig, 1500); });
   }
-}
-function copyAllPanels(btn) {
-  const ids = ['helpMin', 'helpFull', 'helpAI'];
-  const text = ids.map(id => {
-    const el = document.getElementById(id);
-    return el ? el.textContent.replace(/Copy$/, '').trim() : '';
-  }).filter(Boolean).join('\n\n---\n\n');
-  const orig = btn.textContent;
-  const done = () => { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = orig, 1500); };
-  if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done); } else { fallbackCopy(text, done); }
 }
 
 // Boot: restore persisted machine, load machines + status

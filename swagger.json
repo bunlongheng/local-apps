@@ -5,8 +5,7 @@
     "description": "Monitor, manage, and sync local development apps across machines. Provides health checking, Caddy reverse proxy setup, macOS LaunchAgent management, screenshot capture, and cross-machine sync.",
     "version": "1.0.0",
     "contact": {
-      "name": "Bunlong Heng",
-      "url": "https://bheng.dev"
+      "name": "Bunlong Heng"
     }
   },
   "servers": [

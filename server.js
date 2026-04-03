@@ -22,6 +22,7 @@ app.use(express.json());
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc, {
   customCss: `
     .swagger-ui .topbar { display: none }
+    .swagger-ui .models { display: none }
     body { background: #1a1a2e }
     .swagger-ui { font-family: -apple-system, BlinkMacSystemFont, 'SF Mono', monospace }
   `,
