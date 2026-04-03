@@ -35,6 +35,18 @@ db.exec(`
 try { db.exec(`ALTER TABLE apps ADD COLUMN start_command TEXT DEFAULT 'npm run dev'`); } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE apps ADD COLUMN icon TEXT`); } catch { /* already exists */ }
 
+// --- Machines table ---
+db.exec(`
+  CREATE TABLE IF NOT EXISTS machines (
+    id TEXT PRIMARY KEY,
+    hostname TEXT,
+    ip TEXT NOT NULL,
+    port INTEGER DEFAULT 9876,
+    model TEXT,
+    last_seen TEXT DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
 // --- Seed from JSON if DB is empty ---
 const count = db.prepare('SELECT COUNT(*) as n FROM apps').get().n;
 if (count === 0 && fs.existsSync(CONFIG_FILE)) {
@@ -150,4 +162,28 @@ function deleteApp(id) {
   return db.prepare('DELETE FROM apps WHERE id = ?').run(id).changes > 0;
 }
 
-module.exports = { getApps, getApp, upsertApp, deleteApp };
+// --- Machines ---
+function getMachines() {
+  return db.prepare('SELECT * FROM machines ORDER BY rowid').all();
+}
+
+function upsertMachine(data) {
+  db.prepare(`
+    INSERT INTO machines (id, hostname, ip, port, model, last_seen)
+    VALUES (@id, @hostname, @ip, @port, @model, datetime('now'))
+    ON CONFLICT(id) DO UPDATE SET hostname=@hostname, ip=@ip, port=@port, model=@model, last_seen=datetime('now')
+  `).run({
+    id: data.id,
+    hostname: data.hostname || null,
+    ip: data.ip,
+    port: data.port || 9876,
+    model: data.model || null,
+  });
+  return db.prepare('SELECT * FROM machines WHERE id = ?').get(data.id);
+}
+
+function deleteMachine(id) {
+  return db.prepare('DELETE FROM machines WHERE id = ?').run(id).changes > 0;
+}
+
+module.exports = { getApps, getApp, upsertApp, deleteApp, getMachines, upsertMachine, deleteMachine };

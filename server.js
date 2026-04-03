@@ -4,6 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const { execSync, spawn } = require('child_process');
 const QRCode = require('qrcode');
+const swaggerUi = require('swagger-ui-express');
+const swaggerDoc = require('./swagger.json');
 const db = require('./db');
 
 const app = express();
@@ -17,6 +19,14 @@ const NPM_PATH = (() => {
 })();
 
 app.use(express.json());
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc, {
+  customCss: `
+    .swagger-ui .topbar { display: none }
+    body { background: #1a1a2e }
+    .swagger-ui { font-family: -apple-system, BlinkMacSystemFont, 'SF Mono', monospace }
+  `,
+  customSiteTitle: 'Local Apps — API Docs',
+}));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Caddy + /etc/hosts management ---
@@ -261,6 +271,7 @@ async function checkAll() {
 
 // --- Status route (dashboard) ---
 app.get('/api/status', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
   const apps = db.getApps().map(a => {
     const s = getState(a.id);
     const ssIndex = path.join(__dirname, 'public', 'screenshots', a.id, 'index.json');
@@ -432,11 +443,84 @@ app.get('/api/retake/:appId', (req, res) => {
   } catch { res.json({}) }
 })
 
+// --- Machines (peers) ---
+app.get('/api/machines', (req, res) => {
+  res.json(db.getMachines());
+});
+
+app.post('/api/machines', async (req, res) => {
+  let { ip, port = 9876 } = req.body;
+  if (!ip) return res.status(400).json({ error: 'ip is required' });
+  // Clean up: strip protocol, port, trailing slash
+  ip = ip.replace(/^https?:\/\//, '').replace(/:\d+\/?$/, '').replace(/\/+$/, '');
+  const url = `http://${ip}:${port}/api/machine`;
+  try {
+    const info = await new Promise((resolve, reject) => {
+      http.get(url, { timeout: 5000 }, (resp) => {
+        let data = '';
+        resp.on('data', c => data += c);
+        resp.on('end', () => { try { resolve(JSON.parse(data)); } catch { reject(new Error('invalid JSON')); } });
+      }).on('error', reject).on('timeout', function() { this.destroy(); reject(new Error('timeout')); });
+    });
+    const id = info.hostname || ip;
+    const machine = db.upsertMachine({ id, hostname: info.hostname, ip, port, model: info.model });
+    res.json(machine);
+  } catch (err) {
+    // Fallback: try /api/status to get hostname
+    try {
+      const statusUrl = `http://${ip}:${port}/api/status`;
+      const info = await new Promise((resolve, reject) => {
+        http.get(statusUrl, { timeout: 5000 }, (resp) => {
+          let data = '';
+          resp.on('data', c => data += c);
+          resp.on('end', () => { try { resolve(JSON.parse(data)); } catch { reject(new Error('invalid JSON')); } });
+        }).on('error', reject).on('timeout', function() { this.destroy(); reject(new Error('timeout')); });
+      });
+      const hostname = info.apps?.[0]?.hostname || null;
+      const model = info.machineModel || null;
+      const id = hostname || ip;
+      const machine = db.upsertMachine({ id, hostname, ip, port, model });
+      res.json(machine);
+    } catch {
+      const machine = db.upsertMachine({ id: ip, hostname: null, ip, port, model: null });
+      res.json(machine);
+    }
+  }
+});
+
+app.delete('/api/machines/:id', (req, res) => {
+  const ok = db.deleteMachine(req.params.id);
+  res.json({ deleted: ok });
+});
+
+// Proxy: fetch remote machine's /api/status server-side (avoids CORS)
+app.get('/api/machines/:id/status', async (req, res) => {
+  const m = db.getMachines().find(x => x.id === req.params.id);
+  if (!m) return res.status(404).json({ error: 'machine not found' });
+  const url = `http://${m.ip}:${m.port || 9876}/api/status`;
+  try {
+    const data = await new Promise((resolve, reject) => {
+      http.get(url, { timeout: 5000 }, (resp) => {
+        let body = '';
+        resp.on('data', c => body += c);
+        resp.on('end', () => { try { resolve(JSON.parse(body)); } catch { reject(new Error('invalid JSON')); } });
+      }).on('error', reject).on('timeout', function() { this.destroy(); reject(new Error('timeout')); });
+    });
+    const hostname = data.apps?.[0]?.hostname || m.hostname;
+    const model = data.machineModel || m.model;
+    db.upsertMachine({ id: m.id, hostname, ip: m.ip, port: m.port, model });
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: `unreachable: ${err.message}` });
+  }
+});
+
 // --- Machine Sync API ---
 // Each machine exposes its app list + identity. Machines can pull from each other.
 
 // Identity: who is this machine?
 app.get('/api/machine', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
   res.json({
     hostname: os.hostname(),
     model: MACHINE_MODEL,
@@ -580,6 +664,52 @@ app.post('/api/screenshots/:id', (req, res) => {
 app.get('/api/screenshots-status', (req, res) => {
   const jobs = {};
   for (const [id, job] of screenshotJobs) jobs[id] = { startedAt: job.startedAt };
+  res.json(jobs);
+});
+
+// --- Icon Generation API ---
+const iconJobs = new Map();
+
+app.post('/api/generate-icons/:id', (req, res) => {
+  const id = req.params.id;
+  const appCfg = db.getApp(id);
+  if (!appCfg) return res.status(404).json({ error: 'not found' });
+  if (iconJobs.has(id)) return res.json({ status: 'already_running' });
+
+  const proc = spawn('node', [path.join(__dirname, 'scripts', 'generate-favicons.js'), id], {
+    cwd: __dirname, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let output = '';
+  proc.stdout.on('data', d => output += d.toString());
+  proc.stderr.on('data', d => output += d.toString());
+  iconJobs.set(id, { proc, startedAt: new Date().toISOString() });
+  proc.on('close', (code) => {
+    iconJobs.delete(id);
+    broadcast({ type: 'icons_done', id, code });
+  });
+  res.json({ status: 'started' });
+});
+
+app.post('/api/generate-icons', (req, res) => {
+  if (iconJobs.has('__all__')) return res.json({ status: 'already_running' });
+
+  const proc = spawn('node', [path.join(__dirname, 'scripts', 'generate-favicons.js')], {
+    cwd: __dirname, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let output = '';
+  proc.stdout.on('data', d => output += d.toString());
+  proc.stderr.on('data', d => output += d.toString());
+  iconJobs.set('__all__', { proc, startedAt: new Date().toISOString() });
+  proc.on('close', (code) => {
+    iconJobs.delete('__all__');
+    broadcast({ type: 'icons_done', id: '__all__', code });
+  });
+  res.json({ status: 'started' });
+});
+
+app.get('/api/generate-icons/status', (req, res) => {
+  const jobs = {};
+  for (const [id, job] of iconJobs) jobs[id] = { startedAt: job.startedAt };
   res.json(jobs);
 });
 

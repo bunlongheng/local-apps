@@ -37,7 +37,7 @@
   header { padding: 20px 0; border-bottom: 1px solid var(--border); }
   header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
   .subtitle { color: var(--muted); font-size: 12px; margin-top: 2px; }
-  main { padding: 28px 0; }
+  main { padding: 10px 0; }
 
   /* Filter bar */
   .filter-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 20px; }
@@ -128,6 +128,20 @@
   .help-code .copy-all { position:absolute; top:8px; right:8px; background:rgba(255,255,255,0.08); border:1px solid var(--border); color:var(--muted); font-family:inherit; font-size:10px; padding:3px 10px; border-radius:4px; cursor:pointer; transition:all 0.15s; }
   .help-code .copy-all:hover { background:rgba(255,255,255,0.15); color:#fff; }
   .help-desc { font-size:11px; color:var(--muted); line-height:1.6; margin-bottom:6px; }
+
+  /* Machine tabs */
+  .machine-tabs { display:flex; align-items:center; gap:6px; padding:10px 0; border-bottom:1px solid var(--border); }
+  .machine-tab { display:flex; align-items:center; gap:6px; background:none; border:1px solid var(--border); color:var(--muted); font-family:inherit; font-size:11px; padding:5px 12px; border-radius:20px; cursor:pointer; transition:all 0.15s; position:relative; }
+  .machine-tab:hover { border-color:var(--text); color:var(--text); }
+  .machine-tab.active { background:rgba(255,255,255,0.08); border-color:var(--text); color:#fff; font-weight:600; }
+  .machine-tab .tab-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+  .machine-tab .tab-dot.online { background:var(--up); box-shadow:0 0 4px rgba(74,222,128,0.5); }
+  .machine-tab .tab-dot.offline { background:var(--down); }
+  .machine-tab .tab-remove { display:none; margin-left:2px; font-size:10px; color:var(--muted); cursor:pointer; line-height:1; }
+  .machine-tab:hover .tab-remove { display:inline; }
+  .machine-tab .tab-remove:hover { color:var(--down); }
+  .machine-add { display:flex; align-items:center; justify-content:center; width:26px; height:26px; background:none; border:1px dashed var(--border); color:var(--muted); font-size:14px; border-radius:50%; cursor:pointer; transition:all 0.15s; }
+  .machine-add:hover { border-color:var(--text); color:var(--text); }
 </style>
 </head>
 <body>
@@ -143,7 +157,7 @@
       <a href="/gallery.html" style="font-size:11px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:4px 10px;border-radius:6px;transition:all 0.15s" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--text)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">📸 Gallery</a>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
-      <a href="/docs.html" class="help-btn" title="API Docs" style="text-decoration:none;font-size:11px">API</a>
+      <a href="/docs" class="help-btn" title="API Docs" style="text-decoration:none;font-size:11px">API</a>
       <button class="help-btn" onclick="toggleHelp()" title="Quick Reference">?</button>
       <div style="position:relative">
       <button id="qrBtn" onclick="toggleQR()" title="Show LAN QR code" style="background:none;border:none;outline:none;cursor:pointer;padding:0;line-height:1;opacity:0.35;transition:opacity 0.15s;-webkit-tap-highlight-color:transparent;user-select:none" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity=document.getElementById('qrPopover').style.display!=='none'?'1':'0.35'">
@@ -168,6 +182,10 @@
     </div>
   </div>
 </header>
+
+<div class="wrap">
+  <div class="machine-tabs" id="machineTabs"></div>
+</div>
 
 <!-- Help Modal -->
 <div class="modal-backdrop" id="helpBackdrop" onclick="if(event.target===this)toggleHelp()">
@@ -245,12 +263,6 @@ DELETE /api/apps/:id &nbsp;&nbsp;&nbsp;— remove app + teardown infra
 <main>
   <div class="wrap">
 
-    <div class="section-title" style="margin-top:0">Services</div>
-    <div class="filter-bar">
-      <button class="filter-btn active" id="f-all"  onclick="setFilter('all')">All</button>
-      <button class="filter-btn"        id="f-up"   onclick="setFilter('up')">Up</button>
-      <button class="filter-btn"        id="f-down" onclick="setFilter('down')">Down</button>
-    </div>
     <table>
       <thead>
         <tr>
@@ -283,31 +295,119 @@ DELETE /api/apps/:id &nbsp;&nbsp;&nbsp;— remove app + teardown infra
 <script>
 let apps = [];
 let filter = 'all';
+let machines = [];
+let activeMachine = null; // null = local
+let localInfo = {};
+
+const deviceMap = { 'mac mini': 'mac-mini', 'macbook pro': 'macbook-pro', 'macbook air': 'macbook-air' };
+function deviceSvg(model) {
+  if (!model) return null;
+  const key = Object.keys(deviceMap).find(k => model.toLowerCase().includes(k));
+  return key ? `/devices/${deviceMap[key]}.svg` : null;
+}
+
+async function loadMachines() {
+  try {
+    machines = await fetch('/api/machines').then(r => r.json());
+  } catch { machines = []; }
+  renderTabs();
+}
+
+function renderTabs() {
+  const bar = document.getElementById('machineTabs');
+  const localHost = (localInfo.hostname || '').replace('.local', '') || 'Local';
+  const localIcon = deviceSvg(localInfo.model);
+  let html = `<button class="machine-tab${!activeMachine ? ' active' : ''}" onclick="switchMachine(null)">
+    <span class="tab-dot online"></span>
+    ${localIcon ? `<img src="${localIcon}" width="14" height="14" style="opacity:0.7">` : ''}
+    ${escHtml(localHost)}
+  </button>`;
+  for (const m of machines) {
+    const icon = deviceSvg(m.model);
+    const name = (m.hostname || m.ip).replace('.local', '');
+    const isActive = activeMachine === m.id;
+    html += `<button class="machine-tab${isActive ? ' active' : ''}" onclick="switchMachine('${m.id}')">
+      <span class="tab-dot" id="tab-dot-${m.id}"></span>
+      ${icon ? `<img src="${icon}" width="14" height="14" style="opacity:0.7">` : ''}
+      ${escHtml(name)}
+      <span class="tab-remove" onclick="event.stopPropagation();removeMachine('${m.id}')" title="Remove">✕</span>
+    </button>`;
+  }
+  html += `<button class="machine-add" onclick="addMachine()" title="Add machine">+</button>`;
+  bar.innerHTML = html;
+}
+
+async function switchMachine(id) {
+  activeMachine = id;
+  localStorage.setItem('activeMachine', id || '');
+  renderTabs();
+  await load();
+}
+
+async function addMachine() {
+  const ip = prompt('Enter machine IP address:');
+  if (!ip) return;
+  try {
+    await fetch('/api/machines', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) });
+    await loadMachines();
+  } catch (e) { alert('Failed to add machine: ' + e.message); }
+}
+
+async function removeMachine(id) {
+  try {
+    await fetch('/api/machines/' + encodeURIComponent(id), { method: 'DELETE' });
+    if (activeMachine === id) activeMachine = null;
+    await loadMachines();
+    if (!activeMachine) await load();
+  } catch {}
+}
+
+function updateHeader(hostname, model, ip) {
+  const shortHost = (hostname || '').replace('.local', '') || 'Local';
+  document.getElementById('machineTitle').textContent = shortHost;
+  document.title = shortHost + ' — Local Apps';
+  document.getElementById('machineInfo').textContent = ip || '';
+  const iconSrc = deviceSvg(model);
+  const icon = document.getElementById('deviceIcon');
+  if (iconSrc) { icon.src = iconSrc; icon.style.display = 'block'; }
+  else { icon.style.display = 'none'; }
+}
 
 async function load() {
   try {
-    const res = await fetch('/api/status');
-    const data = await res.json();
-    apps = data.apps;
-    const hostname = data.apps[0]?.hostname || '—';
-    const model = data.machineModel || '';
-    // Hostname as title, IP below
-    const shortHost = hostname.replace('.local', '');
-    document.getElementById('machineTitle').textContent = shortHost;
-    document.title = shortHost + ' — Local Apps';
-    document.getElementById('machineInfo').textContent = data.lanIp;
-    // Device icon
-    const deviceMap = { 'mac mini': 'mac-mini', 'macbook pro': 'macbook-pro', 'macbook air': 'macbook-air' };
-    const deviceKey = Object.keys(deviceMap).find(k => model.toLowerCase().includes(k));
-    if (deviceKey) {
-      const icon = document.getElementById('deviceIcon');
-      icon.src = `/devices/${deviceMap[deviceKey]}.svg`;
-      icon.style.display = 'block';
+    let data;
+    if (activeMachine) {
+      const m = machines.find(x => x.id === activeMachine);
+      if (!m) { activeMachine = null; return load(); }
+      const res = await fetch('/api/machines/' + encodeURIComponent(m.id) + '/status');
+      if (!res.ok) throw new Error('unreachable');
+      data = await res.json();
+      updateHeader(m.hostname || m.ip, m.model, m.ip);
+      const dot = document.getElementById('tab-dot-' + m.id);
+      if (dot) { dot.className = 'tab-dot online'; }
+      // Rewrite URLs to use LAN IP
+      apps = data.apps.map(a => ({ ...a, lanUrl: a.localUrl ? a.localUrl.replace('localhost', m.ip) : null }));
+    } else {
+      const res = await fetch('/api/status');
+      data = await res.json();
+      apps = data.apps;
+      const hostname = data.apps[0]?.hostname || '';
+      const model = data.machineModel || '';
+      localInfo = { hostname, model, ip: data.lanIp };
+      updateHeader(hostname, model, data.lanIp);
     }
+    renderTabs();
     renderTable();
   } catch {
-    const tbody = document.getElementById('appTable');
-    tbody.innerHTML = `<tr><td colspan="3" class="no-apps" style="color:var(--muted)">Monitor unreachable — retrying…</td></tr>`;
+    if (activeMachine) {
+      const dot = document.getElementById('tab-dot-' + activeMachine);
+      if (dot) { dot.className = 'tab-dot offline'; }
+      const tbody = document.getElementById('appTable');
+      tbody.innerHTML = `<tr><td colspan="3" class="no-apps" style="color:var(--muted)">Machine unreachable — retrying…</td></tr>`;
+    } else {
+      const tbody = document.getElementById('appTable');
+      tbody.innerHTML = `<tr><td colspan="3" class="no-apps" style="color:var(--muted)">Monitor unreachable — retrying…</td></tr>`;
+    }
     setTimeout(load, 3000);
   }
 }
@@ -339,7 +439,7 @@ function renderTable() {
       </td>
       <td style="text-align:center"><a href="${app.lanUrl || app.localUrl || '#'}" target="_blank" onclick="event.stopPropagation()" style="color:var(--text);font-size:11px;text-decoration:none">${(app.lanUrl || app.localUrl || '').replace(/^https?:\/\//, '') || '—'}</a></td>
       <td style="text-align:right">
-        ${app.hasScreenshots ? `<a href="/gallery.html?app=${app.id}" onclick="event.stopPropagation()" title="View screenshots" style="color:var(--muted);font-size:13px;text-decoration:none;line-height:1;transition:color 0.15s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--muted)'">📸</a>` : ''}
+        ${!activeMachine && app.hasScreenshots ? `<a href="/gallery.html?app=${app.id}" onclick="event.stopPropagation()" title="View screenshots" style="color:var(--muted);font-size:13px;text-decoration:none;line-height:1;transition:color 0.15s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--muted)'">📸</a>` : ''}
       </td>
     </tr>`;
   }).join('');
@@ -480,10 +580,10 @@ function openModal(app) {
     port ?                ['🔌 Port',         port] : null,
     app.repo ?            ['🐙 GitHub',       `<a href="${app.repo}" target="_blank" onclick="event.stopPropagation()">⇗ ${app.repo.replace('https://github.com/','')}</a>`] : null,
     app.prodUrl ?         ['🚀 Prod',         `<a href="${app.prodUrl}" target="_blank" onclick="event.stopPropagation()">${app.prodUrl.replace('https://','')}</a>`] : null,
-    app.localUrl ?        ['🌐 Local',        `<a href="${app.localUrl}" target="_blank" onclick="event.stopPropagation()">${app.localUrl}</a>`] : null,
-    app.caddyUrl ?        ['🔗 Caddy',        `<a href="${app.caddyUrl}" target="_blank" onclick="event.stopPropagation()">${app.caddyUrl}</a>`] : null,
-    app.localPath ?       ['📁 Path',         pathVal(app.localPath)] : null,
-    app.logPath ?         ['📄 Log',          pathVal(app.logPath)] : null,
+    app.localUrl ?        ['🌐 Local',        `<a href="${activeMachine ? (app.lanUrl || app.localUrl) : app.localUrl}" target="_blank" onclick="event.stopPropagation()">${activeMachine ? (app.lanUrl || app.localUrl) : app.localUrl}</a>`] : null,
+    !activeMachine && app.caddyUrl ? ['🔗 Caddy', `<a href="${app.caddyUrl}" target="_blank" onclick="event.stopPropagation()">${app.caddyUrl}</a>`] : null,
+    !activeMachine && app.localPath ? ['📁 Path', pathVal(app.localPath)] : null,
+    !activeMachine && app.logPath ?   ['📄 Log',  pathVal(app.logPath)] : null,
   ].filter(Boolean);
 
   const modalRows = document.getElementById('modalRows');
@@ -494,19 +594,19 @@ function openModal(app) {
     </div>
   `).join('');
 
-  if (isDown && app.logPath) {
-    const logDiv = document.createElement('div');
-    logDiv.className = 'log-block';
-    logDiv.textContent = 'Loading log…';
-    modalRows.appendChild(logDiv);
-    fetch('/api/log/' + app.id).then(r => r.json()).then(d => {
-      logDiv.textContent = d.lines.length ? d.lines.join('\n') : '(no log output)';
-      logDiv.scrollTop = logDiv.scrollHeight;
-    }).catch(() => { logDiv.textContent = '(could not read log)'; });
+  if (!activeMachine) {
+    if (isDown && app.logPath) {
+      const logDiv = document.createElement('div');
+      logDiv.className = 'log-block';
+      logDiv.textContent = 'Loading log…';
+      modalRows.appendChild(logDiv);
+      fetch('/api/log/' + app.id).then(r => r.json()).then(d => {
+        logDiv.textContent = d.lines.length ? d.lines.join('\n') : '(no log output)';
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }).catch(() => { logDiv.textContent = '(could not read log)'; });
+    }
+    loadScreenshots(app.id);
   }
-
-  // Load screenshots
-  loadScreenshots(app.id);
 
   document.getElementById('modalBackdrop').classList.add('open');
 }
@@ -637,6 +737,10 @@ function copyAllPanels(btn) {
   if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done); } else { fallbackCopy(text, done); }
 }
 
+// Boot: restore persisted machine, load machines + status
+const savedMachine = localStorage.getItem('activeMachine');
+if (savedMachine) activeMachine = savedMachine;
+loadMachines();
 load();
 setInterval(load, 15000);
 
