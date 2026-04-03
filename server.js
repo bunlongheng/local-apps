@@ -331,6 +331,20 @@ app.post('/api/apps', (req, res) => {
   res.status(201).json(result);
 });
 
+// Alias: register a new app (same logic as POST /api/apps)
+app.post('/api/register', (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: 'id is required' });
+
+  const infra = setupInfra(id, req.body);
+  const merged = { ...req.body, ...infra };
+  if (!merged.healthUrl && merged.localUrl) merged.healthUrl = merged.localUrl;
+
+  const result = db.upsertApp(merged);
+  broadcast({ type: 'reload' });
+  res.status(201).json(result);
+});
+
 app.put('/api/apps/:id', (req, res) => {
   const existing = db.getApp(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not found' });
@@ -444,54 +458,53 @@ app.get('/api/retake/:appId', (req, res) => {
   } catch { res.json({}) }
 })
 
-// --- Machines (peers) ---
+// --- Machines (peers) — auto-discovery ---
+let discoveredPeers = []; // live peers found on network
+
+function probeHost(ip, port = 9876) {
+  return new Promise((resolve) => {
+    const url = `http://${ip}:${port}/api/machine`;
+    http.get(url, { timeout: 2000 }, (resp) => {
+      let data = '';
+      resp.on('data', c => data += c);
+      resp.on('end', () => {
+        try {
+          const info = JSON.parse(data);
+          resolve({ id: info.hostname || ip, hostname: info.hostname, ip, port, model: info.model, appCount: info.appCount });
+        } catch { resolve(null); }
+      });
+    }).on('error', () => resolve(null)).on('timeout', function() { this.destroy(); resolve(null); });
+  });
+}
+
+async function discoverPeers() {
+  if (LAN_IP === 'N/A') return;
+  const subnet = LAN_IP.split('.').slice(0, 3).join('.');
+  const probes = [];
+  for (let i = 1; i <= 254; i++) {
+    const ip = `${subnet}.${i}`;
+    if (ip === LAN_IP) continue; // skip self
+    probes.push(probeHost(ip));
+  }
+  const results = await Promise.all(probes);
+  discoveredPeers = results.filter(Boolean);
+  // Sync to DB
+  for (const p of discoveredPeers) {
+    db.upsertMachine(p);
+  }
+  // Remove stale machines no longer on network
+  const liveIps = new Set(discoveredPeers.map(p => p.ip));
+  for (const m of db.getMachines()) {
+    if (!liveIps.has(m.ip)) db.deleteMachine(m.id);
+  }
+}
+
+// Discover on boot + every 30s
+discoverPeers();
+setInterval(discoverPeers, 30000);
+
 app.get('/api/machines', (req, res) => {
   res.json(db.getMachines());
-});
-
-app.post('/api/machines', async (req, res) => {
-  let { ip, port = 9876 } = req.body;
-  if (!ip) return res.status(400).json({ error: 'ip is required' });
-  // Clean up: strip protocol, port, trailing slash
-  ip = ip.replace(/^https?:\/\//, '').replace(/:\d+\/?$/, '').replace(/\/+$/, '');
-  const url = `http://${ip}:${port}/api/machine`;
-  try {
-    const info = await new Promise((resolve, reject) => {
-      http.get(url, { timeout: 5000 }, (resp) => {
-        let data = '';
-        resp.on('data', c => data += c);
-        resp.on('end', () => { try { resolve(JSON.parse(data)); } catch { reject(new Error('invalid JSON')); } });
-      }).on('error', reject).on('timeout', function() { this.destroy(); reject(new Error('timeout')); });
-    });
-    const id = info.hostname || ip;
-    const machine = db.upsertMachine({ id, hostname: info.hostname, ip, port, model: info.model });
-    res.json(machine);
-  } catch (err) {
-    // Fallback: try /api/status to get hostname
-    try {
-      const statusUrl = `http://${ip}:${port}/api/status`;
-      const info = await new Promise((resolve, reject) => {
-        http.get(statusUrl, { timeout: 5000 }, (resp) => {
-          let data = '';
-          resp.on('data', c => data += c);
-          resp.on('end', () => { try { resolve(JSON.parse(data)); } catch { reject(new Error('invalid JSON')); } });
-        }).on('error', reject).on('timeout', function() { this.destroy(); reject(new Error('timeout')); });
-      });
-      const hostname = info.apps?.[0]?.hostname || null;
-      const model = info.machineModel || null;
-      const id = hostname || ip;
-      const machine = db.upsertMachine({ id, hostname, ip, port, model });
-      res.json(machine);
-    } catch {
-      const machine = db.upsertMachine({ id: ip, hostname: null, ip, port, model: null });
-      res.json(machine);
-    }
-  }
-});
-
-app.delete('/api/machines/:id', (req, res) => {
-  const ok = db.deleteMachine(req.params.id);
-  res.json({ deleted: ok });
 });
 
 // Proxy: fetch remote machine's /api/status server-side (avoids CORS)

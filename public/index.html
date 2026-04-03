@@ -291,13 +291,11 @@ function renderTabs() {
     const name = (m.hostname || m.ip).replace('.local', '');
     const isActive = activeMachine === m.id;
     html += `<button class="machine-tab${isActive ? ' active' : ''}" onclick="switchMachine('${m.id}')">
-      <span class="tab-dot" id="tab-dot-${m.id}"></span>
+      <span class="tab-dot online" id="tab-dot-${m.id}"></span>
       ${icon ? `<img src="${icon}" width="14" height="14" style="opacity:0.7">` : ''}
       ${escHtml(name)}
-      <span class="tab-remove" onclick="event.stopPropagation();removeMachine('${m.id}')" title="Remove">✕</span>
     </button>`;
   }
-  html += `<button class="machine-add" onclick="addMachine()" title="Add machine">+</button>`;
   bar.innerHTML = html;
 }
 
@@ -308,23 +306,19 @@ async function switchMachine(id) {
   await load();
 }
 
-async function addMachine() {
-  const ip = prompt('Enter machine IP address:');
-  if (!ip) return;
-  try {
-    await fetch('/api/machines', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) });
-    await loadMachines();
-  } catch (e) { alert('Failed to add machine: ' + e.message); }
-}
-
-async function removeMachine(id) {
-  try {
-    await fetch('/api/machines/' + encodeURIComponent(id), { method: 'DELETE' });
-    if (activeMachine === id) activeMachine = null;
-    await loadMachines();
-    if (!activeMachine) await load();
-  } catch {}
-}
+// Auto-refresh machine tabs every 30s (matches server discovery interval)
+setInterval(async () => {
+  const prev = machines.map(m => m.id).join(',');
+  await loadMachines();
+  const curr = machines.map(m => m.id).join(',');
+  if (prev !== curr) {
+    // If active machine disappeared, switch to local
+    if (activeMachine && !machines.find(m => m.id === activeMachine)) {
+      activeMachine = null;
+      await load();
+    }
+  }
+}, 30000);
 
 function updateHeader(hostname, model, ip) {
   const shortHost = (hostname || '').replace('.local', '') || 'Local';
