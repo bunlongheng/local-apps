@@ -730,6 +730,92 @@ app.get('/api/claude/sessions', (req, res) => {
   res.json({ machine: os.hostname(), projects });
 });
 
+// ─── Claude Config API (skills, commands, hooks, mcp, claudeMd) ─────────────
+const CLAUDE_HOME = path.join(os.homedir(), '.claude');
+const MKT_DIR = path.join(CLAUDE_HOME, 'plugins', 'marketplaces', 'claude-plugins-official');
+const PLG_DIR = path.join(MKT_DIR, 'plugins');
+const EXT_DIR = path.join(MKT_DIR, 'external_plugins');
+
+function safeReadFile(p) { try { return fs.readFileSync(p, 'utf-8'); } catch { return ''; } }
+function safeJsonFile(p) { try { return JSON.parse(fs.readFileSync(p, 'utf-8')); } catch { return null; } }
+function isDir(p) { try { return fs.statSync(p).isDirectory(); } catch { return false; } }
+function isFile(p) { try { return fs.statSync(p).isFile(); } catch { return false; } }
+
+app.get('/api/claude/config', (req, res) => {
+  const plugins = [], skills = [], commands = [], mcp = [], hooks = [], claudeMd = [];
+  const bases = [PLG_DIR, EXT_DIR];
+
+  // Plugins
+  for (const base of bases) {
+    if (!isDir(base)) continue;
+    const isExt = base === EXT_DIR;
+    for (const name of fs.readdirSync(base)) {
+      const dir = path.join(base, name);
+      if (!isDir(dir)) continue;
+      const m = safeJsonFile(path.join(dir, 'plugin.json')) ?? safeJsonFile(path.join(dir, 'manifest.json'));
+      plugins.push({ name, description: m?.description ?? name, path: dir, type: isExt ? 'external' : name.endsWith('-lsp') ? 'lsp' : 'builtin' });
+
+      // Skills
+      const sd = path.join(dir, 'skills');
+      if (isDir(sd)) for (const s of fs.readdirSync(sd)) {
+        const sDir = path.join(sd, s);
+        if (!isDir(sDir)) continue;
+        const c = safeReadFile(path.join(sDir, 'SKILL.md'));
+        skills.push({ name: s, plugin: name, description: (c.split('\n').find(l => l.trim() && !l.startsWith('#')) ?? s).slice(0, 120), path: sDir });
+      }
+
+      // Commands
+      const cd = path.join(dir, 'commands');
+      if (isDir(cd)) for (const f of fs.readdirSync(cd).filter(f => f.endsWith('.md'))) {
+        const c = safeReadFile(path.join(cd, f));
+        const fl = c.split('\n').find(l => l.trim() && !l.startsWith('#') && !l.startsWith('---'))?.trim() ?? f;
+        commands.push({ name: '/' + f.replace('.md', ''), plugin: name, description: fl.slice(0, 120), path: path.join(cd, f), content: c });
+      }
+
+      // MCP
+      const mcpData = safeJsonFile(path.join(dir, '.mcp.json'));
+      if (mcpData) {
+        const servers = mcpData.mcpServers ?? mcpData;
+        for (const [n, cfg] of Object.entries(servers)) {
+          if (typeof cfg !== 'object' || !cfg) continue;
+          mcp.push({ name: n, type: cfg.command ? 'command' : cfg.type === 'sse' ? 'sse' : cfg.url ? 'http' : 'unknown', url: cfg.url, command: cfg.command ? `${cfg.command} ${(cfg.args ?? []).join(' ')}`.trim() : undefined, path: path.join(dir, '.mcp.json') });
+        }
+      }
+
+      // Hooks
+      const hData = safeJsonFile(path.join(dir, 'hooks', 'hooks.json'));
+      if (hData) {
+        const hObj = hData.hooks ?? hData;
+        const evts = [], cmds = [];
+        for (const [evt, handlers] of Object.entries(hObj)) {
+          if (!Array.isArray(handlers)) continue;
+          evts.push(evt);
+          for (const h of handlers) for (const ih of (h.hooks ?? [h])) if (ih.command) cmds.push(ih.command);
+        }
+        if (evts.length) hooks.push({ name: hData.description ?? name, plugin: name, events: evts, command: cmds[0], path: path.join(dir, 'hooks', 'hooks.json') });
+      }
+    }
+  }
+
+  // CLAUDE.md files
+  const globalMd = path.join(CLAUDE_HOME, 'CLAUDE.md');
+  if (isFile(globalMd)) claudeMd.push({ name: 'Global CLAUDE.md', path: globalMd, content: safeReadFile(globalMd), scope: 'global' });
+  const projDir = path.join(CLAUDE_HOME, 'projects');
+  if (isDir(projDir)) for (const f of fs.readdirSync(projDir)) {
+    const pm = path.join(projDir, f, 'CLAUDE.md');
+    if (isFile(pm)) claudeMd.push({ name: 'Project: ' + f.replace(/-/g, '/'), path: pm, content: safeReadFile(pm), scope: 'project' });
+  }
+
+  // Settings
+  const settings = safeJsonFile(path.join(CLAUDE_HOME, 'settings.json'));
+  const localSettings = safeJsonFile(path.join(CLAUDE_HOME, 'settings.local.json'));
+
+  res.json({
+    machine: os.hostname(), plugins, skills, commands, mcp, hooks, claudeMd, settings, localSettings,
+    summary: { plugins: plugins.length, skills: skills.length, commands: commands.length, mcp: mcp.length, hooks: hooks.length, claudeMd: claudeMd.length },
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`\n  Local Apps running at:`);
   console.log(`  Local:  http://localhost:${PORT}`);
