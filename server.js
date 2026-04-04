@@ -735,6 +735,8 @@ const CLAUDE_HOME = path.join(os.homedir(), '.claude');
 const MKT_DIR = path.join(CLAUDE_HOME, 'plugins', 'marketplaces', 'claude-plugins-official');
 const PLG_DIR = path.join(MKT_DIR, 'plugins');
 const EXT_DIR = path.join(MKT_DIR, 'external_plugins');
+const STANDALONE_SKILLS = path.join(CLAUDE_HOME, 'skills');
+const STANDALONE_CMDS = path.join(CLAUDE_HOME, 'commands');
 
 function safeReadFile(p) { try { return fs.readFileSync(p, 'utf-8'); } catch { return ''; } }
 function safeJsonFile(p) { try { return JSON.parse(fs.readFileSync(p, 'utf-8')); } catch { return null; } }
@@ -796,6 +798,29 @@ app.get('/api/claude/config', (req, res) => {
       }
     }
   }
+
+  // Standalone skills in ~/.claude/skills/
+  if (isDir(STANDALONE_SKILLS)) for (const s of fs.readdirSync(STANDALONE_SKILLS)) {
+    const sDir = path.join(STANDALONE_SKILLS, s);
+    if (!isDir(sDir)) continue;
+    let c = safeReadFile(path.join(sDir, 'SKILL.md'));
+    if (!c) continue;
+    if (c.startsWith('---')) { const end = c.indexOf('---', 3); if (end !== -1) c = c.slice(end + 3); }
+    const fl = c.split('\n').find(l => l.trim() && !l.startsWith('#') && !l.startsWith('---') && !l.startsWith('name:'))?.trim() ?? s;
+    skills.push({ name: s, plugin: 'standalone', description: fl.slice(0, 120), path: sDir, source: 'external' });
+  }
+
+  // Standalone commands in ~/.claude/commands/
+  if (isDir(STANDALONE_CMDS)) for (const f of fs.readdirSync(STANDALONE_CMDS).filter(f => f.endsWith('.md'))) {
+    const fp = path.join(STANDALONE_CMDS, f);
+    const c = safeReadFile(fp);
+    const fl = c.split('\n').find(l => l.trim() && !l.startsWith('#') && !l.startsWith('---'))?.trim() ?? f;
+    commands.push({ name: '/' + f.replace('.md', ''), plugin: 'standalone', description: fl.slice(0, 120), path: fp, content: c, source: 'external' });
+  }
+
+  // Also add source field to plugin skills/commands
+  skills.forEach(s => { if (!s.source) s.source = s.path?.includes('external_plugins') ? 'external' : 'builtin'; });
+  commands.forEach(c => { if (!c.source) c.source = c.path?.includes('external_plugins') ? 'external' : 'builtin'; });
 
   // CLAUDE.md files
   const globalMd = path.join(CLAUDE_HOME, 'CLAUDE.md');
