@@ -816,6 +816,72 @@ app.get('/api/claude/config', (req, res) => {
   });
 });
 
+// ─── Skill Sync API ─────────────────────────────────────────────────────────
+
+// GET /api/claude/skill/:plugin/:skill — read full skill directory
+app.get('/api/claude/skill/:plugin/:skill', (req, res) => {
+  const { plugin, skill } = req.params;
+  // Search both builtin and external
+  for (const base of [PLG_DIR, EXT_DIR]) {
+    const skillDir = path.join(base, plugin, 'skills', skill);
+    if (!isDir(skillDir)) continue;
+    const files = {};
+    for (const f of fs.readdirSync(skillDir)) {
+      const fp = path.join(skillDir, f);
+      if (isFile(fp)) files[f] = safeReadFile(fp);
+    }
+    return res.json({ plugin, skill, files, path: skillDir });
+  }
+  res.status(404).json({ error: 'skill not found' });
+});
+
+// POST /api/claude/skill/:plugin/:skill — write skill files
+app.post('/api/claude/skill/:plugin/:skill', (req, res) => {
+  const { plugin, skill } = req.params;
+  const { files } = req.body;
+  if (!files || typeof files !== 'object') return res.status(400).json({ error: 'files object required' });
+
+  // Write to external_plugins (safe — never touch builtins)
+  const skillDir = path.join(EXT_DIR, plugin, 'skills', skill);
+  try {
+    fs.mkdirSync(skillDir, { recursive: true });
+    for (const [name, content] of Object.entries(files)) {
+      // Safety: no path traversal
+      if (name.includes('/') || name.includes('..')) continue;
+      fs.writeFileSync(path.join(skillDir, name), content, 'utf-8');
+    }
+    res.json({ ok: true, path: skillDir });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/claude/command/:plugin/:command — read command .md
+app.get('/api/claude/command/:plugin/:command', (req, res) => {
+  const { plugin, command } = req.params;
+  for (const base of [PLG_DIR, EXT_DIR]) {
+    const fp = path.join(base, plugin, 'commands', command + '.md');
+    if (isFile(fp)) return res.json({ plugin, command, content: safeReadFile(fp), path: fp });
+  }
+  res.status(404).json({ error: 'command not found' });
+});
+
+// POST /api/claude/command/:plugin/:command — write command .md
+app.post('/api/claude/command/:plugin/:command', (req, res) => {
+  const { plugin, command } = req.params;
+  const { content } = req.body;
+  if (typeof content !== 'string') return res.status(400).json({ error: 'content string required' });
+
+  const cmdDir = path.join(EXT_DIR, plugin, 'commands');
+  try {
+    fs.mkdirSync(cmdDir, { recursive: true });
+    fs.writeFileSync(path.join(cmdDir, command + '.md'), content, 'utf-8');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`\n  Local Apps running at:`);
   console.log(`  Local:  http://localhost:${PORT}`);
