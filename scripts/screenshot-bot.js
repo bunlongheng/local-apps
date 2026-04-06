@@ -66,8 +66,8 @@ const MACBOOK_FRAME= path.join(FRAMES_DIR, 'macbook.png');
 
 // iPhone 15 Pro Max frame: 1490x2996, screen area x=99 y=243 w=1290 h=2653
 const IPHONE_SCREEN = { x: 99, y: 243, w: 1290, h: 2653 };
-// MacBook Air 13 frame: 3260x2164, screen area x=350 y=306 w=2560 h=1608
-const MACBOOK_SCREEN = { x: 350, y: 306, w: 2560, h: 1608 };
+// MacBook Air frame: 2664x1816, screen area x=52 y=52 w=2560 h=1600
+const MACBOOK_SCREEN = { x: 52, y: 52, w: 2560, h: 1600 };
 
 async function addIPhoneFrame(inputPath, outputPath) {
   const { x, y, w, h } = IPHONE_SCREEN;
@@ -83,10 +83,25 @@ async function addIPhoneFrame(inputPath, outputPath) {
 
 async function addMacBookFrame(inputPath, outputPath) {
   const { x, y, w, h } = MACBOOK_SCREEN;
-  // Resize screenshot to fit screen area (cover from top)
-  const screen = await sharp(inputPath)
-    .resize(w, h, { fit: 'cover', position: 'top' })
-    .png().toBuffer();
+  const meta = await sharp(inputPath).metadata();
+  const srcW = meta.width, srcH = meta.height;
+  const frameAR = w / h;  // 16:10
+  const srcAR = srcW / srcH;
+
+  let screen;
+  if (srcAR >= frameAR) {
+    // Wider than frame — fit width, crop bottom if needed
+    screen = await sharp(inputPath)
+      .resize(w, h, { fit: 'cover', position: 'top' })
+      .png().toBuffer();
+  } else {
+    // Taller than frame (full-page scroll) — crop to frame AR from top, then resize
+    const cropH = Math.round(srcW / frameAR);
+    screen = await sharp(inputPath)
+      .extract({ left: 0, top: 0, width: srcW, height: Math.min(cropH, srcH) })
+      .resize(w, h, { fit: 'fill' })
+      .png().toBuffer();
+  }
 
   await sharp(MACBOOK_FRAME)
     .composite([{ input: screen, top: y, left: x }])
@@ -835,7 +850,7 @@ async function main() {
 
   const targetId = process.argv[2];
   const apps     = (targetId ? config.filter(a => a.id === targetId) : config)
-    .filter(a => a.localUrl && !a.noScreenshot);
+    .filter(a => a.localUrl && !a.noScreenshot && !(rules[a.id]?.skip));
 
   if (!apps.length) {
     console.error(targetId ? `App not found: ${targetId}` : 'No apps with localUrl');
@@ -853,16 +868,16 @@ async function main() {
   });
 
   for (const app of apps) {
-    await runApp(browser, app, creds[app.id] ?? null, rules[app.id] ?? null);
+    await runApp(browser, app, creds[app.id] ?? null, rules[app.id] ?? {});
   }
 
   await browser.close();
 
-  // write master index
-  const masterIndex = apps.map(a => {
-    const idxFile = path.join(OUT_DIR, a.id, 'index.json');
-    return fs.existsSync(idxFile) ? JSON.parse(fs.readFileSync(idxFile, 'utf8')) : { id: a.id };
-  });
+  // write master index — scan ALL app dirs, not just current run
+  const allDirs = fs.existsSync(OUT_DIR) ? fs.readdirSync(OUT_DIR).filter(d => fs.statSync(path.join(OUT_DIR, d)).isDirectory()) : [];
+  const masterIndex = allDirs
+    .map(d => { const f = path.join(OUT_DIR, d, 'index.json'); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null; })
+    .filter(Boolean);
   fs.writeFileSync(path.join(OUT_DIR, 'index.json'), JSON.stringify(masterIndex, null, 2));
 
   console.log('\n✓ All done\n');

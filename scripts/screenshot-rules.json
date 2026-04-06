@@ -35,8 +35,18 @@
     "pageTimeout": 15000,
     "notes": "Next.js app — needs extra wait for hydration before screenshots and nav crawl."
   },
+  "vault": {
+    "notes": "Password vault app on port 4445."
+  },
+  "safe": {
+    "notes": "Secret storage app on port 6100."
+  },
   "drop": {
     "notes": "Electron app on port 4111 — often not running. Skip if unreachable."
+  },
+  "drop-menu": {
+    "skip": true,
+    "notes": "Electron menubar app — no HTTP server, skip screenshots."
   },
   "recap": {
     "notes": "Process-based app (watch.sh), no localUrl — excluded from screenshots."

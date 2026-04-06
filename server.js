@@ -8,7 +8,7 @@ const db = require('./db');
 
 const app = express();
 const PORT = 9876;
-const CHECK_INTERVAL = 10000;
+const CHECK_INTERVAL = 30000;
 const CADDYFILE = process.env.CADDYFILE || '/opt/homebrew/etc/Caddyfile';
 const CADDY_ERROR_ROOT = path.dirname(CADDYFILE);
 const NPM_PATH = (() => {
@@ -255,6 +255,18 @@ async function checkAll() {
       s.status = newStatus;
       broadcast({ type: 'update', id: appCfg.id, status: newStatus });
       if (newStatus === 'down') broadcast({ type: 'alert', id: appCfg.id, name: appCfg.name });
+    }
+
+    // Auto-restart: if down and has a launchAgent, try to restart
+    if (newStatus === 'down' && (appCfg.launchAgentPath || appCfg.launchAgent)) {
+      try {
+        if (appCfg.launchAgentPath) {
+          execSync(`launchctl load -w "${appCfg.launchAgentPath}" 2>/dev/null || launchctl start "${appCfg.launchAgent}" 2>/dev/null || true`);
+        } else {
+          execSync(`launchctl start "${appCfg.launchAgent}" 2>/dev/null || true`);
+        }
+        console.log(`  ↻ auto-restart: ${appCfg.id}`);
+      } catch {}
     }
   }
 }
