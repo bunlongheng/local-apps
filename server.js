@@ -541,7 +541,25 @@ async function discoverPeers() {
   // Remove stale machines no longer on network
   const liveIps = new Set(discoveredPeers.map(p => p.ip));
   for (const m of db.getMachines()) {
-    if (!liveIps.has(m.ip)) db.deleteMachine(m.id);
+    if (!liveIps.has(m.ip)) {
+      db.deleteMachine(m.id);
+      db.deleteRemoteApps(m.id);
+    }
+  }
+  // Fetch and store apps from each peer
+  for (const p of discoveredPeers) {
+    try {
+      const data = await new Promise((resolve, reject) => {
+        http.get(`http://${p.ip}:${p.port || 9876}/api/status`, { timeout: 3000 }, (resp) => {
+          let body = '';
+          resp.on('data', c => body += c);
+          resp.on('end', () => { try { resolve(JSON.parse(body)); } catch { reject(); } });
+        }).on('error', reject);
+      });
+      if (data.apps && Array.isArray(data.apps)) {
+        db.syncRemoteApps(p.id, data.apps);
+      }
+    } catch {}
   }
 }
 
@@ -551,6 +569,27 @@ setInterval(discoverPeers, 30000);
 
 app.get('/api/machines', (req, res) => {
   res.json(db.getMachines());
+});
+
+// All apps from all machines (local + remote, stored in DB)
+app.get('/api/all-apps', (req, res) => {
+  const local = db.getApps().map(a => ({ ...a, machineId: 'local', machine: os.hostname() }));
+  const remote = db.getRemoteApps().map(r => ({
+    id: r.id, name: r.name, healthUrl: r.health_url, localUrl: r.local_url,
+    caddyUrl: r.caddy_url, prodUrl: r.prod_url, repo: r.repo, icon: r.icon,
+    status: r.status, machineId: r.machine_id, syncedAt: r.synced_at,
+  }));
+  res.json({ local, remote, total: local.length + remote.length });
+});
+
+// Remote apps for a specific machine
+app.get('/api/machines/:id/apps', (req, res) => {
+  const apps = db.getRemoteApps(req.params.id);
+  res.json(apps.map(r => ({
+    id: r.id, name: r.name, healthUrl: r.health_url, localUrl: r.local_url,
+    caddyUrl: r.caddy_url, prodUrl: r.prod_url, repo: r.repo, icon: r.icon,
+    status: r.status, syncedAt: r.synced_at,
+  })));
 });
 
 // Proxy: fetch remote machine's /api/status server-side (avoids CORS)

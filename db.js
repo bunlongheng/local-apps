@@ -105,6 +105,70 @@ if (count === 0 && fs.existsSync(CONFIG_FILE)) {
   console.log(`  Seeded ${apps.length} apps from apps.config.json`);
 }
 
+// --- Remote apps table (apps from other machines) ---
+db.exec(`
+  CREATE TABLE IF NOT EXISTS remote_apps (
+    id TEXT NOT NULL,
+    machine_id TEXT NOT NULL,
+    name TEXT,
+    health_url TEXT,
+    local_url TEXT,
+    caddy_url TEXT,
+    prod_url TEXT,
+    repo TEXT,
+    icon TEXT,
+    status TEXT DEFAULT 'unknown',
+    synced_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, machine_id)
+  )
+`);
+
+// --- Remote apps helpers ---
+function upsertRemoteApp(machineId, app) {
+  db.prepare(`
+    INSERT INTO remote_apps (id, machine_id, name, health_url, local_url, caddy_url, prod_url, repo, icon, status, synced_at)
+    VALUES (@id, @machineId, @name, @healthUrl, @localUrl, @caddyUrl, @prodUrl, @repo, @icon, @status, datetime('now'))
+    ON CONFLICT(id, machine_id) DO UPDATE SET
+      name = @name, health_url = @healthUrl, local_url = @localUrl,
+      caddy_url = @caddyUrl, prod_url = @prodUrl, repo = @repo,
+      icon = @icon, status = @status, synced_at = datetime('now')
+  `).run({
+    id: app.id,
+    machineId,
+    name: app.name || app.id,
+    healthUrl: app.healthUrl || app.localUrl || null,
+    localUrl: app.localUrl || null,
+    caddyUrl: app.caddyUrl || null,
+    prodUrl: app.prodUrl || null,
+    repo: app.repo || null,
+    icon: app.icon || null,
+    status: app.status || 'unknown',
+  });
+}
+
+function syncRemoteApps(machineId, apps) {
+  const tx = db.transaction((machineId, apps) => {
+    // Remove old apps from this machine
+    db.prepare('DELETE FROM remote_apps WHERE machine_id = ?').run(machineId);
+    // Insert fresh
+    for (const app of apps) {
+      upsertRemoteApp(machineId, app);
+    }
+  });
+  tx(machineId, apps);
+}
+
+function getRemoteApps(machineId) {
+  if (machineId) {
+    return db.prepare('SELECT * FROM remote_apps WHERE machine_id = ? ORDER BY name').all(machineId);
+  }
+  return db.prepare('SELECT * FROM remote_apps ORDER BY machine_id, name').all();
+}
+
+function deleteRemoteApps(machineId) {
+  return db.prepare('DELETE FROM remote_apps WHERE machine_id = ?').run(machineId).changes;
+}
+
 // --- Helpers (camelCase output) ---
 function rowToApp(row) {
   if (!row) return null;
@@ -238,5 +302,6 @@ function deleteClaude(id) {
 module.exports = {
   getApps, getApp, upsertApp, deleteApp,
   getMachines, upsertMachine, deleteMachine,
+  getRemoteApps, syncRemoteApps, deleteRemoteApps,
   getClaude, getClaudeItem, upsertClaude, deleteClaude,
 };
