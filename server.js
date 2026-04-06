@@ -708,6 +708,8 @@ app.post('/api/generate-icons/:id', (req, res) => {
   if (!appCfg) return res.status(404).json({ error: 'not found' });
   if (iconJobs.has(id)) return res.json({ status: 'already_running' });
 
+  broadcast({ type: 'icons_start', ids: [id] });
+
   const proc = spawn('node', [path.join(__dirname, 'scripts', 'generate-favicons.js'), id], {
     cwd: __dirname, stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -719,11 +721,15 @@ app.post('/api/generate-icons/:id', (req, res) => {
     iconJobs.delete(id);
     broadcast({ type: 'icons_done', id, code });
   });
-  res.json({ status: 'started' });
+  res.json({ status: 'started', ids: [id] });
 });
 
 app.post('/api/generate-icons', (req, res) => {
   if (iconJobs.has('__all__')) return res.json({ status: 'already_running' });
+
+  // Figure out which app IDs will be generated
+  const allApps = db.getApps().map(a => a.id);
+  broadcast({ type: 'icons_start', ids: allApps });
 
   const proc = spawn('node', [path.join(__dirname, 'scripts', 'generate-favicons.js')], {
     cwd: __dirname, stdio: ['ignore', 'pipe', 'pipe'],
@@ -736,7 +742,7 @@ app.post('/api/generate-icons', (req, res) => {
     iconJobs.delete('__all__');
     broadcast({ type: 'icons_done', id: '__all__', code });
   });
-  res.json({ status: 'started' });
+  res.json({ status: 'started', ids: allApps });
 });
 
 app.get('/api/generate-icons/status', (req, res) => {

@@ -33,6 +33,12 @@
   ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
   body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
 
+  /* Icon generation spin */
+  @keyframes icon-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .icon-spinning img, .icon-spinning span { animation: icon-spin 0.8s linear infinite; border-radius: 50% !important; }
+  .icon-fresh img { animation: icon-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  @keyframes icon-pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
   .wrap { max-width: 900px; margin: 0 auto; padding: 0 24px; }
   header { padding: 20px 0; border-bottom: 1px solid var(--border); }
   header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
@@ -395,7 +401,7 @@ function renderTable() {
       <td>
         <div style="display:flex;align-items:center;gap:12px">
           <span class="dot ${app.status}"></span>
-          ${appIcon(app)}
+          <span class="app-icon-wrap" id="icon-${app.id}">${appIcon(app)}</span>
           <a class="app-name" href="${app.lanUrl || app.localUrl || '#'}" target="_blank" onclick="event.stopPropagation()">${app.name}</a>
         </div>
       </td>
@@ -489,6 +495,27 @@ function connectSSE() {
     }
     if (msg.type === 'reload') { location.reload(); }
     if (msg.type === 'screenshots_done') { loadScreenshots(msg.id); }
+    if (msg.type === 'icons_start') {
+      (msg.ids || []).forEach(id => {
+        const el = document.getElementById('icon-' + id);
+        if (el) { el.classList.add('icon-spinning'); el.classList.remove('icon-fresh'); }
+      });
+    }
+    if (msg.type === 'icons_done') {
+      const bust = '?v=' + Date.now();
+      const ids = msg.id === '__all__' ? apps.map(a => a.id) : [msg.id];
+      ids.forEach(id => {
+        const el = document.getElementById('icon-' + id);
+        if (el) {
+          el.classList.remove('icon-spinning');
+          el.classList.add('icon-fresh');
+          // Refresh the icon src to bust cache
+          const img = el.querySelector('img');
+          if (img) { img.src = img.src.split('?')[0] + bust; }
+          setTimeout(() => el.classList.remove('icon-fresh'), 500);
+        }
+      });
+    }
   };
   es.onerror = () => { es.close(); setTimeout(connectSSE, 3000); };
 }
