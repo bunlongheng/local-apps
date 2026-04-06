@@ -2,6 +2,17 @@
 # Health Check & Auto-Fix — ensures all apps are running
 # Deploys Claude Code agents to diagnose and fix any down apps
 # Can be run manually or via cron
+# Only runs on HUB machines — agents skip silently
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROLE_FILE="$SCRIPT_DIR/../machine-role.json"
+ROLE="hub"
+[ -f "$ROLE_FILE" ] && ROLE=$(python3 -c "import json; print(json.load(open('$ROLE_FILE')).get('role','hub'))" 2>/dev/null || echo "hub")
+
+if [ "$ROLE" = "agent" ]; then
+  echo "$(date) — Skipped: machine role is AGENT (bots disabled)" >> /tmp/health-check-fix.log
+  exit 0
+fi
 
 LOG="/tmp/health-check-fix.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')

@@ -9,6 +9,18 @@ const db = require('./db');
 const app = express();
 const PORT = 9876;
 const CHECK_INTERVAL = 30000;
+
+// Machine role: "hub" (full orchestrator + bots) or "agent" (status reporting only)
+// Set via: MACHINE_ROLE=agent node server.js  or in machine-role.json
+const MACHINE_ROLE = (() => {
+  if (process.env.MACHINE_ROLE) return process.env.MACHINE_ROLE;
+  const roleFile = path.join(__dirname, 'machine-role.json');
+  if (fs.existsSync(roleFile)) {
+    try { return JSON.parse(fs.readFileSync(roleFile, 'utf8')).role || 'hub'; } catch {}
+  }
+  return 'hub';
+})();
+const IS_HUB = MACHINE_ROLE === 'hub';
 const CADDYFILE = process.env.CADDYFILE || '/opt/homebrew/etc/Caddyfile';
 const CADDY_ERROR_ROOT = path.dirname(CADDYFILE);
 const NPM_PATH = (() => {
@@ -257,8 +269,8 @@ async function checkAll() {
       if (newStatus === 'down') broadcast({ type: 'alert', id: appCfg.id, name: appCfg.name });
     }
 
-    // Auto-restart: if down and has a launchAgent, try to restart
-    if (newStatus === 'down' && (appCfg.launchAgentPath || appCfg.launchAgent)) {
+    // Auto-restart: hub only — agent mode just reports status
+    if (IS_HUB && newStatus === 'down' && (appCfg.launchAgentPath || appCfg.launchAgent)) {
       try {
         if (appCfg.launchAgentPath) {
           execSync(`launchctl load -w "${appCfg.launchAgentPath}" 2>/dev/null || launchctl start "${appCfg.launchAgent}" 2>/dev/null || true`);
@@ -302,7 +314,7 @@ app.get('/api/status', (req, res) => {
       hasScreenshots,
     };
   });
-  res.json({ apps, lanIp: LAN_IP, machineModel: MACHINE_MODEL, monitorUrl: `http://${LAN_IP}:${PORT}` });
+  res.json({ apps, lanIp: LAN_IP, machineModel: MACHINE_MODEL, machineRole: MACHINE_ROLE, monitorUrl: `http://${LAN_IP}:${PORT}` });
 });
 
 // --- CRUD: Apps ---
@@ -623,6 +635,7 @@ app.get('/api/machine', (req, res) => {
   res.json({
     hostname: os.hostname(),
     model: MACHINE_MODEL,
+    role: MACHINE_ROLE,
     lanIp: LAN_IP,
     port: PORT,
     appCount: db.getApps().length,
@@ -1025,6 +1038,7 @@ app.use((err, req, res, _next) => {
 app.listen(PORT, () => {
   console.log(`\n  Local Apps running at:`);
   console.log(`  Local:  http://localhost:${PORT}`);
-  console.log(`  LAN:    http://${LAN_IP}:${PORT}\n`);
+  console.log(`  LAN:    http://${LAN_IP}:${PORT}`);
+  console.log(`  Role:   ${MACHINE_ROLE.toUpperCase()}${IS_HUB ? ' (bots + auto-fix enabled)' : ' (status reporting only)'}\n`);
   startupSync();
 });

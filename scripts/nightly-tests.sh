@@ -2,6 +2,17 @@
 # Nightly test runner — runs `npm test` on all apps
 # If any fail, spawns a Claude Code agent per failed repo to auto-fix
 # Scheduled via launchctl at 1:00 AM daily
+# Only runs on HUB machines — agents skip silently
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROLE_FILE="$SCRIPT_DIR/../machine-role.json"
+ROLE="hub"
+[ -f "$ROLE_FILE" ] && ROLE=$(python3 -c "import json; print(json.load(open('$ROLE_FILE')).get('role','hub'))" 2>/dev/null || echo "hub")
+
+if [ "$ROLE" = "agent" ]; then
+  echo "$(date) — Skipped: machine role is AGENT (nightly tests disabled)" >> /tmp/nightly-tests.log
+  exit 0
+fi
 
 LOG="/tmp/nightly-tests.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
