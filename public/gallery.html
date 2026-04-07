@@ -117,6 +117,8 @@
       <div class="tab-sep"></div>
       <button class="tab"        data-mode="mobile"          onclick="setMode('mobile')">📱 Mobile</button>
       <button class="tab"        data-mode="mobile-framed"   onclick="setMode('mobile-framed')">iPhone</button>
+      <div class="tab-sep"></div>
+      <button class="tab"        data-mode="gifs"            onclick="setMode('gifs')">🎬 GIFs</button>
       <span class="count-badge" id="countBadge"></span>
     </div>
     <div class="grid-wrap" id="gridWrap">
@@ -155,6 +157,7 @@ const FAVICONS = {
 
 let allApps = [];
 let appData = {};   // id → index.json data
+let gifData = {};   // id → gifs/index.json data
 let retakeData = {}; // id → retake.json data  { "mode/filename": true }
 let currentApp = null;
 let currentMode = 'desktop';
@@ -181,6 +184,10 @@ async function init() {
       const r = await fetch(`/api/retake/${a.id}`).then(r => r.json());
       retakeData[a.id] = r;
     } catch { retakeData[a.id] = {}; }
+    try {
+      const g = await fetch(`/screenshots/${a.id}/gifs/index.json`).then(r => r.json());
+      gifData[a.id] = g.gifs || [];
+    } catch { gifData[a.id] = []; }
   }));
 
   renderSidebar(statusMap);
@@ -195,7 +202,8 @@ function renderSidebar(statusMap) {
   const list = document.getElementById('appList');
   list.innerHTML = allApps.map(a => {
     const data = appData[a.id] || {};
-    const shots = (data.desktop || data.screenshots || []).length + (data.mobile || []).length;
+    const gifs = (gifData[a.id] || []).length;
+    const shots = (data.desktop || data.screenshots || []).length + (data.mobile || []).length + gifs;
     const favicon = FAVICONS[a.id] ? `<img src="${FAVICONS[a.id]}" onerror="this.style.display='none'">` : '';
     const dot = statusMap[a.id] || 'unknown';
     return `<div class="app-item" id="app-${a.id}" onclick="selectApp('${a.id}')">
@@ -226,6 +234,7 @@ function isNewFormat(id) {
 }
 
 function getShots(id, mode) {
+  if (mode === 'gifs') return gifData[id] || [];
   const data = appData[id];
   if (!data) return [];
   if (isNewFormat(id)) {
@@ -241,6 +250,7 @@ function getShots(id, mode) {
 }
 
 function shotUrl(id, mode, filename) {
+  if (mode === 'gifs') return `/screenshots/${id}/gifs/${filename}`;
   if (isNewFormat(id)) return `/screenshots/${id}/${mode}/${filename}`;
   // Flat format — files are directly in the app folder
   return `/screenshots/${id}/${filename}`;
@@ -251,8 +261,15 @@ function renderGrid() {
 
   // Show/hide tabs based on format
   const newFmt = isNewFormat(currentApp);
-  document.querySelectorAll('.tab[data-mode="mobile"], .tab[data-mode="mobile-framed"], .tab[data-mode="desktop-framed"], .tab-sep').forEach(el => {
+  const hasGifs = (gifData[currentApp] || []).length > 0;
+  document.querySelectorAll('.tab[data-mode="mobile"], .tab[data-mode="mobile-framed"], .tab[data-mode="desktop-framed"]').forEach(el => {
     el.style.display = newFmt ? '' : 'none';
+  });
+  document.querySelector('.tab[data-mode="gifs"]').style.display = hasGifs ? '' : 'none';
+  // Show/hide separators
+  document.querySelectorAll('.tab-sep').forEach((el, i) => {
+    if (i === 0) el.style.display = newFmt ? '' : 'none';
+    if (i === 1) el.style.display = hasGifs ? '' : 'none';
   });
   if (!newFmt && currentMode !== 'desktop') { currentMode = 'desktop'; document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.mode === 'desktop')); }
 
