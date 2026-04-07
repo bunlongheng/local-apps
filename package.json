@@ -14,6 +14,8 @@
   "dependencies": {
     "better-sqlite3": "^12.8.0",
     "express": "^4.18.2",
+    "gif-encoder-2": "^1.0.5",
+    "png-js": "^1.0.0",
     "qrcode": "^1.5.4",
     "sharp": "^0.34.5"
   },
