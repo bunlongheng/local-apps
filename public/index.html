@@ -529,10 +529,15 @@ function connectSSE() {
   es.onmessage = e => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'update') {
-      const app = apps.find(a => a.id === msg.id);
-      if (app) { app.status = msg.status; renderTable(); }
+      if (msg.status === 'removed') {
+        apps = apps.filter(a => a.id !== msg.id);
+        renderTable();
+      } else {
+        const app = apps.find(a => a.id === msg.id);
+        if (app) { app.status = msg.status; renderTable(); }
+      }
     }
-    if (msg.type === 'reload') { location.reload(); }
+    if (msg.type === 'reload') { load(); }
     if (msg.type === 'screenshots_done') { loadScreenshots(msg.id); }
     if (msg.type === 'icons_start') {
       (msg.ids || []).forEach(id => {

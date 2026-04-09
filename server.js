@@ -41,8 +41,11 @@ function writeCaddyfile(content) {
 }
 
 function reloadCaddy() {
-  try { execSync('caddy reload --config ' + CADDYFILE + ' --adapter caddyfile 2>/dev/null || brew services restart caddy 2>/dev/null || true'); }
-  catch { /* best effort */ }
+  // Validate first - never reload with broken config
+  try {
+    execSync('caddy validate --config ' + CADDYFILE + ' --adapter caddyfile 2>/dev/null');
+    execSync('caddy reload --config ' + CADDYFILE + ' --adapter caddyfile 2>/dev/null');
+  } catch { /* validation failed or reload failed - don't crash caddy */ }
 }
 
 function addCaddyEntry(id, port) {
@@ -429,7 +432,7 @@ app.delete('/api/apps/:id', (req, res) => {
   if (!deleted) return res.status(404).json({ error: 'not found' });
   teardownInfra(req.params.id);
   delete state[req.params.id];
-  broadcast({ type: 'reload' });
+  broadcast({ type: 'update', id: req.params.id, status: 'removed' });
   res.json({ ok: true });
 });
 
