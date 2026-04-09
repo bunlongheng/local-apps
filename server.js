@@ -331,6 +331,7 @@ app.get('/api/status', (req, res) => {
       launchAgentPath: a.launchAgentPath || null,
       icon: a.icon || null,
       repo: a.repo || null,
+      prodUrl: a.prodUrl || null,
       localPath: a.localPath || null,
       logPath: a.logPath || null,
       hostname: os.hostname(),
