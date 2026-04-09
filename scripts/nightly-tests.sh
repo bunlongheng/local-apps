@@ -59,19 +59,40 @@ for entry in "${APPS[@]}"; do
   fi
 
   cd "$dir"
+
+  # Unit + integration tests
   OUTPUT=$(npm test 2>&1)
   EXIT_CODE=$?
 
   if [ $EXIT_CODE -eq 0 ]; then
-    echo "  ✓ PASS" >> "$LOG"
-    PASS=$((PASS + 1))
-    RESULTS="$RESULTS\n✓ $name"
+    echo "  ✓ unit PASS" >> "$LOG"
   else
-    echo "  ✗ FAIL (exit $EXIT_CODE)" >> "$LOG"
+    echo "  ✗ unit FAIL (exit $EXIT_CODE)" >> "$LOG"
     echo "$OUTPUT" | tail -20 >> "$LOG"
     FAIL=$((FAIL + 1))
-    RESULTS="$RESULTS\n✗ $name — exit $EXIT_CODE"
+    RESULTS="$RESULTS\n✗ $name unit — exit $EXIT_CODE"
     FAILED_APPS+=("$name|$dir")
+  fi
+
+  # E2E tests (if test:e2e script exists)
+  HAS_E2E=$(node -e "try{const p=require('./package.json');console.log(p.scripts&&p.scripts['test:e2e']?'yes':'no')}catch{console.log('no')}" 2>/dev/null)
+  if [ "$HAS_E2E" = "yes" ]; then
+    E2E_OUT=$(npm run test:e2e 2>&1)
+    E2E_EXIT=$?
+    if [ $E2E_EXIT -eq 0 ]; then
+      echo "  ✓ e2e PASS" >> "$LOG"
+    else
+      echo "  ✗ e2e FAIL (exit $E2E_EXIT)" >> "$LOG"
+      echo "$E2E_OUT" | tail -15 >> "$LOG"
+      FAIL=$((FAIL + 1))
+      RESULTS="$RESULTS\n✗ $name e2e — exit $E2E_EXIT"
+      FAILED_APPS+=("$name|$dir")
+    fi
+  fi
+
+  if [ $EXIT_CODE -eq 0 ] && [ "${E2E_EXIT:-0}" -eq 0 ]; then
+    PASS=$((PASS + 1))
+    RESULTS="$RESULTS\n✓ $name"
   fi
 done
 

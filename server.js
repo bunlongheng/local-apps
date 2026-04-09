@@ -751,6 +751,50 @@ app.get('/api/generate-icons/status', (req, res) => {
   res.json(jobs);
 });
 
+// --- Cron Status API ---
+const CRON_JOBS = [
+  { id: 'git-pull-all',       hour: '12 AM', log: '/tmp/git-pull-all.log',       summary: null },
+  { id: 'nightly-tests',      hour: '1 AM',  log: '/tmp/nightly-tests.log',      summary: '/tmp/nightly-tests-summary.json' },
+  { id: 'nightly-screenshots', hour: '2 AM', log: '/tmp/nightly-screenshots.log', summary: null },
+  { id: 'nightly-gifs',       hour: '3 AM',  log: '/tmp/nightly-gifs.log',       summary: null },
+  { id: 'deep-audit',         hour: '4 AM',  log: '/tmp/deep-audit.log',         summary: '/tmp/deep-audit-summary.json' },
+  { id: 'nightly-scan',       hour: '5 AM',  log: '/tmp/nightly-scan.log',       summary: '/tmp/nightly-scan-summary.json' },
+  { id: 'nightly-summary',    hour: '6 AM',  log: '/tmp/nightly-summary.log',    summary: null },
+  { id: 'health-check-fix',   hour: '5min',  log: '/tmp/health-check-fix.log',   summary: '/tmp/health-check-summary.json' },
+  { id: 'link-crawler',       hour: '1:30 AM', log: '/tmp/link-crawler.log',     summary: '/tmp/link-crawler-summary.json' },
+];
+
+app.get('/api/crons', (req, res) => {
+  const results = CRON_JOBS.map(c => {
+    const result = { ...c, lastRun: null, lastLines: null, summaryData: null };
+    // Get last modified time of log
+    try {
+      const stat = fs.statSync(c.log);
+      result.lastRun = stat.mtime.toISOString();
+      // Last 10 lines
+      const content = fs.readFileSync(c.log, 'utf8');
+      result.lastLines = content.split('\n').slice(-12).join('\n');
+    } catch {}
+    // Get summary JSON
+    if (c.summary) {
+      try { result.summaryData = JSON.parse(fs.readFileSync(c.summary, 'utf8')); } catch {}
+    }
+    return result;
+  });
+  res.json(results);
+});
+
+app.get('/api/crons/:id/log', (req, res) => {
+  const cron = CRON_JOBS.find(c => c.id === req.params.id);
+  if (!cron) return res.status(404).json({ error: 'cron not found' });
+  try {
+    const lines = parseInt(req.query.lines) || 100;
+    const content = fs.readFileSync(cron.log, 'utf8');
+    const tail = content.split('\n').slice(-lines).join('\n');
+    res.type('text').send(tail);
+  } catch { res.type('text').send('No log file yet'); }
+});
+
 // --- File watcher (public dir only) ---
 let reloadTimer = null;
 fs.watch(path.join(__dirname, 'public'), { recursive: true }, () => {
