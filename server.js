@@ -777,15 +777,18 @@ app.get('/api/generate-icons/status', (req, res) => {
 
 // --- Cron Status API ---
 const CRON_JOBS = [
-  { id: 'git-pull-all',       hour: '12 AM', log: '/tmp/git-pull-all.log',       summary: null },
-  { id: 'nightly-tests',      hour: '1 AM',  log: '/tmp/nightly-tests.log',      summary: '/tmp/nightly-tests-summary.json' },
-  { id: 'nightly-screenshots', hour: '2 AM', log: '/tmp/nightly-screenshots.log', summary: null },
-  { id: 'nightly-gifs',       hour: '3 AM',  log: '/tmp/nightly-gifs.log',       summary: null },
-  { id: 'deep-audit',         hour: '4 AM',  log: '/tmp/deep-audit.log',         summary: '/tmp/deep-audit-summary.json' },
-  { id: 'nightly-scan',       hour: '5 AM',  log: '/tmp/nightly-scan.log',       summary: '/tmp/nightly-scan-summary.json' },
-  { id: 'nightly-summary',    hour: '6 AM',  log: '/tmp/nightly-summary.log',    summary: null },
-  { id: 'health-check-fix',   hour: '5min',  log: '/tmp/health-check-fix.log',   summary: '/tmp/health-check-summary.json' },
-  { id: 'link-crawler',       hour: '1:30 AM', log: '/tmp/link-crawler.log',     summary: '/tmp/link-crawler-summary.json' },
+  // Always running
+  { id: 'auto-restart',       hour: '30s',   desc: 'Restart any down app via launchctl',                    autoFix: true,  log: '/tmp/local-apps.log',           summary: null },
+  { id: 'health-check-fix',   hour: '5min',  desc: 'Quick fix + Claude agents for stubborn failures',       autoFix: true,  log: '/tmp/health-check-fix.log',     summary: '/tmp/health-check-summary.json' },
+  // Nightly pipeline
+  { id: 'git-pull-all',       hour: '12 AM', desc: 'Sync all repos from GitHub',                            autoFix: false, log: '/tmp/git-pull-all.log',         summary: null },
+  { id: 'nightly-tests',      hour: '1 AM',  desc: 'Unit + E2E tests, Claude agents auto-fix',              autoFix: true,  log: '/tmp/nightly-tests.log',        summary: '/tmp/nightly-tests-summary.json' },
+  { id: 'nightly-crawler',    hour: '1:30 AM', desc: 'Crawl all pages, screenshot errors, Claude agents fix', autoFix: true, log: '/tmp/link-crawler.log',         summary: '/tmp/link-crawler-summary.json' },
+  { id: 'nightly-screenshots', hour: '2 AM', desc: 'All apps desktop + mobile + framed',                    autoFix: false, log: '/tmp/nightly-screenshots.log',  summary: null },
+  { id: 'nightly-gifs',       hour: '3 AM',  desc: 'Animated HD recordings via LAN',                        autoFix: false, log: '/tmp/nightly-gifs.log',         summary: null },
+  { id: 'deep-audit',         hour: '4 AM',  desc: 'Cache, modules, ports, disk, Caddy',                    autoFix: true,  log: '/tmp/deep-audit.log',           summary: '/tmp/deep-audit-summary.json' },
+  { id: 'nightly-scan',       hour: '5 AM',  desc: 'Security + performance scan (flags only)',               autoFix: false, log: '/tmp/nightly-scan.log',         summary: '/tmp/nightly-scan-summary.json' },
+  { id: 'nightly-summary',    hour: '6 AM',  desc: 'Aggregate results, post to stickies',                   autoFix: false, log: '/tmp/nightly-summary.log',      summary: null },
 ];
 
 app.get('/api/crons', (req, res) => {
