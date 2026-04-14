@@ -1,0 +1,4 @@
+{
+  "role": "hub",
+  "description": "Primary machine - runs all bots, tests, auto-fix agents, screenshots"
+}

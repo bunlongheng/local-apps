@@ -6,7 +6,7 @@
  *
  * Usage:
  *   node scripts/gif-bot.js 3pi                               # all pages, auto-detect LAN
- *   node scripts/gif-bot.js 3pi --url http://10.0.0.138:3333  # explicit URL
+ *   node scripts/gif-bot.js 3pi --url http://remote-ip:3333  # explicit URL
  *   node scripts/gif-bot.js 3pi --pages /,/quality             # specific pages
  */
 

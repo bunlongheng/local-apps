@@ -13,7 +13,7 @@ if [ "$ROLE" = "agent" ]; then
   exit 0
 fi
 
-export PATH="/Users/bheng/.nvm/versions/node/v20.19.5/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH="$(dirname $(which node)):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
 LOG="/tmp/nightly-summary.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
@@ -77,7 +77,7 @@ echo -e "$REPORT" >> "$LOG"
 # Post to stickies
 source ~/.zshrc 2>/dev/null
 if command -v stickies &>/dev/null; then
-  echo -e "$REPORT" | stickies --title="Nightly Report $DATE" --tags=nightly,report --path=/AI 2>/dev/null || true
+  echo -e "$REPORT" | stickies --title="Nightly Report $DATE" --tags=nightly,report --path=/Reporting 2>/dev/null || true
   echo "  Posted to stickies" >> "$LOG"
 fi
 

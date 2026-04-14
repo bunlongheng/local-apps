@@ -15,7 +15,7 @@ if [ "$ROLE" = "agent" ]; then
   exit 0
 fi
 
-export PATH="/Users/bheng/.nvm/versions/node/v20.19.5/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH="$(dirname $(which node)):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
 LOG="/tmp/link-crawler.log"
 
@@ -23,22 +23,22 @@ echo "========================================" >> "$LOG"
 echo "Link Crawler - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG"
 echo "========================================" >> "$LOG"
 
-cd /Users/bheng/Sites/local-apps
+cd $HOME/Sites/local-apps
 
 # App paths lookup
 declare -A APP_PATHS
 APP_PATHS=(
-  [bheng]="/Users/bheng/Sites/bheng"
-  [tools]="/Users/bheng/Sites/tools"
-  [diagrams]="/Users/bheng/Sites/diagrams"
-  [claude]="/Users/bheng/Sites/claude"
-  [3pi]="/Users/bheng/Sites/3pi"
-  [3pi-poc]="/Users/bheng/Sites/3pi-poc"
-  [stickies]="/Users/bheng/Sites/stickies"
-  [vault]="/Users/bheng/Sites/vault"
-  [mindmaps]="/Users/bheng/Sites/mindmaps"
-  [safe]="/Users/bheng/Sites/safe"
-  [drop-web]="/Users/bheng/Sites/drop"
+  [bheng]="$HOME/Sites/bheng"
+  [tools]="$HOME/Sites/tools"
+  [diagrams]="$HOME/Sites/diagrams"
+  [claude]="$HOME/Sites/claude"
+  [3pi]="$HOME/Sites/3pi"
+  [3pi-poc]="$HOME/Sites/3pi-poc"
+  [stickies]="$HOME/Sites/stickies"
+  [vault]="$HOME/Sites/vault"
+  [mindmaps]="$HOME/Sites/mindmaps"
+  [safe]="$HOME/Sites/safe"
+  [drop-web]="$HOME/Sites/drop"
 )
 
 # ── Phase 1: Restart down apps ──────────────────────────────────────────────

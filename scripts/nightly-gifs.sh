@@ -13,14 +13,14 @@ if [ "$ROLE" = "agent" ]; then
   exit 0
 fi
 
-export PATH="/Users/bheng/.nvm/versions/node/v20.19.5/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH="$(dirname $(which node)):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
 LOG="/tmp/nightly-gifs.log"
 echo "========================================" >> "$LOG"
 echo "Nightly GIFs - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG"
 echo "========================================" >> "$LOG"
 
-cd /Users/bheng/Sites/local-apps
+cd $HOME/Sites/local-apps
 
 # Record 3pi GIFs (5 batches of 5 in parallel)
 PAGES_ALL="/:dashboard /quality:quality /security:security /bugs:bugs /performance:performance /tech-debt:tech-debt /deployment:deployment /releases:releases /cycles:cycles /capacity:capacity /velocity:velocity /metrics:metrics /architecture:architecture /data-flow:data-flow /database:database /jira-view:jira-view /pm:pm /slack:slack /links:links /notifications:notifications /api-reference:api-reference /me:me /settings:settings /admin/users:admin-users /admin/completed:admin-completed"

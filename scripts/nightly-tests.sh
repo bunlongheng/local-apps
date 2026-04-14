@@ -23,24 +23,24 @@ FIXED=0
 RESULTS=""
 FAILED_APPS=()
 
-export PATH="/Users/bheng/.nvm/versions/node/v20.19.5/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH="$(dirname $(which node)):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
 echo "========================================" >> "$LOG"
 echo "Nightly Test Run — $TIMESTAMP" >> "$LOG"
 echo "========================================" >> "$LOG"
 
 APPS=(
-  "bheng|/Users/bheng/Sites/bheng"
-  "tools|/Users/bheng/Sites/tools"
-  "diagrams|/Users/bheng/Sites/diagrams"
-  "claude|/Users/bheng/Sites/claude"
-  "3pi|/Users/bheng/Sites/3pi"
-  "3pi-poc|/Users/bheng/Sites/3pi-poc"
-  "stickies|/Users/bheng/Sites/stickies"
-  "vault|/Users/bheng/Sites/vault"
-  "mindmaps|/Users/bheng/Sites/mindmaps"
-  "safe|/Users/bheng/Sites/safe"
-  "drop-web|/Users/bheng/Sites/drop"
+  "bheng|$HOME/Sites/bheng"
+  "tools|$HOME/Sites/tools"
+  "diagrams|$HOME/Sites/diagrams"
+  "claude|$HOME/Sites/claude"
+  "3pi|$HOME/Sites/3pi"
+  "3pi-poc|$HOME/Sites/3pi-poc"
+  "stickies|$HOME/Sites/stickies"
+  "vault|$HOME/Sites/vault"
+  "mindmaps|$HOME/Sites/mindmaps"
+  "safe|$HOME/Sites/safe"
+  "drop-web|$HOME/Sites/drop"
 )
 
 # ── Phase 1: Run all tests ──────────────────────────────────────────────────

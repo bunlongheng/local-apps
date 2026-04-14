@@ -13,14 +13,14 @@ if [ "$ROLE" = "agent" ]; then
   exit 0
 fi
 
-export PATH="/Users/bheng/.nvm/versions/node/v20.19.5/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH="$(dirname $(which node)):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
 LOG="/tmp/nightly-screenshots.log"
 echo "========================================" >> "$LOG"
 echo "Nightly Screenshots - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG"
 echo "========================================" >> "$LOG"
 
-cd /Users/bheng/Sites/local-apps
+cd $HOME/Sites/local-apps
 node scripts/screenshot-bot.js >> "$LOG" 2>&1
 
 echo "Done: $(date '+%H:%M:%S')" >> "$LOG"

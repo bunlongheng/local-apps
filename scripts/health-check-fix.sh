@@ -22,7 +22,7 @@ FIXED=0
 TOTAL=0
 FAILED_APPS=()
 
-export PATH="/Users/bheng/.nvm/versions/node/v20.19.5/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH="$(dirname $(which node)):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
 echo "========================================" >> "$LOG"
 echo "Health Check & Fix — $TIMESTAMP" >> "$LOG"
@@ -33,7 +33,7 @@ echo "========================================" >> "$LOG"
 # Check local-apps monitor
 if ! curl -s -o /dev/null -w "" --max-time 3 http://localhost:9876/api/status 2>/dev/null; then
   echo "  ↻ Starting local-apps monitor..." >> "$LOG"
-  cd /Users/bheng/Sites/local-apps
+  cd $HOME/Sites/local-apps
   node server.js > /tmp/local-apps.log 2>&1 &
   sleep 3
 fi
@@ -52,19 +52,19 @@ fi
 # ── Step 2: Check all apps ───────────────────────────────────────────────────
 
 APPS=(
-  "bheng|3000|/Users/bheng/Sites/bheng|http"
-  "tools|3001|/Users/bheng/Sites/tools|http"
-  "diagrams|3002|/Users/bheng/Sites/diagrams|http"
-  "claude|3003|/Users/bheng/Sites/claude|http"
-  "3pi|3333|/Users/bheng/Sites/3pi|http"
-  "3pi-poc|3334|/Users/bheng/Sites/3pi-poc|http"
-  "stickies|4444|/Users/bheng/Sites/stickies|http"
-  "vault|4445|/Users/bheng/Sites/vault|http"
-  "mindmaps|5173|/Users/bheng/Sites/mindmaps|http"
-  "safe|6100|/Users/bheng/Sites/safe|http"
-  "drop-web|3010|/Users/bheng/Sites/drop|http"
-  "drop-menu|0|/Users/bheng/Sites/drop/electron|process:drop/electron"
-  "ai-spinner|0|/Users/bheng/Sites/streamdeck|process:streamdeck"
+  "bheng|3000|$HOME/Sites/bheng|http"
+  "tools|3001|$HOME/Sites/tools|http"
+  "diagrams|3002|$HOME/Sites/diagrams|http"
+  "claude|3003|$HOME/Sites/claude|http"
+  "3pi|3333|$HOME/Sites/3pi|http"
+  "3pi-poc|3334|$HOME/Sites/3pi-poc|http"
+  "stickies|4444|$HOME/Sites/stickies|http"
+  "vault|4445|$HOME/Sites/vault|http"
+  "mindmaps|5173|$HOME/Sites/mindmaps|http"
+  "safe|6100|$HOME/Sites/safe|http"
+  "drop-web|3010|$HOME/Sites/drop|http"
+  "drop-menu|0|$HOME/Sites/drop/electron|process:drop/electron"
+  "ai-spinner|0|$HOME/Sites/streamdeck|process:streamdeck"
 )
 
 for entry in "${APPS[@]}"; do

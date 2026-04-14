@@ -16,25 +16,25 @@ fi
 LOG="/tmp/git-pull-all.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
-export PATH="/Users/bheng/.nvm/versions/node/v20.19.5/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH="$(dirname $(which node)):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
 echo "========================================" >> "$LOG"
 echo "Git Pull All - $TIMESTAMP" >> "$LOG"
 echo "========================================" >> "$LOG"
 
 REPOS=(
-  "/Users/bheng/Sites/bheng"
-  "/Users/bheng/Sites/tools"
-  "/Users/bheng/Sites/diagrams"
-  "/Users/bheng/Sites/claude"
-  "/Users/bheng/Sites/3pi"
-  "/Users/bheng/Sites/3pi-poc"
-  "/Users/bheng/Sites/stickies"
-  "/Users/bheng/Sites/vault"
-  "/Users/bheng/Sites/mindmaps"
-  "/Users/bheng/Sites/safe"
-  "/Users/bheng/Sites/drop"
-  "/Users/bheng/Sites/local-apps"
+  "$HOME/Sites/bheng"
+  "$HOME/Sites/tools"
+  "$HOME/Sites/diagrams"
+  "$HOME/Sites/claude"
+  "$HOME/Sites/3pi"
+  "$HOME/Sites/3pi-poc"
+  "$HOME/Sites/stickies"
+  "$HOME/Sites/vault"
+  "$HOME/Sites/mindmaps"
+  "$HOME/Sites/safe"
+  "$HOME/Sites/drop"
+  "$HOME/Sites/local-apps"
 )
 
 PULLED=0

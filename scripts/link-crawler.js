@@ -180,7 +180,7 @@ async function main() {
 
         try {
             const { execSync } = require('child_process');
-            execSync(`source ~/.zshrc 2>/dev/null; echo "${errorReport.replace(/"/g, '\\"')}" | stickies --title="Link Crawler: ${totalErrors} errors" --tags=crawler,errors --path=/AI 2>/dev/null || true`, { shell: '/bin/zsh' });
+            execSync(`source ~/.zshrc 2>/dev/null; echo "${errorReport.replace(/"/g, '\\"')}" | stickies --title="Link Crawler: ${totalErrors} errors" --tags=crawler,errors --path=/Reporting 2>/dev/null || true`, { shell: '/bin/zsh' });
         } catch {}
     }
 

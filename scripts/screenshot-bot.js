@@ -608,7 +608,7 @@ async function flowMindmaps(page, appDir, creds) {
 }
 
 async function flow3pi(page, appDir, creds) {
-  const base = 'http://10.0.0.138:3333';
+  const base = process.env.REMOTE_URL || 'http://localhost:3333';
 
   // 1. Login via landing
   await page.goto(base, { waitUntil: 'commit', timeout: 60000 });

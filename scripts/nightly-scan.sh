@@ -17,24 +17,24 @@ fi
 LOG="/tmp/nightly-scan.log"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
-export PATH="/Users/bheng/.nvm/versions/node/v20.19.5/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH="$(dirname $(which node)):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
 echo "========================================" >> "$LOG"
 echo "Security & Performance Scan - $TIMESTAMP" >> "$LOG"
 echo "========================================" >> "$LOG"
 
 APPS=(
-  "bheng|/Users/bheng/Sites/bheng|3000"
-  "tools|/Users/bheng/Sites/tools|3001"
-  "diagrams|/Users/bheng/Sites/diagrams|3002"
-  "claude|/Users/bheng/Sites/claude|3003"
-  "3pi|/Users/bheng/Sites/3pi|3333"
-  "3pi-poc|/Users/bheng/Sites/3pi-poc|3334"
-  "stickies|/Users/bheng/Sites/stickies|4444"
-  "vault|/Users/bheng/Sites/vault|4445"
-  "mindmaps|/Users/bheng/Sites/mindmaps|5173"
-  "safe|/Users/bheng/Sites/safe|6100"
-  "drop-web|/Users/bheng/Sites/drop|3010"
+  "bheng|$HOME/Sites/bheng|3000"
+  "tools|$HOME/Sites/tools|3001"
+  "diagrams|$HOME/Sites/diagrams|3002"
+  "claude|$HOME/Sites/claude|3003"
+  "3pi|$HOME/Sites/3pi|3333"
+  "3pi-poc|$HOME/Sites/3pi-poc|3334"
+  "stickies|$HOME/Sites/stickies|4444"
+  "vault|$HOME/Sites/vault|4445"
+  "mindmaps|$HOME/Sites/mindmaps|5173"
+  "safe|$HOME/Sites/safe|6100"
+  "drop-web|$HOME/Sites/drop|3010"
 )
 
 AGENT_PIDS=()
@@ -123,7 +123,7 @@ if [ "$TOTAL_FLAGS" -gt 0 ]; then
   source ~/.zshrc 2>/dev/null
   if command -v stickies &>/dev/null; then
     echo -e "# Nightly Scan - $TIMESTAMP\n\n$SEC_FLAGS security flags, $PERF_FLAGS performance flags\n\n$ALL_FLAGS" | \
-      stickies --title="Nightly Scan: ${TOTAL_FLAGS} flags" --tags=security,performance,audit --path=/AI 2>/dev/null || true
+      stickies --title="Nightly Scan: ${TOTAL_FLAGS} flags" --tags=security,performance,audit --path=/Reporting 2>/dev/null || true
   fi
 fi
 

@@ -18,24 +18,24 @@ TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 ISSUES=0
 FIXED=0
 
-export PATH="/Users/bheng/.nvm/versions/node/v20.19.5/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+export PATH="$(dirname $(which node)):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
 echo "========================================" >> "$LOG"
 echo "Deep Audit - $TIMESTAMP" >> "$LOG"
 echo "========================================" >> "$LOG"
 
 APPS=(
-  "bheng|3000|/Users/bheng/Sites/bheng"
-  "tools|3001|/Users/bheng/Sites/tools"
-  "diagrams|3002|/Users/bheng/Sites/diagrams"
-  "claude|3003|/Users/bheng/Sites/claude"
-  "3pi|3333|/Users/bheng/Sites/3pi"
-  "3pi-poc|3334|/Users/bheng/Sites/3pi-poc"
-  "stickies|4444|/Users/bheng/Sites/stickies"
-  "vault|4445|/Users/bheng/Sites/vault"
-  "mindmaps|5173|/Users/bheng/Sites/mindmaps"
-  "safe|6100|/Users/bheng/Sites/safe"
-  "drop-web|3010|/Users/bheng/Sites/drop"
+  "bheng|3000|$HOME/Sites/bheng"
+  "tools|3001|$HOME/Sites/tools"
+  "diagrams|3002|$HOME/Sites/diagrams"
+  "claude|3003|$HOME/Sites/claude"
+  "3pi|3333|$HOME/Sites/3pi"
+  "3pi-poc|3334|$HOME/Sites/3pi-poc"
+  "stickies|4444|$HOME/Sites/stickies"
+  "vault|4445|$HOME/Sites/vault"
+  "mindmaps|5173|$HOME/Sites/mindmaps"
+  "safe|6100|$HOME/Sites/safe"
+  "drop-web|3010|$HOME/Sites/drop"
 )
 
 # ── Check 1: Turbopack/Next.js cache corruption ─────────────────────────────
@@ -232,7 +232,7 @@ if [ "$ISSUES" -gt 0 ] || [ "$FIXED" -gt 0 ]; then
   source ~/.zshrc 2>/dev/null
   SUMMARY="Deep Audit $TIMESTAMP: $FIXED fixed, $ISSUES unresolved"
   if command -v stickies &>/dev/null; then
-    tail -30 "$LOG" | stickies --title="$SUMMARY" --tags=audit,infra --path=/AI 2>/dev/null || true
+    tail -30 "$LOG" | stickies --title="$SUMMARY" --tags=audit,infra --path=/Reporting 2>/dev/null || true
   fi
 fi
 

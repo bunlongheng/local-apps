@@ -8,3 +8,10 @@ local.db
 .DS_Store
 public/screenshots/
 scripts/screenshot-credentials.json
+.env
+.env.local
+.env.*.local
+*.plist
+machine-role.json
+-*
+OPEN-SOURCE-PLAN.md

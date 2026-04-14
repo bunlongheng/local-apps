@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
 sync-env: Scan all .env files in ~/Sites and push to Safe API.
-Usage: python3 scripts/sync-env.sh [--machine m2] [--host http://10.0.0.218:6100]
+Usage: python3 scripts/sync-env.sh [--machine m2] [--host http://localhost:6100]
 """
 
 import os, json, subprocess, socket, argparse
 
 SITES_DIR = os.path.expanduser("~/Sites")
 SKIP_SUFFIXES = (".example", ".sample", ".template")
-DEFAULT_HOST = "http://10.0.0.218:6100"
+DEFAULT_HOST = "http://localhost:6100"
 SAFE_API_KEY = os.environ.get("SAFE_API_KEY", "")
 
 def collect_keys(sites_dir):
