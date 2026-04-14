@@ -217,6 +217,13 @@ function getLanIp() {
 }
 const LAN_IP = getLanIp();
 
+// --- Tailscale IP detection ---
+function getTailscaleIp() {
+  try { return execSync('tailscale ip -4 2>/dev/null').toString().trim(); }
+  catch { return null; }
+}
+const TAILSCALE_IP = getTailscaleIp();
+
 // --- Machine model detection ---
 const MACHINE_MODEL = (() => {
   try {
@@ -324,6 +331,7 @@ app.get('/api/status', (req, res) => {
       name: a.name,
       localUrl: a.localUrl,
       lanUrl: a.localUrl ? a.localUrl.replace('localhost', LAN_IP) : null,
+      tailscaleUrl: (TAILSCALE_IP && a.localUrl) ? a.localUrl.replace('localhost', TAILSCALE_IP) : null,
       status: s.status,
       lastChecked: s.lastChecked,
       caddyUrl: a.caddyUrl || null,
@@ -338,7 +346,7 @@ app.get('/api/status', (req, res) => {
       hasScreenshots,
     };
   });
-  res.json({ apps, lanIp: LAN_IP, machineModel: MACHINE_MODEL, machineRole: MACHINE_ROLE, monitorUrl: `http://${LAN_IP}:${PORT}` });
+  res.json({ apps, lanIp: LAN_IP, tailscaleIp: TAILSCALE_IP, machineModel: MACHINE_MODEL, machineRole: MACHINE_ROLE, monitorUrl: `http://${LAN_IP}:${PORT}` });
 });
 
 // --- CRUD: Apps ---
