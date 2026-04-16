@@ -33,6 +33,11 @@
   ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
   body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; touch-action: manipulation; }
 
+  /* Copy button */
+  .copy-btn { width: 28px; height: 28px; background: none; border: none; cursor: pointer; flex-shrink: 0; opacity: 0.3; transition: opacity 0.15s; background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='9' y='9' width='13' height='13' rx='2'/%3E%3Cpath d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; }
+  .copy-btn:hover, .copy-btn:active { opacity: 1; }
+  .copy-btn.copied { opacity: 1; background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2322c55e' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E"); }
+
   /* Icon generation spin */
   @keyframes icon-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   .icon-spinning img, .icon-spinning span { animation: icon-spin 0.8s linear infinite; border-radius: 50% !important; }
@@ -278,12 +283,12 @@ curl -X POST http://localhost:9876/api/apps \
 <div class="modal-backdrop" id="modalBackdrop" onclick="closeModal(event)">
   <div class="modal">
     <button class="modal-close" onclick="closeModal()">✕</button>
-    <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between">
+    <div class="modal-header">
       <div style="display:flex;align-items:center;gap:8px">
         <span class="dot" id="modalDot"></span>
         <span class="modal-title" id="modalTitle"></span>
       </div>
-      <span id="modalChecked" style="color:var(--muted);font-size:10px"></span>
+      <div id="modalChecked" style="color:var(--muted);font-size:9px;margin-top:4px;padding-left:20px"></div>
     </div>
     <div class="modal-rows" id="modalRows"></div>
     <div id="modalScreenshots"></div>
@@ -652,7 +657,7 @@ function openModal(app) {
       : `<span>${r.value || ''}${r.extra || ''}</span>`;
     const copyVal = r.url || r.value || '';
     const copyBtn = copyVal
-      ? `<button onclick="event.stopPropagation();navigator.clipboard.writeText('${escHtml(copyVal)}');this.innerHTML='<svg width=\\'12\\' height=\\'12\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'#22c55e\\' stroke-width=\\'2\\'><polyline points=\\'20 6 9 17 4 12\\'/></svg>';setTimeout(()=>this.innerHTML='<svg width=\\'12\\' height=\\'12\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'currentColor\\' stroke-width=\\'2\\'><rect x=\\'9\\' y=\\'9\\' width=\\'13\\' height=\\'13\\' rx=\\'2\\'/><path d=\\'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1\\'/></svg>',1200)" style="background:none;border:none;color:var(--muted);padding:4px 6px;cursor:pointer;flex-shrink:0;opacity:0.4;transition:opacity 0.15s;display:flex;align-items:center" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.4'"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>`
+      ? `<button class="copy-btn" onclick="event.stopPropagation();navigator.clipboard.writeText('${escHtml(copyVal)}');this.classList.add('copied');setTimeout(()=>this.classList.remove('copied'),1200)"></button>`
       : '';
     return `
       <div class="modal-row" style="display:flex;align-items:center">
