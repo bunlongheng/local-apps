@@ -618,17 +618,19 @@ function openModal(app) {
     ? ` &nbsp;<button class="start-btn" id="start-${app.id}" ${isStarting ? 'disabled' : ''} onclick="startApp('${app.id}',this)">${isStarting ? '⟳ Starting…' : '▶ Start'}</button>`
     : '';
 
+  const checkedStr = app.lastChecked ? new Date(app.lastChecked).toLocaleString() : '';
+
   const rows = [
-    ['⬤ Status', `<span class="status-text ${app.status}">${statusLabel}</span>${startBtnHtml}`],
-    app.lastChecked ?     ['🕐 Checked',     new Date(app.lastChecked).toLocaleString()] : null,
-    port ?                ['🔌 Port',         port] : null,
-    app.repo ?            ['🐙 GitHub',       `<a href="${app.repo}" target="_blank" onclick="event.stopPropagation()">⇗ ${app.repo.replace('https://github.com/','')}</a>`] : null,
-    app.prodUrl ?         ['🚀 Prod',         `<a href="${app.prodUrl}" target="_blank" onclick="event.stopPropagation()">${app.prodUrl.replace('https://','')}</a>`] : null,
-    app.localUrl ?        ['🌐 Local',        `<a href="${activeMachine ? (app.lanUrl || app.localUrl) : app.localUrl}" target="_blank" onclick="event.stopPropagation()">${activeMachine ? (app.lanUrl || app.localUrl) : app.localUrl}</a>`] : null,
-    !activeMachine && app.caddyUrl ? ['🔗 Caddy', `<a href="${app.caddyUrl}" target="_blank" onclick="event.stopPropagation()">${app.caddyUrl}</a>`] : null,
+    port ? ['🔌 Port', `${port} ${startBtnHtml} <span style="float:right;color:var(--muted);font-size:10px">${checkedStr}</span>`] : null,
+    app.localUrl ?        ['🌐 Local',      `<a href="${app.localUrl}" target="_blank" onclick="event.stopPropagation()">${app.localUrl}</a>`] : null,
+    app.lanUrl ?          ['📡 LAN',        `<a href="${app.lanUrl}" target="_blank" onclick="event.stopPropagation()">${app.lanUrl}</a>`] : null,
+    app.tailscaleUrl ?    ['🔗 Tailscale',  `<a href="${app.tailscaleUrl}" target="_blank" onclick="event.stopPropagation()">${app.tailscaleUrl}</a>`] : null,
+    app.caddyUrl ?        ['🏠 Caddy',      `<a href="${app.caddyUrl}" target="_blank" onclick="event.stopPropagation()">${app.caddyUrl}</a>`] : null,
+    app.prodUrl ?         ['🚀 Prod',       `<a href="${app.prodUrl}" target="_blank" onclick="event.stopPropagation()">${app.prodUrl.replace('https://','')}</a>`] : null,
+    app.repo ?            ['🐙 GitHub',     `<a href="${app.repo}" target="_blank" onclick="event.stopPropagation()">⇗ ${app.repo.replace('https://github.com/','')}</a>`] : null,
     !activeMachine && app.localPath ? ['📁 Path', pathVal(app.localPath)] : null,
     !activeMachine && app.logPath ?   ['📄 Log',  pathVal(app.logPath)] : null,
-    !activeMachine && app.hasScreenshots ? ['📸 Screenshots', `<a href="/gallery.html?app=${app.id}" target="_blank" onclick="event.stopPropagation()">View Gallery</a>`] : null,
+    app.hasScreenshots ?  ['📸 Screenshots', `<a href="/gallery.html?app=${app.id}" target="_blank" onclick="event.stopPropagation()">View Gallery</a>`] : null,
   ].filter(Boolean);
 
   const modalRows = document.getElementById('modalRows');
