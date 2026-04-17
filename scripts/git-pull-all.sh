@@ -58,6 +58,22 @@ for dir in "${REPOS[@]}"; do
       echo "  PULL $name - updated" >> "$LOG"
       echo "  $OUTPUT" | head -3 >> "$LOG"
       PULLED=$((PULLED + 1))
+
+      # Rebuild if package.json has a build script
+      if [ -f "$dir/package.json" ] && grep -q '"build"' "$dir/package.json" 2>/dev/null; then
+        echo "  BUILD $name..." >> "$LOG"
+        cd "$dir" && npm run build >> "$LOG" 2>&1
+        if [ $? -eq 0 ]; then
+          echo "  BUILD $name - OK" >> "$LOG"
+          # Restart the app to pick up new build
+          launchctl stop "com.bheng.$name" 2>/dev/null
+          sleep 1
+          launchctl start "com.bheng.$name" 2>/dev/null
+          echo "  RESTART $name" >> "$LOG"
+        else
+          echo "  BUILD $name - FAILED" >> "$LOG"
+        fi
+      fi
     fi
   else
     echo "  FAIL $name - $OUTPUT" >> "$LOG"

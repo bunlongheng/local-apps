@@ -333,6 +333,7 @@ app.get('/api/status', (req, res) => {
       lanUrl: a.localUrl ? a.localUrl.replace('localhost', LAN_IP) : null,
       tailscaleUrl: (TAILSCALE_IP && a.localUrl) ? a.localUrl.replace('localhost', TAILSCALE_IP) : null,
       status: s.status,
+      mode: (a.startCommand || '').includes('start') && !(a.startCommand || '').includes('dev') ? 'prod' : 'dev',
       lastChecked: s.lastChecked,
       caddyUrl: a.caddyUrl || null,
       launchAgent: a.launchAgent || null,

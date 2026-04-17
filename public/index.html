@@ -459,7 +459,7 @@ function renderTable() {
         <div style="display:flex;align-items:center;gap:12px">
           <span class="dot ${app.status}"></span>
           <span class="app-icon-wrap" id="icon-${app.id}">${appIcon(app)}</span>
-          <a class="app-name" href="${app.lanUrl || app.localUrl || '#'}" target="_blank" onclick="event.stopPropagation()">${app.name}</a>
+          <a class="app-name" href="${app.lanUrl || app.localUrl || '#'}" target="_blank" onclick="event.stopPropagation()">${app.name}</a>${app.mode === 'prod' ? '<span style="font-size:8px;font-weight:700;color:#22c55e;margin-left:6px;opacity:0.6">PROD</span>' : '<span style="font-size:8px;font-weight:700;color:#f59e0b;margin-left:6px;opacity:0.6">DEV</span>'}
         </div>
       </td>
       <td class="col-hostname" style="text-align:left"><a href="${app.caddyUrl || app.localUrl || '#'}" target="_blank" onclick="event.stopPropagation()" style="color:var(--text);font-size:11px;text-decoration:none">${(app.caddyUrl || app.localUrl || '').replace(/^https?:\/\//, '') || '—'}</a></td>
