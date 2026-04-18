@@ -477,6 +477,22 @@ app.delete('/api/apps/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Dynamic manifest (adapts name based on access method) ---
+app.get('/api/manifest', (req, res) => {
+  const host = req.hostname || req.headers.host || '';
+  let label = 'Local Apps';
+  if (host.startsWith('100.')) label = 'Apps (Tailscale)';
+  else if (host.startsWith('10.') || host.startsWith('192.168.')) label = 'Apps (LAN)';
+  else if (host.endsWith('.localhost')) label = 'Apps (Caddy)';
+
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'manifest.json'), 'utf8'));
+  manifest.name = label;
+  manifest.short_name = label;
+  manifest.start_url = `http://${req.headers.host}/`;
+  res.setHeader('Content-Type', 'application/manifest+json');
+  res.json(manifest);
+});
+
 // --- Other routes ---
 app.get('/api/qr', async (req, res) => {
   const url = `http://${LAN_IP}:${PORT}`;

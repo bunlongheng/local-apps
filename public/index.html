@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/icon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png">
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="/api/manifest">
 <meta name="theme-color" content="#0f1117">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -365,11 +365,29 @@ setInterval(async () => {
   }
 }, 30000);
 
+function detectAccessMode() {
+  const host = location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') return { mode: 'local', label: 'localhost', color: '#64748b' };
+  if (host.endsWith('.localhost')) return { mode: 'caddy', label: host, color: '#8b5cf6' };
+  if (host.startsWith('10.') || host.startsWith('192.168.')) return { mode: 'lan', label: host, color: '#3b82f6' };
+  if (host.startsWith('100.')) return { mode: 'tailscale', label: host, color: '#06b6d4' };
+  return { mode: 'remote', label: host, color: '#22c55e' };
+}
+
 function updateHeader(hostname, model, ip) {
   const shortHost = (hostname || '').replace('.local', '') || 'Local';
+  const access = detectAccessMode();
   document.getElementById('machineTitle').textContent = shortHost;
-  document.title = shortHost + ' — Local Apps';
-  document.getElementById('machineInfo').textContent = ip || '';
+
+  // Show access mode indicator
+  const modeLabel = { local: '', lan: 'LAN', tailscale: 'Tailscale', caddy: 'Caddy', remote: 'Remote' }[access.mode] || '';
+  const displayIp = access.mode === 'tailscale' ? location.host : (access.mode === 'lan' ? location.host : ip || '');
+  const badge = modeLabel ? `<span style="font-size:9px;font-weight:700;color:${access.color};background:${access.color}15;border:1px solid ${access.color}30;padding:1px 6px;border-radius:4px;margin-left:6px">${modeLabel}</span>` : '';
+  document.getElementById('machineInfo').innerHTML = (displayIp || '') + badge;
+
+  // Set page title with access mode
+  document.title = shortHost + (modeLabel ? ` (${modeLabel})` : '') + ' — Local Apps';
+
   const iconSrc = deviceSvg(model);
   const icon = document.getElementById('deviceIcon');
   if (iconSrc) { icon.src = iconSrc; icon.style.display = 'block'; }
