@@ -264,33 +264,8 @@ function deleteMachine(id) {
   return db.prepare('DELETE FROM machines WHERE id = ?').run(id).changes > 0;
 }
 
-// --- Claude ---
-function getClaude(category) {
-  if (category) return db.prepare('SELECT * FROM claude WHERE category = ? ORDER BY updated_at DESC').all(category);
-  return db.prepare('SELECT * FROM claude ORDER BY updated_at DESC').all();
-}
-
-function getClaudeItem(id) {
-  return db.prepare('SELECT * FROM claude WHERE id = ?').get(id) || null;
-}
-
-function upsertClaude(data) {
-  db.prepare(`
-    INSERT INTO claude (id, category, name, content, meta)
-    VALUES (@id, @category, @name, @content, @meta)
-    ON CONFLICT(id) DO UPDATE SET
-      category=@category, name=@name, content=@content, meta=@meta, updated_at=datetime('now')
-  `).run({ id: data.id, category: data.category, name: data.name, content: data.content, meta: data.meta || null });
-  return getClaudeItem(data.id);
-}
-
-function deleteClaude(id) {
-  return db.prepare('DELETE FROM claude WHERE id = ?').run(id).changes > 0;
-}
-
 module.exports = {
   getApps, getApp, upsertApp, deleteApp,
   getMachines, upsertMachine, deleteMachine,
   getRemoteApps, syncRemoteApps, deleteRemoteApps,
-  getClaude, getClaudeItem, upsertClaude, deleteClaude,
 };

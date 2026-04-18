@@ -419,84 +419,6 @@
         }
       }
     },
-    "/api/apps/export": {
-      "get": {
-        "tags": ["Machine Sync"],
-        "summary": "Export portable app list",
-        "description": "Returns app list without machine-specific paths (localPath, logPath). Used by `/api/sync` to merge apps across machines.",
-        "responses": {
-          "200": {
-            "description": "Portable app list",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "hostname": { "type": "string" },
-                    "lanIp": { "type": "string" },
-                    "apps": {
-                      "type": "array",
-                      "items": { "$ref": "#/components/schemas/AppExport" }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/sync": {
-      "post": {
-        "tags": ["Machine Sync"],
-        "summary": "Sync from remote machine",
-        "description": "Connects to another Local Apps instance and merges its app list into this machine. Adds missing apps (with localPath derived from ~/Sites/{id}), and syncs ports/repos/icons for existing apps.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["remote"],
-                "properties": {
-                  "remote": {
-                    "type": "string",
-                    "description": "IP or IP:port of remote machine",
-                    "example": "10.0.0.218"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Sync result",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/SyncResult" }
-              }
-            }
-          },
-          "400": {
-            "description": "Missing remote parameter",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
-              }
-            }
-          },
-          "502": {
-            "description": "Failed to reach remote machine",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/screenshots": {
       "get": {
         "tags": ["Screenshots"],
@@ -893,18 +815,6 @@
           "hasScreenshots": { "type": "boolean" }
         }
       },
-      "AppExport": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string" },
-          "name": { "type": "string" },
-          "healthUrl": { "type": "string" },
-          "localUrl": { "type": "string" },
-          "repo": { "type": "string", "nullable": true },
-          "startCommand": { "type": "string", "nullable": true },
-          "icon": { "type": "string", "nullable": true }
-        }
-      },
       "Machine": {
         "type": "object",
         "properties": {
@@ -924,22 +834,6 @@
           "lanIp": { "type": "string", "example": "10.0.0.218" },
           "port": { "type": "integer", "example": 9876 },
           "appCount": { "type": "integer", "example": 10 }
-        }
-      },
-      "SyncResult": {
-        "type": "object",
-        "properties": {
-          "synced": { "type": "boolean", "example": true },
-          "remote": {
-            "type": "object",
-            "properties": {
-              "hostname": { "type": "string" },
-              "ip": { "type": "string" }
-            }
-          },
-          "added": { "type": "integer", "description": "Number of new apps added" },
-          "updated": { "type": "integer", "description": "Number of existing apps updated" },
-          "total": { "type": "integer", "description": "Total apps after sync" }
         }
       },
       "Error": {
