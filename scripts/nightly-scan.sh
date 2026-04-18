@@ -28,13 +28,10 @@ APPS=(
   "tools|$HOME/Sites/tools|3001"
   "diagrams|$HOME/Sites/diagrams|3002"
   "claude|$HOME/Sites/claude|3003"
-  "3pi|$HOME/Sites/3pi|3333"
-  "3pi-poc|$HOME/Sites/3pi-poc|3334"
   "stickies|$HOME/Sites/stickies|4444"
-  "vault|$HOME/Sites/vault|4445"
   "mindmaps|$HOME/Sites/mindmaps|5173"
   "safe|$HOME/Sites/safe|6100"
-  "drop-web|$HOME/Sites/drop|3010"
+  "drop|$HOME/Sites/drop|3010"
 )
 
 AGENT_PIDS=()

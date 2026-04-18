@@ -32,19 +32,15 @@ APP_PATHS=(
   [tools]="$HOME/Sites/tools"
   [diagrams]="$HOME/Sites/diagrams"
   [claude]="$HOME/Sites/claude"
-  [3pi]="$HOME/Sites/3pi"
-  [3pi-poc]="$HOME/Sites/3pi-poc"
   [stickies]="$HOME/Sites/stickies"
-  [vault]="$HOME/Sites/vault"
   [mindmaps]="$HOME/Sites/mindmaps"
   [safe]="$HOME/Sites/safe"
-  [drop-web]="$HOME/Sites/drop"
+  [drop]="$HOME/Sites/drop"
 )
 
 # ── Phase 1: Restart down apps ──────────────────────────────────────────────
 
 echo "  Phase 1: restarting down apps..." >> "$LOG"
-for pair in "bheng:3000" "tools:3001" "diagrams:3002" "claude:3003" "3pi:3333" "3pi-poc:3334" "stickies:4444" "vault:4445" "mindmaps:5173" "safe:6100" "drop-web:3010"; do
   IFS=':' read -r name port <<< "$pair"
   code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://localhost:$port/" 2>/dev/null)
   if [ "$code" = "000" ] || [ "$code" -ge 500 ]; then

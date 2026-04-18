@@ -29,13 +29,10 @@ APPS=(
   "tools|3001|$HOME/Sites/tools"
   "diagrams|3002|$HOME/Sites/diagrams"
   "claude|3003|$HOME/Sites/claude"
-  "3pi|3333|$HOME/Sites/3pi"
-  "3pi-poc|3334|$HOME/Sites/3pi-poc"
   "stickies|4444|$HOME/Sites/stickies"
-  "vault|4445|$HOME/Sites/vault"
   "mindmaps|5173|$HOME/Sites/mindmaps"
   "safe|6100|$HOME/Sites/safe"
-  "drop-web|3010|$HOME/Sites/drop"
+  "drop|3010|$HOME/Sites/drop"
 )
 
 # ── Check 1: Turbopack/Next.js cache corruption ─────────────────────────────

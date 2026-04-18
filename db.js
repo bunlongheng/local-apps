@@ -35,17 +35,6 @@ db.exec(`
 try { db.exec(`ALTER TABLE apps ADD COLUMN start_command TEXT DEFAULT 'npm run dev'`); } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE apps ADD COLUMN icon TEXT`); } catch { /* already exists */ }
 
-// --- Claude table ---
-db.exec(`
-  CREATE TABLE IF NOT EXISTS claude (
-    id TEXT PRIMARY KEY,
-    type TEXT,
-    key TEXT,
-    value TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )
-`);
 
 // --- Machines table ---
 db.exec(`

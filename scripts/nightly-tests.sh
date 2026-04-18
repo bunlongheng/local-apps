@@ -34,13 +34,10 @@ APPS=(
   "tools|$HOME/Sites/tools"
   "diagrams|$HOME/Sites/diagrams"
   "claude|$HOME/Sites/claude"
-  "3pi|$HOME/Sites/3pi"
-  "3pi-poc|$HOME/Sites/3pi-poc"
   "stickies|$HOME/Sites/stickies"
-  "vault|$HOME/Sites/vault"
   "mindmaps|$HOME/Sites/mindmaps"
   "safe|$HOME/Sites/safe"
-  "drop-web|$HOME/Sites/drop"
+  "drop|$HOME/Sites/drop"
 )
 
 # ── Phase 1: Run all tests ──────────────────────────────────────────────────

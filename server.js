@@ -251,7 +251,6 @@ function getState(id) {
 
 // --- HTTP health check (GET, only 2xx/3xx = "up") ---
 const http = require('http');
-const https = require('https');
 function tcpCheck(url) {
   return new Promise(resolve => {
     try {
