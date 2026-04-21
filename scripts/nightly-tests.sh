@@ -38,6 +38,9 @@ APPS=(
   "mindmaps|$HOME/Sites/mindmaps"
   "safe|$HOME/Sites/safe"
   "drop|$HOME/Sites/drop"
+  "audit|$HOME/Sites/audit"
+  "workflows|$HOME/Sites/workflows"
+  "system-design|$HOME/Sites/system-design"
 )
 
 # ── Phase 1: Run all tests ──────────────────────────────────────────────────

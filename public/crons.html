@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cron Jobs — Local Apps</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<meta name="theme-color" content="#0f1117">
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --border: #222222;
+    --text: #c9c9c9;
+    --muted: #555555;
+    --up: #4ade80;
+    --down: #f87171;
+    --accent: #c9c9c9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { color-scheme: dark; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+  body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+
+  /* Sidebar */
+  .sidebar { position:fixed; top:0; left:0; bottom:0; width:200px; background:#111; border-right:1px solid var(--border); display:flex; flex-direction:column; z-index:100; }
+  .sidebar-header { padding:16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .sidebar-ip { font-size:11px; color:var(--muted); font-weight:500; letter-spacing:0.02em; }
+  .sidebar-nav { padding:12px 8px; display:flex; flex-direction:column; gap:1px; }
+  .sidebar-nav a { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:7px; font-size:12px; color:var(--muted); text-decoration:none; transition:all 0.12s; font-weight:500; }
+  .sidebar-nav a:hover { background:rgba(255,255,255,0.05); color:var(--text); }
+  .sidebar-nav a.active { background:rgba(255,255,255,0.08); color:#fff; font-weight:600; }
+  .sidebar-nav a svg { opacity:0.45; flex-shrink:0; }
+  .sidebar-nav a.active svg { opacity:0.9; }
+  .sidebar-footer { margin-top:auto; padding:12px 16px; border-top:1px solid var(--border); font-size:10px; color:var(--muted); }
+  .page-body { margin-left:200px; }
+  .hamburger { display:none; background:none; border:none; color:var(--text); cursor:pointer; padding:4px; line-height:1; position:relative; width:24px; height:24px; }
+  .hamburger .bar { position:absolute; left:3px; width:18px; height:1.5px; background:var(--text); border-radius:1px; transition:transform 0.3s ease, opacity 0.3s ease; }
+  .hamburger .bar:nth-child(1) { top:6px; }
+  .hamburger .bar:nth-child(2) { top:11px; }
+  .hamburger .bar:nth-child(3) { top:16px; }
+  .hamburger.open .bar:nth-child(1) { top:11px; transform:rotate(45deg); }
+  .hamburger.open .bar:nth-child(2) { opacity:0; }
+  .hamburger.open .bar:nth-child(3) { top:11px; transform:rotate(-45deg); }
+  .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:99; }
+  @media (max-width: 768px) {
+    .sidebar { transform:translateX(-100%); transition:transform 0.2s ease; }
+    .sidebar.open { transform:translateX(0); }
+    .sidebar-overlay.open { display:block; }
+    .page-body { margin-left:0; }
+    .hamburger { display:flex; }
+  }
+
+  .wrap { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+  header { padding: 20px 0; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; color: #fff; }
+
+  /* Cron rows */
+  .cron-list { padding: 10px 0; }
+  .cron-row { border-bottom: 1px solid var(--border); }
+  .cron-header { display:flex; align-items:center; gap:12px; padding:12px 0; cursor:pointer; user-select:none; }
+  .cron-header:hover { background:rgba(255,255,255,0.02); }
+  .cron-chevron { color:var(--muted); font-size:10px; width:14px; text-align:center; flex-shrink:0; transition:transform 0.15s; }
+  .cron-row.open .cron-chevron { transform:rotate(90deg); }
+  .cron-icon { color:#6366f1; flex-shrink:0; }
+  .cron-name { font-size:13px; font-weight:600; }
+  .cron-desc { font-size:11px; color:var(--muted); margin-top:1px; }
+  .cron-meta { margin-left:auto; display:flex; align-items:center; gap:12px; }
+  .cron-badge { font-size:9px; padding:2px 8px; border-radius:10px; background:rgba(99,102,241,0.12); color:#818cf8; font-weight:600; letter-spacing:0.03em; }
+  .cron-time { font-size:11px; color:var(--muted); white-space:nowrap; }
+  .cron-body { display:none; padding:0 0 14px 26px; }
+  .cron-row.open .cron-body { display:block; }
+  .cron-log-path { font-size:11px; color:var(--muted); margin-bottom:8px; }
+  .cron-log { background:rgba(0,0,0,0.4); border:1px solid var(--border); border-radius:6px; padding:10px 12px; font-size:10px; font-family:'SF Mono','Fira Code',monospace; color:var(--muted); max-height:300px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; line-height:1.6; }
+  .cron-summary { margin-top:10px; }
+  .cron-summary-label { font-size:10px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px; }
+  .no-data { text-align:center; padding:60px; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <span class="sidebar-ip" id="sidebarIp">10.0.0.218</span>
+  </div>
+  <div class="sidebar-nav">
+    <a href="/" id="nav-status">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Status
+    </a>
+    <a href="/crons.html" class="active" id="nav-crons">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Cron Jobs
+    </a>
+    <a href="/gallery.html" id="nav-gallery">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      Screenshots
+    </a>
+    <a href="/logos.html" id="nav-logos">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Logos
+    </a>
+    <a href="/readmes.html" id="nav-readmes">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      READMEs
+    </a>
+    <a href="/docs.html" id="nav-docs">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      API Docs
+    </a>
+  </div>
+  <div class="sidebar-footer">localhost:9876</div>
+</nav>
+
+<div class="page-body">
+<header>
+  <div class="wrap" style="display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="hamburger" id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Menu">
+        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+      </button>
+      <div>
+        <h1>Cron Jobs</h1>
+        <div id="cronCount" style="color:var(--muted);font-size:11px;margin-top:2px"></div>
+      </div>
+    </div>
+    <button onclick="loadCrons()" style="background:none;border:1px solid var(--border);color:var(--muted);font-family:inherit;font-size:11px;padding:5px 14px;border-radius:6px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--text)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">Refresh</button>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="cron-list" id="cronList">
+      <div class="no-data">Loading...</div>
+    </div>
+  </div>
+</main>
+</div>
+
+<script>
+let crons = [];
+
+async function loadCrons() {
+  try {
+    const res = await fetch('/api/crons');
+    const data = await res.json();
+    crons = Array.isArray(data) ? data : (data.crons || []);
+    document.getElementById('cronCount').textContent = crons.length + ' scheduled jobs';
+    renderCrons();
+  } catch (e) {
+    document.getElementById('cronList').innerHTML = '<div class="no-data">Failed to load cron data</div>';
+  }
+}
+
+function renderCrons() {
+  const list = document.getElementById('cronList');
+  if (!crons.length) {
+    list.innerHTML = '<div class="no-data">No cron jobs configured</div>';
+    return;
+  }
+  list.innerHTML = crons.map(c => {
+    const hasLog = c.lastLines && c.lastLines.length > 0;
+    const time = c.lastRun ? timeAgo(c.lastRun) : 'Never run';
+    const summary = c.summaryData
+      ? `<div class="cron-summary"><div class="cron-summary-label">Summary</div><div class="cron-log">${escHtml(typeof c.summaryData === 'string' ? c.summaryData : JSON.stringify(c.summaryData, null, 2))}</div></div>`
+      : '';
+    return `
+      <div class="cron-row" id="cron-${c.id}">
+        <div class="cron-header" onclick="toggleCron('${c.id}')">
+          <span class="cron-chevron">▶</span>
+          <svg class="cron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <div style="flex:1">
+            <div class="cron-name">${escHtml(c.id)}</div>
+            <div class="cron-desc">${escHtml(c.desc || '')}</div>
+          </div>
+          <div class="cron-meta">
+            ${c.hour ? `<span class="cron-badge" style="background:rgba(255,255,255,0.05);color:var(--muted)">${escHtml(c.hour)}</span>` : ''}
+            ${c.autoFix ? '<span class="cron-badge">auto-fix</span>' : ''}
+            <span class="cron-time">${time}</span>
+          </div>
+        </div>
+        <div class="cron-body">
+          ${c.log ? `<div class="cron-log-path">Log: ${escHtml(c.log)}</div>` : ''}
+          ${hasLog ? `<div class="cron-log">${escHtml(Array.isArray(c.lastLines) ? c.lastLines.join('\n') : c.lastLines)}</div>` : '<div style="font-size:11px;color:var(--muted);font-style:italic">No log output available</div>'}
+          ${summary}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleCron(id) {
+  document.getElementById('cron-' + id).classList.toggle('open');
+}
+
+function timeAgo(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const secs = Math.floor(diff / 1000);
+  if (secs < 60) return secs + 's ago';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  const days = Math.floor(hrs / 24);
+  return days + 'd ago';
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function toggleSidebar() {
+  const open = document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('open', open);
+  document.getElementById('hamburgerBtn').classList.toggle('open', open);
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+  document.getElementById('hamburgerBtn').classList.remove('open');
+}
+
+loadCrons();
+</script>
+</body>
+</html>

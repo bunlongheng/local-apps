@@ -60,6 +60,10 @@ h1 { font-size:20px; font-weight:700; margin-bottom:24px; }
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
       Logos
     </a>
+    <a href="/readmes.html">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      READMEs
+    </a>
     <a href="/docs.html">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       API Docs
@@ -118,6 +122,18 @@ const PROMPTS = {
   'bheng': {
     desc: 'Personal developer portfolio',
     prompt: 'Design a 1024x1024 app icon for "bheng", a developer portfolio. Minimalist letter B stylized as a code bracket with electric blue glow. Black background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.'
+  },
+  'audit': {
+    desc: 'GitHub repo analyzer with auto-generated diagrams',
+    prompt: 'Design a 1024x1024 app icon for "Audit", a GitHub repo analyzer that generates diagrams instantly. A magnifying glass over a code repository structure with Mermaid-style flowchart lines radiating out. Red (#DC2626) and dark charcoal palette with glowing scan lines. Dark background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.'
+  },
+  'workflows': {
+    desc: 'Visual drag-and-drop automation flow builder',
+    prompt: 'Design a 1024x1024 app icon for "Workflows", a visual drag-and-drop automation builder. Connected workflow nodes with curved bezier lines flowing left to right, glowing connection points. Cyan (#06B6D4) and electric blue palette on a dark background. Rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.'
+  },
+  'system-design': {
+    desc: 'Interactive AWS and distributed system architecture diagrams',
+    prompt: 'Design a 1024x1024 app icon for "System Design", an interactive architecture diagram tool for AWS and distributed systems. Show cloud infrastructure icons (server, database, load balancer) connected by network lines in a layered architecture. Purple (#B45CF6) and orange accent palette on a dark background. Rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.'
   }
 };
 
@@ -133,6 +149,9 @@ const FAVICONS = {
   'ai-spinner': '/favicons/ai-spinner.png',
   'moments': '/favicons/moments.png',
   'frames': '/favicons/frames.png',
+  'audit': '/favicons/audit.png',
+  'workflows': '/favicons/workflows.png',
+  'system-design': '/favicons/system-design.png',
 };
 
 const _v = Date.now();

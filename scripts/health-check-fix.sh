@@ -62,6 +62,9 @@ APPS=(
   "drop|3010|$HOME/Sites/drop|http"
   "drop-menu|0|$HOME/Sites/drop/electron|process:drop/electron"
   "ai-spinner|0|$HOME/Sites/streamdeck|process:streamdeck"
+  "audit|3004|$HOME/Sites/audit|http"
+  "workflows|3005|$HOME/Sites/workflows|http"
+  "system-design|3006|$HOME/Sites/system-design|http"
 )
 
 for entry in "${APPS[@]}"; do

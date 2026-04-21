@@ -32,6 +32,9 @@ APPS=(
   "mindmaps|$HOME/Sites/mindmaps|5173"
   "safe|$HOME/Sites/safe|6100"
   "drop|$HOME/Sites/drop|3010"
+  "audit|$HOME/Sites/audit|3004"
+  "workflows|$HOME/Sites/workflows|3005"
+  "system-design|$HOME/Sites/system-design|3006"
 )
 
 AGENT_PIDS=()

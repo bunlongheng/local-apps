@@ -6,6 +6,7 @@ const { execSync, spawn } = require('child_process');
 const QRCode = require('qrcode');
 const db = require('./db');
 
+const { marked } = require('marked');
 const compression = require('compression');
 const app = express();
 app.use(compression());
@@ -833,6 +834,19 @@ const CRON_JOBS = [
   { id: 'nightly-summary',    hour: '6 AM',  desc: 'Aggregate results, post to stickies',                   autoFix: false, log: '/tmp/nightly-summary.log',      summary: null },
   // Daytime
   { id: 'health-reminder',    hour: '45min', desc: 'Water, breaks, walks, eye rest, stretch reminders',     autoFix: false, log: '/tmp/health-reminder.log',      summary: null },
+  // Nexus Agents (12 agents x 2 runs = 24hr coverage)
+  { id: 'agent-pulse',  hour: '12AM+12PM', desc: '💫 Pulse — Git sync, stale branches, backup verify',      autoFix: false, log: '/tmp/agent-pulse.log',  summary: null },
+  { id: 'agent-blitz',  hour: '1AM+1PM',   desc: '💎 Blitz — Unit tests, type check, lint',                 autoFix: true,  log: '/tmp/agent-blitz.log',  summary: '/tmp/nightly-tests-summary.json' },
+  { id: 'agent-arrow',  hour: '2AM+2PM',   desc: '🎯 Arrow — E2E tests, accessibility, link crawler',      autoFix: true,  log: '/tmp/agent-arrow.log',  summary: '/tmp/link-crawler-summary.json' },
+  { id: 'agent-shadow', hour: '3AM+3PM',   desc: '🥷 Shadow — Security scan, dependency audit',             autoFix: false, log: '/tmp/agent-shadow.log', summary: '/tmp/nightly-scan-summary.json' },
+  { id: 'agent-frost',  hour: '4AM+4PM',   desc: '🧊 Frost — Lighthouse, screenshots',                     autoFix: false, log: '/tmp/agent-frost.log',  summary: null },
+  { id: 'agent-earth',  hour: '5AM+5PM',   desc: '🌍 Earth — Deep audit, dead code hunter',                 autoFix: true,  log: '/tmp/agent-earth.log',  summary: '/tmp/deep-audit-summary.json' },
+  { id: 'agent-zap',    hour: '6AM+6PM',   desc: '⚡ Zap — Bundle analyzer, performance profiler',          autoFix: false, log: '/tmp/agent-zap.log',    summary: '/tmp/agent-zap-summary.json' },
+  { id: 'agent-sand',   hour: '7AM+7PM',   desc: '🏖️ Sand — DB integrity, API health',                     autoFix: false, log: '/tmp/agent-sand.log',   summary: '/tmp/agent-sand-summary.json' },
+  { id: 'agent-venus',  hour: '8AM+8PM',   desc: '💜 Venus — UI regression, screenshot diff',               autoFix: false, log: '/tmp/agent-venus.log',  summary: '/tmp/agent-venus-summary.json' },
+  { id: 'agent-rock',   hour: '9AM+9PM',   desc: '🪨 Rock — Log analyzer, GIF recordings',                  autoFix: false, log: '/tmp/agent-rock.log',   summary: null },
+  { id: 'agent-blaze',  hour: '10AM+10PM', desc: '🔥 Blaze — SEO check, documentation audit',               autoFix: false, log: '/tmp/agent-blaze.log',  summary: '/tmp/agent-blaze-summary.json' },
+  { id: 'agent-snow',   hour: '11AM+11PM', desc: '❄️ Snow — Summary report, auto-fix orchestrator',         autoFix: true,  log: '/tmp/agent-snow.log',   summary: '/tmp/agent-snow-summary.json' },
 ];
 
 // Cache cron data - refresh every 30s instead of reading files on every request
@@ -869,6 +883,22 @@ app.get('/api/crons/:id/log', (req, res) => {
     const tail = content.split('\n').slice(-lines).join('\n');
     res.type('text').send(tail);
   } catch { res.type('text').send('No log file yet'); }
+});
+
+// --- README API ---
+app.get('/api/readme/:id', (req, res) => {
+  const appConfig = db.getApps().find(a => a.id === req.params.id);
+  const localPath = appConfig?.localPath;
+  if (!localPath) return res.status(404).json({ error: 'app not found' });
+
+  const readmePath = path.join(localPath, 'README.md');
+  try {
+    const md = fs.readFileSync(readmePath, 'utf8');
+    const html = marked(md);
+    res.json({ markdown: md, html });
+  } catch {
+    res.status(404).json({ error: 'no README.md' });
+  }
 });
 
 // --- Screenshot ZIP download ---

@@ -33,6 +33,9 @@ APPS=(
   "mindmaps|5173|$HOME/Sites/mindmaps"
   "safe|6100|$HOME/Sites/safe"
   "drop|3010|$HOME/Sites/drop"
+  "audit|3004|$HOME/Sites/audit"
+  "workflows|3005|$HOME/Sites/workflows"
+  "system-design|3006|$HOME/Sites/system-design"
 )
 
 # ── Check 1: Turbopack/Next.js cache corruption ─────────────────────────────

@@ -230,6 +230,10 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
       Logos
     </a>
+    <a href="/readmes.html" id="nav-readmes">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      READMEs
+    </a>
     <a href="/docs.html" id="nav-docs">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       API Docs
@@ -577,6 +581,9 @@ const FAVICONS = {
   'ai-spinner':  '/favicons/ai-spinner.png',
   'moments':     '/favicons/moments.png',
   'frames':      '/favicons/frames.png',
+  'audit':       '/favicons/audit.png',
+  'workflows':   '/favicons/workflows.png',
+  'system-design':'/favicons/system-design.png',
   '3pi-poc':     '/favicons/3pi-poc.png',
   '3pi':         '/favicons/3pi.svg',
   'drop-web':    '/favicons/drop.svg',
@@ -596,13 +603,13 @@ function avatarColor(id) {
 function letterAvatar(id, name) {
   const letter = (name || id).charAt(0).toUpperCase();
   const [bg, fg] = avatarColor(id);
-  return `<span style="width:24px;height:24px;border-radius:6px;background:${bg};color:${fg};display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;letter-spacing:0">${letter}</span>`;
+  return `<span style="width:32px;height:32px;border-radius:8px;background:${bg};color:${fg};display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;letter-spacing:0">${letter}</span>`;
 }
 
 const _v = Date.now();
 function iconImg(src, id, name) {
   const av = letterAvatar(id, name).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-  return `<img src="${escHtml(src)}?v=${_v}" width="24" height="24" style="border-radius:6px;object-fit:contain;flex-shrink:0" onerror="this.outerHTML='${av}'">`;
+  return `<img src="${escHtml(src)}?v=${_v}" width="32" height="32" style="border-radius:8px;object-fit:contain;flex-shrink:0" onerror="this.outerHTML='${av}'">`;
 }
 
 function appIcon(app) {

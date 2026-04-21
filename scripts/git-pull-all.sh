@@ -31,6 +31,9 @@ REPOS=(
   "$HOME/Sites/mindmaps"
   "$HOME/Sites/safe"
   "$HOME/Sites/drop"
+  "$HOME/Sites/audit"
+  "$HOME/Sites/workflows"
+  "$HOME/Sites/system-design"
   "$HOME/Sites/local-apps"
 )
 

@@ -88,5 +88,32 @@
     "repo": "https://github.com/bunlongheng/safe",
     "localPath": "/Users/bheng/Sites/safe",
     "logPath": "/tmp/safe.log"
+  },
+  {
+    "id": "audit",
+    "name": "Audit",
+    "healthUrl": "http://localhost:3004",
+    "localUrl": "http://localhost:3004",
+    "repo": "https://github.com/bunlongheng/audit",
+    "localPath": "/Users/bheng/Sites/audit",
+    "logPath": "/tmp/audit.log"
+  },
+  {
+    "id": "workflows",
+    "name": "Workflows",
+    "healthUrl": "http://localhost:3005",
+    "localUrl": "http://localhost:3005",
+    "repo": "https://github.com/bunlongheng/workflows",
+    "localPath": "/Users/bheng/Sites/workflows",
+    "logPath": "/tmp/workflows.log"
+  },
+  {
+    "id": "system-design",
+    "name": "System Design",
+    "healthUrl": "http://localhost:3006",
+    "localUrl": "http://localhost:3006",
+    "repo": "https://github.com/bunlongheng/system-design",
+    "localPath": "/Users/bheng/Sites/system-design",
+    "logPath": "/tmp/system-design.log"
   }
 ]
