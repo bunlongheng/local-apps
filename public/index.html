@@ -57,6 +57,35 @@
   .flip-num.changed { animation: flip-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
   @keyframes flip-in { 0% { transform: translateY(-8px) scale(0.8); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
 
+  /* Sidebar */
+  .sidebar { position:fixed; top:0; left:0; bottom:0; width:200px; background:#111; border-right:1px solid var(--border); display:flex; flex-direction:column; z-index:100; }
+  .sidebar-header { padding:16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .sidebar-ip { font-size:11px; color:var(--muted); font-weight:500; letter-spacing:0.02em; }
+  .sidebar-nav { padding:12px 8px; display:flex; flex-direction:column; gap:1px; }
+  .sidebar-nav a { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:7px; font-size:12px; color:var(--muted); text-decoration:none; transition:all 0.12s; font-weight:500; }
+  .sidebar-nav a:hover { background:rgba(255,255,255,0.05); color:var(--text); }
+  .sidebar-nav a.active { background:rgba(255,255,255,0.08); color:#fff; font-weight:600; }
+  .sidebar-nav a svg { opacity:0.45; flex-shrink:0; }
+  .sidebar-nav a.active svg { opacity:0.9; }
+  .sidebar-footer { margin-top:auto; padding:12px 16px; border-top:1px solid var(--border); font-size:10px; color:var(--muted); }
+  .page-body { margin-left:200px; }
+  .hamburger { display:none; background:none; border:none; color:var(--text); cursor:pointer; padding:4px; line-height:1; position:relative; width:24px; height:24px; }
+  .hamburger .bar { position:absolute; left:3px; width:18px; height:1.5px; background:var(--text); border-radius:1px; transition:transform 0.3s ease, opacity 0.3s ease; }
+  .hamburger .bar:nth-child(1) { top:6px; }
+  .hamburger .bar:nth-child(2) { top:11px; }
+  .hamburger .bar:nth-child(3) { top:16px; }
+  .hamburger.open .bar:nth-child(1) { top:11px; transform:rotate(45deg); }
+  .hamburger.open .bar:nth-child(2) { opacity:0; }
+  .hamburger.open .bar:nth-child(3) { top:11px; transform:rotate(-45deg); }
+  .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:99; }
+  @media (max-width: 768px) {
+    .sidebar { transform:translateX(-100%); transition:transform 0.2s ease; }
+    .sidebar.open { transform:translateX(0); }
+    .sidebar-overlay.open { display:block; }
+    .page-body { margin-left:0; }
+    .hamburger { display:flex; }
+  }
+
   .wrap { max-width: 900px; margin: 0 auto; padding: 0 24px; }
   header { padding: 20px 0; border-bottom: 1px solid var(--border); }
   header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
@@ -179,9 +208,43 @@
 </head>
 <body>
 
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <span class="sidebar-ip" id="sidebarIp">10.0.0.218</span>
+  </div>
+  <div class="sidebar-nav">
+    <a href="/" class="active" id="nav-status">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Status
+    </a>
+    <a href="/crons.html" id="nav-crons">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Cron Jobs
+    </a>
+    <a href="/gallery.html" id="nav-gallery">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      Screenshots
+    </a>
+    <a href="/logos.html" id="nav-logos">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Logos
+    </a>
+    <a href="/docs.html" id="nav-docs">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      API Docs
+    </a>
+  </div>
+  <div class="sidebar-footer">localhost:9876</div>
+</nav>
+
+<div class="page-body">
 <header>
   <div class="wrap" style="display:flex;align-items:center;justify-content:space-between;gap:16px">
     <div style="display:flex;align-items:center;gap:12px">
+      <button class="hamburger" id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Menu">
+        <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+      </button>
       <img id="deviceIcon" src="" width="28" height="28" style="display:none;opacity:0.85">
       <div>
         <h1 id="machineTitle" style="color:#fff">Local Apps</h1>
@@ -194,7 +257,6 @@
     </div>
 
     <div style="display:flex;align-items:center;gap:10px">
-      <a href="/gallery.html" class="help-btn" title="Gallery" style="text-decoration:none;font-size:13px">📸</a>
       <button class="help-btn" onclick="toggleHelp()" title="Quick Reference">?</button>
       <div style="position:relative">
       <button id="qrBtn" onclick="toggleQR()" title="Show LAN QR code" style="background:none;border:none;outline:none;cursor:pointer;padding:0;line-height:1;opacity:0.35;transition:opacity 0.15s;-webkit-tap-highlight-color:transparent;user-select:none" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity=document.getElementById('qrPopover').style.display!=='none'?'1':'0.35'">
@@ -304,6 +366,18 @@ curl -X POST http://localhost:9876/api/apps \
 </div>
 
 <script>
+function toggleSidebar() {
+  const open = document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('open', open);
+  document.getElementById('hamburgerBtn').classList.toggle('open', open);
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+  document.getElementById('hamburgerBtn').classList.remove('open');
+}
+
+let hasTailscale = false;
 let apps = [];
 let filter = 'all';
 let machines = [];
@@ -410,7 +484,10 @@ async function load() {
       const hostname = data.apps[0]?.hostname || '';
       const model = data.machineModel || '';
       localInfo = { hostname, model, ip: data.lanIp };
+      hasTailscale = !!data.tailscaleIp;
       updateHeader(hostname, model, data.lanIp);
+      const sidebarIp = document.getElementById('sidebarIp');
+      if (sidebarIp) sidebarIp.textContent = data.lanIp || 'localhost';
     }
     renderTabs();
     renderTable();
@@ -479,7 +556,7 @@ function renderTable() {
       <td class="col-lan" style="text-align:left"><a href="${app.lanUrl || app.localUrl || '#'}" target="_blank" onclick="event.stopPropagation()" style="color:var(--text);font-size:11px;text-decoration:none">${(app.lanUrl || app.localUrl || '').replace(/^https?:\/\//, '') || '—'}</a></td>
       <td class="col-actions" style="text-align:center">
         <div style="display:flex;align-items:center;justify-content:center;gap:16px">
-          <a href="${app.tailscaleUrl || '#'}" target="_blank" onclick="event.stopPropagation()" title="Tailscale" style="text-decoration:none;opacity:${app.tailscaleUrl ? '0.5' : '0.1'};transition:opacity 0.15s;display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px" onmouseover="this.style.opacity='1';this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.opacity='${app.tailscaleUrl ? '0.5' : '0.1'}';this.style.background='none'"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="4" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="20" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="4" cy="16" r="2"/><circle cx="20" cy="8" r="2"/><circle cx="20" cy="16" r="2"/></svg></a>
+          ${(hasTailscale && detectAccessMode().mode === 'tailscale') ? `<a href="${app.tailscaleUrl || '#'}" target="_blank" onclick="event.stopPropagation()" title="Tailscale" style="text-decoration:none;opacity:${app.tailscaleUrl ? '0.5' : '0.1'};transition:opacity 0.15s;display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px" onmouseover="this.style.opacity='1';this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.opacity='${app.tailscaleUrl ? '0.5' : '0.1'}';this.style.background='none'"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="4" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="20" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="4" cy="16" r="2"/><circle cx="20" cy="8" r="2"/><circle cx="20" cy="16" r="2"/></svg></a>` : ''}
           <a href="${app.prodUrl || '#'}" target="_blank" onclick="event.stopPropagation()" title="Vercel" style="text-decoration:none;opacity:${app.prodUrl ? '0.5' : '0.1'};transition:opacity 0.15s;display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px" onmouseover="this.style.opacity='1';this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.opacity='${app.prodUrl ? '0.5' : '0.1'}';this.style.background='none'"><svg width="14" height="14" viewBox="0 0 76 65" fill="white"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z"/></svg></a>
         </div>
       </td>
@@ -490,17 +567,21 @@ function renderTable() {
 // Icon priority: app.icon (DB) → FAVICONS map → letter avatar
 const FAVICONS = {
   'bheng':       '/favicons/bheng.png',
-  'diagrams':    '/favicons/diagrams.svg',
+  'tools':       '/favicons/tools.png',
+  'diagrams':    '/favicons/diagrams.png',
+  'claude':      '/favicons/claude.png',
   'stickies':    '/favicons/stickies.png',
-  'mindmaps':    '/favicons/mindmaps.svg',
+  'mindmaps':    '/favicons/mindmaps.png',
+  'safe':        '/favicons/safe.png',
+  'drop':        '/favicons/drop.png',
+  'ai-spinner':  '/favicons/ai-spinner.png',
+  'moments':     '/favicons/moments.png',
+  'frames':      '/favicons/frames.png',
   '3pi-poc':     '/favicons/3pi-poc.png',
   '3pi':         '/favicons/3pi.svg',
-  'drop':        '/favicons/drop.svg',
   'drop-web':    '/favicons/drop.svg',
-  'claude':      '/favicons/claude-mascot.svg',
   'claude-live': '/favicons/claude-live.svg',
   'recap':       '/favicons/recap.svg',
-  'tools':       '/favicons/tools.svg',
   'vault':       '/favicons/vault.svg',
 };
 
@@ -518,9 +599,10 @@ function letterAvatar(id, name) {
   return `<span style="width:24px;height:24px;border-radius:6px;background:${bg};color:${fg};display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;letter-spacing:0">${letter}</span>`;
 }
 
+const _v = Date.now();
 function iconImg(src, id, name) {
   const av = letterAvatar(id, name).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-  return `<img src="${escHtml(src)}" width="24" height="24" style="border-radius:6px;object-fit:contain;flex-shrink:0" onerror="this.outerHTML='${av}'">`;
+  return `<img src="${escHtml(src)}?v=${_v}" width="24" height="24" style="border-radius:6px;object-fit:contain;flex-shrink:0" onerror="this.outerHTML='${av}'">`;
 }
 
 function appIcon(app) {
@@ -749,15 +831,19 @@ async function loadScreenshots(id) {
   const container = document.getElementById('modalScreenshots');
   container.innerHTML = '';
   try {
-    const data = await fetch('/api/screenshots/' + id).then(r => r.json());
+    const [data, statusRes] = await Promise.all([
+      fetch('/api/screenshots/' + id).then(r => r.json()),
+      fetch('/api/screenshots-status').then(r => r.json()).catch(() => ({})),
+    ]);
     const shots = data.screenshots || [];
     const capturedAt = data.capturedAt ? new Date(data.capturedAt).toLocaleString() : null;
+    const isRunning = !!statusRes[id];
 
     const header = document.createElement('div');
     header.className = 'shots-header';
     header.innerHTML = `
       <span class="shots-label">Screenshots${shots.length ? ` (${shots.length})` : ''}${capturedAt ? ` · ${capturedAt}` : ''}</span>
-      <button class="capture-btn" onclick="captureScreenshots('${id}',this)">Capture</button>
+      <button class="capture-btn" id="capture-btn-${id}" ${isRunning ? 'disabled' : ''} onclick="captureScreenshots('${id}',this)">${isRunning ? 'Running…' : 'Capture'}</button>
     `;
     container.appendChild(header);
 
@@ -786,14 +872,20 @@ async function loadScreenshots(id) {
 }
 
 async function captureScreenshots(id, btn) {
-  btn.textContent = 'Capturing…';
+  if (btn.disabled) return;
+  btn.textContent = 'Running…';
   btn.disabled = true;
+  btn.style.opacity = '0.5';
+  btn.style.cursor = 'default';
   try {
-    await fetch('/api/screenshots/' + id, { method: 'POST' });
-    btn.textContent = 'Running…';
+    const res = await fetch('/api/screenshots/' + id, { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (data.status === 'already_running') return;
   } catch {
     btn.textContent = 'Error';
     btn.disabled = false;
+    btn.style.opacity = '';
+    btn.style.cursor = '';
   }
 }
 
@@ -869,5 +961,6 @@ load();
 setInterval(load, 15000);
 
 </script>
+</div>
 </body>
 </html>

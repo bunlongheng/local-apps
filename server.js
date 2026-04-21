@@ -10,7 +10,7 @@ const compression = require('compression');
 const app = express();
 app.use(compression());
 app.use((req, res, next) => {
-  // Cache static files for 1 hour, API responses for 0
+  // Cache static files for 1 hour, busted by ?v= timestamp in JS
   if (req.path.match(/\.(ico|png|svg|jpg|css|js|woff2?)$/)) {
     res.setHeader('Cache-Control', 'public, max-age=3600');
   }
@@ -226,12 +226,12 @@ function getLanIp() {
 }
 const LAN_IP = getLanIp();
 
-// --- Tailscale IP detection ---
+// --- Tailscale IP detection (re-checked each status call) ---
 function getTailscaleIp() {
   try { return execSync('tailscale ip -4 2>/dev/null').toString().trim(); }
   catch { return null; }
 }
-const TAILSCALE_IP = getTailscaleIp();
+let TAILSCALE_IP = getTailscaleIp();
 
 // --- Machine model detection ---
 const MACHINE_MODEL = (() => {
@@ -340,6 +340,7 @@ setInterval(refreshScreenshotCache, 60000);
 
 app.get('/api/status', (req, res) => {
   res.header('Access-Control-Allow-Origin', '*');
+  TAILSCALE_IP = getTailscaleIp();
   const apps = db.getApps().map(a => {
     const s = getState(a.id);
     return {
@@ -830,6 +831,8 @@ const CRON_JOBS = [
   { id: 'deep-audit',         hour: '4 AM',  desc: 'Cache, modules, ports, disk, Caddy',                    autoFix: true,  log: '/tmp/deep-audit.log',           summary: '/tmp/deep-audit-summary.json' },
   { id: 'nightly-scan',       hour: '5 AM',  desc: 'Security + performance scan (flags only)',               autoFix: false, log: '/tmp/nightly-scan.log',         summary: '/tmp/nightly-scan-summary.json' },
   { id: 'nightly-summary',    hour: '6 AM',  desc: 'Aggregate results, post to stickies',                   autoFix: false, log: '/tmp/nightly-summary.log',      summary: null },
+  // Daytime
+  { id: 'health-reminder',    hour: '45min', desc: 'Water, breaks, walks, eye rest, stretch reminders',     autoFix: false, log: '/tmp/health-reminder.log',      summary: null },
 ];
 
 // Cache cron data - refresh every 30s instead of reading files on every request
@@ -866,6 +869,34 @@ app.get('/api/crons/:id/log', (req, res) => {
     const tail = content.split('\n').slice(-lines).join('\n');
     res.type('text').send(tail);
   } catch { res.type('text').send('No log file yet'); }
+});
+
+// --- Screenshot ZIP download ---
+app.get('/api/screenshots/:id/download', (req, res) => {
+  const id = req.params.id;
+  const baseDir = path.join(__dirname, 'public', 'screenshots', id);
+  if (!fs.existsSync(baseDir)) return res.status(404).json({ error: 'no screenshots' });
+
+  const { execSync } = require('child_process');
+  const tmpZip = `/tmp/${id}-screenshots.zip`;
+  try { fs.unlinkSync(tmpZip); } catch {}
+
+  // Collect subfolders: desktop, desktop-framed, mobile, mobile-framed, gifs
+  const folders = ['desktop', 'desktop-framed', 'mobile', 'mobile-framed', 'gifs'];
+  const existing = folders.filter(f => {
+    const full = path.join(baseDir, f);
+    return fs.existsSync(full) && fs.readdirSync(full).length > 0;
+  });
+
+  if (!existing.length) return res.status(404).json({ error: 'no screenshot files' });
+
+  // Build zip with subfolders preserved
+  const args = existing.map(f => `"${f}/"`).join(' ');
+  execSync(`cd "${baseDir}" && zip -r "${tmpZip}" ${args}`, { stdio: 'ignore' });
+
+  res.download(tmpZip, `${id}.zip`, () => {
+    try { fs.unlinkSync(tmpZip); } catch {}
+  });
 });
 
 // --- File watcher (public dir only) ---
