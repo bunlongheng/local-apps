@@ -725,6 +725,28 @@ async function flow3piPoc(page, appDir) {
   }
 }
 
+async function flowLocalApps(page, appDir) {
+  const base = 'http://localhost:9876';
+  const routes = [
+    { path: '/',               name: '01-status' },
+    { path: '/routines.html',  name: '02-routines' },
+    { path: '/gallery.html',   name: '03-gallery' },
+    { path: '/logos.html',     name: '04-logos' },
+    { path: '/readmes.html',   name: '05-readmes' },
+    { path: '/docs.html',      name: '06-docs' },
+  ];
+
+  for (const { path, name } of routes) {
+    try {
+      await page.goto(base + path, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      await page.waitForTimeout(2000);
+      await shot(page, appDir, `${name}.png`);
+    } catch (err) {
+      console.log(`    ✗   ${path}: ${err.message.slice(0, 70)}`);
+    }
+  }
+}
+
 // ─── per-app runner ──────────────────────────────────────────────────────────
 
 async function runMode(browser, cfg, creds, rules, modeDir, isM) {
@@ -746,7 +768,7 @@ async function runMode(browser, cfg, creds, rules, modeDir, isM) {
   const page = await ctx.newPage();
   page.on('console', () => {});
 
-  const customFlows = { diagrams: flowDiagrams, mindmaps: flowMindmaps, '3pi-poc': flow3piPoc, stickies: flowStickies, 'drop-web': flowDropWeb, '3pi': flow3pi };
+  const customFlows = { diagrams: flowDiagrams, mindmaps: flowMindmaps, '3pi-poc': flow3piPoc, stickies: flowStickies, 'drop-web': flowDropWeb, '3pi': flow3pi, 'local-apps': flowLocalApps };
 
   try {
     if (customFlows[cfg.id]) {

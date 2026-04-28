@@ -218,9 +218,9 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       Status
     </a>
-    <a href="/crons.html" id="nav-crons">
+    <a href="/routines.html" id="nav-crons">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      Cron Jobs
+      Routines
     </a>
     <a href="/gallery.html" id="nav-gallery">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -405,6 +405,7 @@ async function loadMachines() {
 function renderTabs() {
   const bar = document.getElementById('machineTabs');
   const localHost = (localInfo.hostname || '').replace('.local', '') || 'Local';
+  const access = detectAccessMode();
   const localIcon = deviceSvg(localInfo.model);
   let html = `<button class="machine-tab${!activeMachine ? ' active' : ''}" onclick="switchMachine(null)">
     ${localIcon ? `<img src="${localIcon}" width="14" height="14" style="opacity:0.7">` : ''}
@@ -461,7 +462,7 @@ function updateHeader(hostname, model, ip) {
   document.getElementById('machineInfo').textContent = displayIp;
   document.title = shortHost + ' — Local Apps';
 
-  const iconSrc = deviceSvg(model);
+  const iconSrc = access.mode === 'tailscale' ? '/devices/tailscale.svg' : deviceSvg(model);
   const icon = document.getElementById('deviceIcon');
   if (iconSrc) { icon.src = iconSrc; icon.style.display = 'block'; }
   else { icon.style.display = 'none'; }
@@ -541,26 +542,35 @@ function updateFlipCounters() {
 function renderTable() {
   updateFlipCounters();
   const tbody = document.getElementById('appTable');
+  const access = detectAccessMode();
+  const isTailscale = access.mode === 'tailscale';
+  const isLan = access.mode === 'lan';
   const visible = filter === 'all' ? apps : apps.filter(a => a.status === filter);
   if (!visible.length) {
     tbody.innerHTML = `<tr><td colspan="4" class="no-apps">No apps</td></tr>`;
     return;
   }
   tbody.innerHTML = visible.map(app => {
+    // Pick best URL for this access mode
+    const bestUrl = isTailscale ? (app.tailscaleUrl || app.localUrl || '#')
+                   : isLan ? (app.lanUrl || app.localUrl || '#')
+                   : (app.localUrl || '#');
+    const hostnameUrl = app.caddyUrl || app.localUrl || '#';
+    const lanUrl = isTailscale ? (app.tailscaleUrl || '#') : (app.lanUrl || app.localUrl || '#');
     return `
     <tr id="row-${app.id}" onclick="openModal(apps.find(a=>a.id==='${app.id}'))">
       <td>
         <div style="display:flex;align-items:center;gap:12px">
           <span class="dot ${app.status}"></span>
           <span class="app-icon-wrap" id="icon-${app.id}">${appIcon(app)}</span>
-          <a class="app-name" href="${app.lanUrl || app.localUrl || '#'}" target="_blank" onclick="event.stopPropagation()">${app.name}</a>
+          <a class="app-name" href="${bestUrl}" target="_blank" onclick="event.stopPropagation()">${app.name}</a>
         </div>
       </td>
-      <td class="col-hostname" style="text-align:left"><a href="${app.caddyUrl || app.localUrl || '#'}" target="_blank" onclick="event.stopPropagation()" style="color:var(--text);font-size:11px;text-decoration:none">${(app.caddyUrl || app.localUrl || '').replace(/^https?:\/\//, '') || '—'}</a></td>
-      <td class="col-lan" style="text-align:left"><a href="${app.lanUrl || app.localUrl || '#'}" target="_blank" onclick="event.stopPropagation()" style="color:var(--text);font-size:11px;text-decoration:none">${(app.lanUrl || app.localUrl || '').replace(/^https?:\/\//, '') || '—'}</a></td>
+      <td class="col-hostname" style="text-align:left"><a href="${hostnameUrl}" target="_blank" onclick="event.stopPropagation()" style="color:var(--text);font-size:11px;text-decoration:none">${hostnameUrl.replace(/^https?:\/\//, '') || '—'}</a></td>
+      <td class="col-lan" style="text-align:left"><a href="${lanUrl}" target="_blank" onclick="event.stopPropagation()" style="color:var(--text);font-size:11px;text-decoration:none">${lanUrl.replace(/^https?:\/\//, '') || '—'}</a></td>
       <td class="col-actions" style="text-align:center">
         <div style="display:flex;align-items:center;justify-content:center;gap:16px">
-          ${(hasTailscale && detectAccessMode().mode === 'tailscale') ? `<a href="${app.tailscaleUrl || '#'}" target="_blank" onclick="event.stopPropagation()" title="Tailscale" style="text-decoration:none;opacity:${app.tailscaleUrl ? '0.5' : '0.1'};transition:opacity 0.15s;display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px" onmouseover="this.style.opacity='1';this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.opacity='${app.tailscaleUrl ? '0.5' : '0.1'}';this.style.background='none'"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="4" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="20" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="4" cy="16" r="2"/><circle cx="20" cy="8" r="2"/><circle cx="20" cy="16" r="2"/></svg></a>` : ''}
+          ${isTailscale ? `<a href="${app.tailscaleUrl || '#'}" target="_blank" onclick="event.stopPropagation()" title="Tailscale" style="text-decoration:none;opacity:${app.tailscaleUrl ? '0.5' : '0.1'};transition:opacity 0.15s;display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px" onmouseover="this.style.opacity='1';this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.opacity='${app.tailscaleUrl ? '0.5' : '0.1'}';this.style.background='none'"><img src="/devices/tailscale.svg" width="16" height="16" style="opacity:0.85"></a>` : ''}
           <a href="${app.prodUrl || '#'}" target="_blank" onclick="event.stopPropagation()" title="Vercel" style="text-decoration:none;opacity:${app.prodUrl ? '0.5' : '0.1'};transition:opacity 0.15s;display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px" onmouseover="this.style.opacity='1';this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.opacity='${app.prodUrl ? '0.5' : '0.1'}';this.style.background='none'"><svg width="14" height="14" viewBox="0 0 76 65" fill="white"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z"/></svg></a>
         </div>
       </td>
@@ -643,6 +653,24 @@ async function startApp(id, btn) {
     btn.disabled = false;
     startingApps.delete(id);
   }
+}
+
+async function toggleCompanion(id, path, proc, cmd, btn) {
+  const running = btn.dataset.running === '1';
+  btn.disabled = true;
+  btn.textContent = running ? '⟳ Stopping…' : '⟳ Starting…';
+  try {
+    if (running) {
+      await fetch('/api/process-kill/' + proc, { method: 'POST' });
+      btn.textContent = '▶ Start'; btn.dataset.running = '0';
+      document.getElementById('dot-' + id).className = 'dot down';
+    } else {
+      await fetch('/api/companion-start', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ path, cmd, log: '/tmp/' + id + '.log' }) });
+      btn.textContent = '■ Stop'; btn.dataset.running = '1';
+      document.getElementById('dot-' + id).className = 'dot up';
+    }
+  } catch { btn.textContent = 'err'; }
+  btn.disabled = false;
 }
 
 function escHtml(s) {
@@ -784,8 +812,6 @@ function openModal(app) {
     linkRow('🏠', 'Caddy', app.caddyUrl),
     linkRow('🚀', 'Prod', app.prodUrl, app.prodUrl?.replace('https://','')),
     linkRow('🐙', 'GitHub', app.repo, app.repo?.replace('https://github.com/','')),
-    !activeMachine && app.localPath ? { icon: '📁', label: 'Path', value: app.localPath, url: null } : null,
-    !activeMachine && app.logPath ? { icon: '📄', label: 'Log', value: app.logPath, url: null } : null,
     app.hasScreenshots ? { icon: '📸', label: 'Screenshots', value: 'View Gallery', url: '/gallery.html?app=' + app.id } : null,
   ].filter(Boolean).map(r => {
     if (Array.isArray(r)) return { icon: '', label: r[0], value: r[2], url: r[1] };
@@ -808,6 +834,39 @@ function openModal(app) {
         ${copyBtn}
       </div>`;
   }).join('');
+
+  // Companion apps for Drop
+  if (app.id === 'drop') {
+    const companions = [
+      { id: 'drop-menu', name: 'Drop Menu', desc: 'Electron menu bar', path: '/Users/bheng/Sites/drop/electron', proc: 'electron', cmd: 'npm start' },
+      { id: 'drop-dock', name: 'Drop Dock', desc: 'Native Swift menu bar', path: '/Users/bheng/Sites/drop/native', proc: 'DropMenu', cmd: './DropMenu' },
+    ];
+    const section = document.createElement('div');
+    section.style.cssText = 'margin-top:2px;padding-top:10px';
+    section.innerHTML = `<div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Companion Apps</div>`;
+    for (const c of companions) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04)';
+      row.innerHTML = `
+        <div>
+          <span style="font-size:12px;font-weight:600">${c.name}</span>
+          <span style="font-size:10px;color:var(--muted);margin-left:6px">${c.desc}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="dot" id="dot-${c.id}" style="width:6px;height:6px"></span>
+          <button id="btn-${c.id}" style="background:none;border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:10px;padding:3px 10px;border-radius:4px;cursor:pointer" onclick="toggleCompanion('${c.id}','${c.path}','${c.proc}','${c.cmd}',this)">…</button>
+        </div>`;
+      section.appendChild(row);
+      // Check if running
+      fetch('/api/process-check/' + c.proc).then(r => r.json()).then(d => {
+        const dot = document.getElementById('dot-' + c.id);
+        const btn = document.getElementById('btn-' + c.id);
+        if (d.running) { dot.className = 'dot up'; btn.textContent = '■ Stop'; btn.dataset.running = '1'; }
+        else { dot.className = 'dot down'; btn.textContent = '▶ Start'; btn.dataset.running = '0'; }
+      }).catch(() => {});
+    }
+    modalRows.appendChild(section);
+  }
 
   if (!activeMachine) {
     if (isDown && app.logPath) {

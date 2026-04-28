@@ -39,6 +39,7 @@ const NPM_PATH = (() => {
 })();
 
 app.use(express.json());
+app.get('/crons.html', (req, res) => res.redirect('/routines.html'));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Caddy + /etc/hosts management ---
@@ -229,7 +230,7 @@ const LAN_IP = getLanIp();
 
 // --- Tailscale IP detection (re-checked each status call) ---
 function getTailscaleIp() {
-  try { return execSync('tailscale ip -4 2>/dev/null').toString().trim(); }
+  try { return execSync('/usr/local/bin/tailscale ip -4 2>/dev/null').toString().trim(); }
   catch { return null; }
 }
 let TAILSCALE_IP = getTailscaleIp();
@@ -239,8 +240,17 @@ const MACHINE_MODEL = (() => {
   try {
     const name = execSync('system_profiler SPHardwareDataType 2>/dev/null').toString();
     const match = name.match(/Model Name:\s*(.+)/);
-    return match ? match[1].trim() : null;
-  } catch { return null; }
+    if (match) return match[1].trim();
+  } catch {}
+  // Fallback: sysctl hw.model (works in sandboxed envs where system_profiler fails)
+  try {
+    const hw = execSync('/usr/sbin/sysctl -n hw.model 2>/dev/null').toString().trim();
+    if (hw.includes('Macmini') || hw.includes('Mac16,')) return 'Mac mini';
+    if (hw.includes('MacBookPro') || hw.includes('Mac15,') || hw.includes('Mac14,')) return 'MacBook Pro';
+    if (hw.includes('MacBookAir')) return 'MacBook Air';
+    if (hw.startsWith('Mac')) return 'Mac mini';
+  } catch {}
+  return null;
 })();
 
 // --- State ---
@@ -477,6 +487,33 @@ app.delete('/api/apps/:id', (req, res) => {
   delete state[req.params.id];
   broadcast({ type: 'update', id: req.params.id, status: 'removed' });
   res.json({ ok: true });
+});
+
+// --- Companion app helpers (Drop Menu / Drop Dock) ---
+app.get('/api/process-check/:proc', (req, res) => {
+  try {
+    const out = execSync(`pgrep -f "${req.params.proc}"`, { encoding: 'utf8', timeout: 3000 }).trim();
+    res.json({ running: out.length > 0 });
+  } catch { res.json({ running: false }); }
+});
+
+app.post('/api/process-kill/:proc', (req, res) => {
+  try {
+    execSync(`pkill -f "${req.params.proc}"`, { timeout: 3000 });
+    res.json({ ok: true });
+  } catch { res.json({ ok: true }); }
+});
+
+app.post('/api/companion-start', (req, res) => {
+  const { path: appPath, cmd, log } = req.body;
+  if (!appPath || !cmd) return res.status(400).json({ error: 'path and cmd required' });
+  const logFile = log || '/tmp/companion.log';
+  const out = fs.openSync(logFile, 'a');
+  const child = spawn('bash', ['-c', `source ~/.nvm/nvm.sh && nvm use 20 && cd "${appPath}" && ${cmd}`], {
+    detached: true, stdio: ['ignore', out, out],
+  });
+  child.unref();
+  res.json({ ok: true, pid: child.pid });
 });
 
 // --- Dynamic manifest (adapts name based on access method) ---
@@ -819,41 +856,46 @@ app.get('/api/generate-icons/status', (req, res) => {
 });
 
 // --- Cron Status API ---
+// cost: [budgetPerAgent, maxApps, runsPerDay, tokensPerAgent(K)]
+// Token estimates: $1.00 budget ~ 300K tok, $0.50 ~ 150K tok (Sonnet, 4:1 in/out ratio)
 const CRON_JOBS = [
   // Always running
-  { id: 'auto-restart',       hour: '30s',   desc: 'Restart any down app via launchctl',                    autoFix: true,  log: '/tmp/local-apps.log',           summary: null },
-  { id: 'health-check-fix',   hour: '5min',  desc: 'Quick fix + Claude agents for stubborn failures',       autoFix: true,  log: '/tmp/health-check-fix.log',     summary: '/tmp/health-check-summary.json' },
+  { id: 'auto-restart',       hour: '30s',   desc: 'Restart any down app via launchctl',                    autoFix: true,  log: '/tmp/local-apps.log',           summary: null,                              cost: null },
+  { id: 'health-check-fix',   hour: '5min',  desc: 'Quick fix + Claude agents for stubborn failures',       autoFix: true,  log: '/tmp/health-check-fix.log',     summary: '/tmp/health-check-summary.json',  cost: [1.00, 2, 1, 300] },
   // Nightly pipeline
-  { id: 'git-pull-all',       hour: '12 AM', desc: 'Sync all repos from GitHub',                            autoFix: false, log: '/tmp/git-pull-all.log',         summary: null },
-  { id: 'nightly-tests',      hour: '1 AM',  desc: 'Unit + E2E tests, Claude agents auto-fix',              autoFix: true,  log: '/tmp/nightly-tests.log',        summary: '/tmp/nightly-tests-summary.json' },
-  { id: 'nightly-crawler',    hour: '1:30 AM', desc: 'Crawl all pages, screenshot errors, Claude agents fix', autoFix: true, log: '/tmp/link-crawler.log',         summary: '/tmp/link-crawler-summary.json' },
-  { id: 'nightly-screenshots', hour: '2 AM', desc: 'All apps desktop + mobile + framed',                    autoFix: false, log: '/tmp/nightly-screenshots.log',  summary: null },
-  { id: 'nightly-gifs',       hour: '3 AM',  desc: 'Animated HD recordings via LAN',                        autoFix: false, log: '/tmp/nightly-gifs.log',         summary: null },
-  { id: 'deep-audit',         hour: '4 AM',  desc: 'Cache, modules, ports, disk, Caddy',                    autoFix: true,  log: '/tmp/deep-audit.log',           summary: '/tmp/deep-audit-summary.json' },
-  { id: 'nightly-scan',       hour: '5 AM',  desc: 'Security + performance scan (flags only)',               autoFix: false, log: '/tmp/nightly-scan.log',         summary: '/tmp/nightly-scan-summary.json' },
-  { id: 'nightly-summary',    hour: '6 AM',  desc: 'Aggregate results, post to stickies',                   autoFix: false, log: '/tmp/nightly-summary.log',      summary: null },
+  { id: 'git-pull-all',       hour: '12 AM', desc: 'Sync all repos from GitHub',                            autoFix: false, log: '/tmp/git-pull-all.log',         summary: null,                              cost: null },
+  { id: 'nightly-tests',      hour: '1 AM',  desc: 'Unit + E2E tests, Claude agents auto-fix',              autoFix: true,  log: '/tmp/nightly-tests.log',        summary: '/tmp/nightly-tests-summary.json', cost: [1.00, 11, 1, 300] },
+  { id: 'nightly-crawler',    hour: '1:30 AM', desc: 'Crawl all pages, screenshot errors, Claude agents fix', autoFix: true, log: '/tmp/link-crawler.log',         summary: '/tmp/link-crawler-summary.json',  cost: [1.00, 14, 1, 300] },
+  { id: 'nightly-screenshots', hour: '2 AM', desc: 'All apps desktop + mobile + framed',                    autoFix: false, log: '/tmp/nightly-screenshots.log',  summary: null,                              cost: null },
+  { id: 'nightly-gifs',       hour: '3 AM',  desc: 'Animated HD recordings via LAN',                        autoFix: false, log: '/tmp/nightly-gifs.log',         summary: null,                              cost: null },
+  { id: 'deep-audit',         hour: '4 AM',  desc: 'Cache, modules, ports, disk, Caddy',                    autoFix: true,  log: '/tmp/deep-audit.log',           summary: '/tmp/deep-audit-summary.json',    cost: [1.00, 14, 1, 300] },
+  { id: 'nightly-scan',       hour: '5 AM',  desc: 'Security + performance scan (flags only)',               autoFix: false, log: '/tmp/nightly-scan.log',         summary: '/tmp/nightly-scan-summary.json',  cost: [0.50, 11, 1, 150] },
+  { id: 'nightly-summary',    hour: '6 AM',  desc: 'Aggregate results, post to stickies',                   autoFix: false, log: '/tmp/nightly-summary.log',      summary: null,                              cost: null },
   // Daytime
-  { id: 'health-reminder',    hour: '45min', desc: 'Water, breaks, walks, eye rest, stretch reminders',     autoFix: false, log: '/tmp/health-reminder.log',      summary: null },
+  { id: 'health-reminder',    hour: '45min', desc: 'Water, breaks, walks, eye rest, stretch reminders',     autoFix: false, log: '/tmp/health-reminder.log',      summary: null,                              cost: null },
   // Nexus Agents (12 agents x 2 runs = 24hr coverage)
-  { id: 'agent-pulse',  hour: '12AM+12PM', desc: '💫 Pulse — Git sync, stale branches, backup verify',      autoFix: false, log: '/tmp/agent-pulse.log',  summary: null },
-  { id: 'agent-blitz',  hour: '1AM+1PM',   desc: '💎 Blitz — Unit tests, type check, lint',                 autoFix: true,  log: '/tmp/agent-blitz.log',  summary: '/tmp/nightly-tests-summary.json' },
-  { id: 'agent-arrow',  hour: '2AM+2PM',   desc: '🎯 Arrow — E2E tests, accessibility, link crawler',      autoFix: true,  log: '/tmp/agent-arrow.log',  summary: '/tmp/link-crawler-summary.json' },
-  { id: 'agent-shadow', hour: '3AM+3PM',   desc: '🥷 Shadow — Security scan, dependency audit',             autoFix: false, log: '/tmp/agent-shadow.log', summary: '/tmp/nightly-scan-summary.json' },
-  { id: 'agent-frost',  hour: '4AM+4PM',   desc: '🧊 Frost — Lighthouse, screenshots',                     autoFix: false, log: '/tmp/agent-frost.log',  summary: null },
-  { id: 'agent-earth',  hour: '5AM+5PM',   desc: '🌍 Earth — Deep audit, dead code hunter',                 autoFix: true,  log: '/tmp/agent-earth.log',  summary: '/tmp/deep-audit-summary.json' },
-  { id: 'agent-zap',    hour: '6AM+6PM',   desc: '⚡ Zap — Bundle analyzer, performance profiler',          autoFix: false, log: '/tmp/agent-zap.log',    summary: '/tmp/agent-zap-summary.json' },
-  { id: 'agent-sand',   hour: '7AM+7PM',   desc: '🏖️ Sand — DB integrity, API health',                     autoFix: false, log: '/tmp/agent-sand.log',   summary: '/tmp/agent-sand-summary.json' },
-  { id: 'agent-venus',  hour: '8AM+8PM',   desc: '💜 Venus — UI regression, screenshot diff',               autoFix: false, log: '/tmp/agent-venus.log',  summary: '/tmp/agent-venus-summary.json' },
-  { id: 'agent-rock',   hour: '9AM+9PM',   desc: '🪨 Rock — Log analyzer, GIF recordings',                  autoFix: false, log: '/tmp/agent-rock.log',   summary: null },
-  { id: 'agent-blaze',  hour: '10AM+10PM', desc: '🔥 Blaze — SEO check, documentation audit',               autoFix: false, log: '/tmp/agent-blaze.log',  summary: '/tmp/agent-blaze-summary.json' },
-  { id: 'agent-snow',   hour: '11AM+11PM', desc: '❄️ Snow — Summary report, auto-fix orchestrator',         autoFix: true,  log: '/tmp/agent-snow.log',   summary: '/tmp/agent-snow-summary.json' },
+  { id: 'agent-pulse',  hour: '12AM+12PM', desc: '💫 Pulse — Git sync, stale branches, backup verify',      autoFix: false, log: '/tmp/agent-pulse.log',  summary: null,                              cost: null },
+  { id: 'agent-blitz',  hour: '1AM+1PM',   desc: '💎 Blitz — Unit tests, type check, lint',                 autoFix: true,  log: '/tmp/agent-blitz.log',  summary: '/tmp/nightly-tests-summary.json', cost: [1.00, 11, 2, 300] },
+  { id: 'agent-arrow',  hour: '2AM+2PM',   desc: '🎯 Arrow — E2E tests, accessibility, link crawler',      autoFix: true,  log: '/tmp/agent-arrow.log',  summary: '/tmp/link-crawler-summary.json',  cost: [1.00, 14, 2, 300] },
+  { id: 'agent-shadow', hour: '3AM+3PM',   desc: '🥷 Shadow — Security scan, dependency audit',             autoFix: false, log: '/tmp/agent-shadow.log', summary: '/tmp/nightly-scan-summary.json',  cost: [0.50, 11, 2, 150] },
+  { id: 'agent-frost',  hour: '4AM+4PM',   desc: '🧊 Frost — Lighthouse, screenshots',                     autoFix: false, log: '/tmp/agent-frost.log',  summary: null,                              cost: null },
+  { id: 'agent-earth',  hour: '5AM+5PM',   desc: '🌍 Earth — Deep audit, dead code hunter',                 autoFix: true,  log: '/tmp/agent-earth.log',  summary: '/tmp/deep-audit-summary.json',    cost: [1.00, 14, 2, 300] },
+  { id: 'agent-zap',    hour: '6AM+6PM',   desc: '⚡ Zap — Bundle analyzer, performance profiler',          autoFix: false, log: '/tmp/agent-zap.log',    summary: '/tmp/agent-zap-summary.json',     cost: [0.50, 14, 2, 150] },
+  { id: 'agent-sand',   hour: '7AM+7PM',   desc: '🏖️ Sand — DB integrity, API health',                     autoFix: false, log: '/tmp/agent-sand.log',   summary: '/tmp/agent-sand-summary.json',    cost: [0.50, 14, 2, 150] },
+  { id: 'agent-venus',  hour: '8AM+8PM',   desc: '💜 Venus — UI regression, screenshot diff',               autoFix: false, log: '/tmp/agent-venus.log',  summary: '/tmp/agent-venus-summary.json',   cost: [0.50, 14, 2, 150] },
+  { id: 'agent-rock',   hour: '9AM+9PM',   desc: '🪨 Rock — Log analyzer, GIF recordings',                  autoFix: false, log: '/tmp/agent-rock.log',   summary: null,                              cost: null },
+  { id: 'agent-blaze',  hour: '10AM+10PM', desc: '🔥 Blaze — SEO check, documentation audit',               autoFix: false, log: '/tmp/agent-blaze.log',  summary: '/tmp/agent-blaze-summary.json',   cost: [0.50, 14, 2, 150] },
+  { id: 'agent-snow',   hour: '11AM+11PM', desc: '❄️ Snow — Summary report, auto-fix orchestrator',         autoFix: true,  log: '/tmp/agent-snow.log',   summary: '/tmp/agent-snow-summary.json',    cost: [0.50, 11, 2, 150] },
 ];
 
 // Cache cron data - refresh every 30s instead of reading files on every request
 let cronCache = { data: null, ts: 0 };
 function refreshCronCache() {
+  let launchctlList = '';
+  try { launchctlList = execSync('launchctl list 2>/dev/null').toString(); } catch {}
   cronCache.data = CRON_JOBS.map(c => {
-    const result = { ...c, lastRun: null, lastLines: null, summaryData: null };
+    const label = `com.${USERNAME}.${c.id}`;
+    const result = { ...c, lastRun: null, lastLines: null, summaryData: null, enabled: launchctlList.includes(label) };
     try {
       const stat = fs.statSync(c.log);
       result.lastRun = stat.mtime.toISOString();
@@ -872,6 +914,73 @@ setInterval(refreshCronCache, 30000);
 
 app.get('/api/crons', (req, res) => {
   res.json(cronCache.data || []);
+});
+
+app.post('/api/crons/:id/toggle', (req, res) => {
+  const cron = CRON_JOBS.find(c => c.id === req.params.id);
+  if (!cron) return res.status(404).json({ error: 'cron not found' });
+  const label = `com.${USERNAME}.${cron.id}`;
+  const plistPath = path.join(LAUNCH_AGENTS_DIR, `${label}.plist`);
+  if (!fs.existsSync(plistPath)) return res.status(404).json({ error: 'no plist found' });
+  try {
+    // Check if currently loaded
+    const list = execSync(`launchctl list 2>/dev/null`).toString();
+    const isLoaded = list.includes(label);
+    if (isLoaded) {
+      execSync(`launchctl bootout gui/${process.getuid()}/${label} 2>/dev/null || launchctl unload "${plistPath}" 2>/dev/null`);
+      res.json({ enabled: false, id: cron.id });
+    } else {
+      execSync(`launchctl bootstrap gui/${process.getuid()} "${plistPath}" 2>/dev/null || launchctl load -w "${plistPath}" 2>/dev/null`);
+      res.json({ enabled: true, id: cron.id });
+    }
+    refreshCronCache();
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/crons/toggle-all', (req, res) => {
+  const { enable } = req.body || {};
+  const results = [];
+  for (const cron of CRON_JOBS) {
+    const label = `com.${USERNAME}.${cron.id}`;
+    const plistPath = path.join(LAUNCH_AGENTS_DIR, `${label}.plist`);
+    if (!fs.existsSync(plistPath)) continue;
+    try {
+      if (enable) {
+        execSync(`launchctl bootstrap gui/${process.getuid()} "${plistPath}" 2>/dev/null || launchctl load -w "${plistPath}" 2>/dev/null`);
+      } else {
+        execSync(`launchctl bootout gui/${process.getuid()}/${label} 2>/dev/null || launchctl unload "${plistPath}" 2>/dev/null`);
+      }
+      results.push({ id: cron.id, enabled: !!enable });
+    } catch {}
+  }
+  refreshCronCache();
+  res.json({ ok: true, enabled: !!enable, count: results.length });
+});
+
+app.post('/api/crons/:id/run', (req, res) => {
+  const cron = CRON_JOBS.find(c => c.id === req.params.id);
+  if (!cron) return res.status(404).json({ error: 'cron not found' });
+  const label = `com.${USERNAME}.${cron.id}`;
+  try {
+    execSync(`launchctl kickstart gui/${process.getuid()}/${label} 2>/dev/null`);
+    res.json({ ok: true, id: cron.id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/crons/:id/log', (req, res) => {
+  const cron = CRON_JOBS.find(c => c.id === req.params.id);
+  if (!cron) return res.status(404).json({ error: 'cron not found' });
+  try {
+    fs.writeFileSync(cron.log, '', 'utf8');
+    refreshCronCache();
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.get('/api/crons/:id/log', (req, res) => {

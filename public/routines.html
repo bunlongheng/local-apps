@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cron Jobs — Local Apps</title>
+<title>Routines — Local Apps</title>
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 <meta name="theme-color" content="#0f1117">
 <style>
@@ -65,7 +65,7 @@
   .cron-chevron { color:var(--muted); font-size:10px; width:14px; text-align:center; flex-shrink:0; transition:transform 0.15s; }
   .cron-row.open .cron-chevron { transform:rotate(90deg); }
   .cron-icon { color:#6366f1; flex-shrink:0; }
-  .cron-name { font-size:13px; font-weight:600; }
+  .cron-name { font-size:13px; font-weight:400; }
   .cron-desc { font-size:11px; color:var(--muted); margin-top:1px; }
   .cron-meta { margin-left:auto; display:flex; align-items:center; gap:12px; }
   .cron-badge { font-size:9px; padding:2px 8px; border-radius:10px; background:rgba(99,102,241,0.12); color:#818cf8; font-weight:600; letter-spacing:0.03em; }
@@ -100,15 +100,15 @@
   /* Modal */
   .cron-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:300; backdrop-filter:blur(4px); }
   .cron-modal-overlay.open { display:flex; align-items:center; justify-content:center; }
-  .cron-modal { background:#161616; border:1px solid var(--border); border-radius:12px; width:90%; max-width:520px; max-height:80vh; overflow-y:auto; padding:0; box-shadow:0 16px 48px rgba(0,0,0,0.5); }
+  .cron-modal { background:#161616; border:1px solid var(--border); border-radius:12px; width:90%; max-width:520px; max-height:80vh; overflow-y:auto; padding:0; box-shadow:0 16px 48px rgba(0,0,0,0.5); color:#fff; }
   .cron-modal-header { display:flex; align-items:center; gap:12px; padding:20px 20px 16px; border-bottom:1px solid var(--border); }
   .cron-modal-body { padding:16px 20px 20px; }
   .cron-modal-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
   .cron-modal-row:last-child { border-bottom:none; }
-  .cron-modal-label { font-size:11px; color:var(--muted); }
-  .cron-modal-value { font-size:12px; color:var(--text); font-weight:500; text-align:right; }
+  .cron-modal-label { font-size:11px; color:rgba(255,255,255,0.7); }
+  .cron-modal-value { font-size:12px; color:#fff; font-weight:500; text-align:right; }
   .cron-modal-actions { display:flex; gap:8px; padding:12px 20px; border-top:1px solid var(--border); }
-  .cron-modal-btn { flex:1; padding:8px; border:1px solid var(--border); border-radius:6px; background:none; color:var(--text); font-family:inherit; font-size:11px; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .cron-modal-btn { flex:1; padding:8px; border:1px solid var(--border); border-radius:6px; background:none; color:#fff; font-family:inherit; font-size:11px; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; justify-content:center; gap:6px; }
   .cron-modal-btn:hover { background:rgba(255,255,255,0.06); border-color:var(--text); }
   .cron-modal-btn.danger { color:var(--down); }
   .cron-modal-btn.danger:hover { background:rgba(248,113,113,0.1); border-color:var(--down); }
@@ -131,9 +131,9 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       Status
     </a>
-    <a href="/crons.html" class="active" id="nav-crons">
+    <a href="/routines.html" class="active" id="nav-crons">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      Cron Jobs
+      Routines
     </a>
     <a href="/gallery.html" id="nav-gallery">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -163,7 +163,7 @@
         <span class="bar"></span><span class="bar"></span><span class="bar"></span>
       </button>
       <div>
-        <h1>Cron Jobs</h1>
+        <h1>Routines</h1>
         <div id="cronCount" style="color:var(--muted);font-size:11px;margin-top:2px"></div>
       </div>
     </div>
@@ -299,7 +299,7 @@ function renderCostSummary() {
           ${iconNum ? `<img src="/agents/${iconNum}.png" width="28" height="28" style="border-radius:50%;border:2px solid ${AGENT_COLORS[iconNum]};box-shadow:0 0 6px ${AGENT_COLORS[iconNum]}40">` : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`}
         </div>
         <div>
-          <div style="font-size:12px;font-weight:600;${iconNum ? `color:${AGENT_COLORS[iconNum]}` : ''}">${escHtml(displayName(c.id))}</div>
+          <div style="font-size:12px;${iconNum ? `color:${AGENT_COLORS[iconNum]}` : ''}">${escHtml(taskName(c))}</div>
           <div style="font-size:10px;color:var(--muted)">${c.cost[3]}K/agent x ${c.cost[1]} apps x ${c.cost[2]} runs</div>
         </div>
         <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
@@ -312,32 +312,44 @@ function renderCostSummary() {
 
 function renderLogs() {
   const el = document.getElementById('logTimeline');
-  // Sort by last run (most recent first)
   const sorted = [...crons].filter(c => c.lastRun).sort((a, b) => new Date(b.lastRun) - new Date(a.lastRun));
   if (!sorted.length) { el.innerHTML = '<div class="no-data">No logs yet</div>'; return; }
 
   el.innerHTML = sorted.map((c, i) => {
     const iconNum = AGENT_ICONS[c.id];
-    const color = iconNum ? AGENT_COLORS[iconNum] : '#6366f1';
+    const agentColor = iconNum ? AGENT_COLORS[iconNum] : '#6366f1';
     const ago = timeAgo(c.lastRun);
     const ts = new Date(c.lastRun).toLocaleString();
     const lines = (c.lastLines || '').trim();
+    const hasError = lines.toLowerCase().includes('error') || lines.toLowerCase().includes('fail');
+    const borderColor = hasError ? '#ef4444' : '#4ade80';
+    const expanded = i === 0;
     return `
-      <div style="display:flex;gap:0;min-height:60px">
-        <div style="display:flex;flex-direction:column;align-items:center;width:44px;flex-shrink:0">
-          ${iconNum ? `<img src="/agents/${iconNum}.png" width="28" height="28" style="border-radius:50%;border:2px solid ${color};box-shadow:0 0 6px ${color}40">` : `<div style="width:28px;height:28px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>`}
-          ${i < sorted.length - 1 ? `<div style="flex:1;width:2px;background:var(--border);margin:4px 0"></div>` : ''}
-        </div>
-        <div style="flex:1;padding:0 0 16px 10px;min-width:0">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:12px;font-weight:600;color:${color}">${escHtml(displayName(c.id))}</span>
-            <span style="font-size:10px;color:var(--muted)">${ago}</span>
+      <div style="margin-bottom:6px;border:1px solid ${borderColor}40;border-radius:8px;background:var(--surface);overflow:hidden;box-shadow:0 0 8px ${borderColor}15">
+        <div onclick="toggleLogCard(this)" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;user-select:none">
+          ${iconNum ? `<img src="/agents/${iconNum}.png" width="28" height="28" style="border-radius:50%;border:2px solid ${agentColor};box-shadow:0 0 6px ${agentColor}40;flex-shrink:0">` : `<div style="width:28px;height:28px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>`}
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;color:var(--text)">${escHtml(taskName(c))}</span>
+            </div>
           </div>
-          <div style="font-size:10px;color:var(--muted);margin-top:2px">${ts}</div>
-          ${lines ? `<div style="margin-top:6px;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:10px;color:var(--muted);max-height:${i === 0 ? '200' : '120'}px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;line-height:1.5;font-family:'SF Mono','Fira Code',monospace;${i > 0 ? 'display:none' : ''}" onclick="this.style.display='block'" class="log-block" data-idx="${i}">${escHtml(lines)}</div><button onclick="const b=this.previousElementSibling;b.style.display=b.style.display==='none'?'block':'none';this.textContent=b.style.display==='none'?'Show log':'Hide log'" style="background:none;border:none;color:var(--muted);font-size:9px;cursor:pointer;padding:2px 0;font-family:inherit;${i === 0 ? 'display:none' : ''}">${i === 0 ? 'Hide log' : 'Show log'}</button>` : ''}
+          <span style="font-size:10px;color:rgba(255,255,255,0.5);white-space:nowrap">${ago}</span>
+          <span class="log-chevron" style="font-size:10px;color:var(--muted);transition:transform 0.15s;${expanded ? 'transform:rotate(90deg)' : ''}">\u25B6</span>
+        </div>
+        <div class="log-expand" style="${expanded ? '' : 'display:none'}">
+          <div style="padding:0 14px 4px;font-size:10px;color:rgba(255,255,255,0.4)">${ts}</div>
+          ${lines ? `<div style="margin:4px 14px 12px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:10px 12px;font-size:10px;color:rgba(255,255,255,0.8);max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;line-height:1.6;font-family:'SF Mono','Fira Code',monospace">${escHtml(lines)}</div>` : '<div style="padding:4px 14px 12px;font-size:10px;color:rgba(255,255,255,0.3);font-style:italic">No output</div>'}
         </div>
       </div>`;
   }).join('');
+}
+
+function toggleLogCard(header) {
+  const expand = header.nextElementSibling;
+  const chevron = header.querySelector('.log-chevron');
+  const isOpen = expand.style.display !== 'none';
+  expand.style.display = isOpen ? 'none' : '';
+  chevron.style.transform = isOpen ? '' : 'rotate(90deg)';
 }
 
 function cronTokDaily(c) {
@@ -375,10 +387,8 @@ function renderCrons() {
           </div>
           <div style="min-width:0">
             <div style="display:flex;align-items:center;gap:8px">
-              <span class="cron-name" ${AGENT_ICONS[c.id] ? `style="color:${AGENT_COLORS[AGENT_ICONS[c.id]]}"` : ''}>${escHtml(displayName(c.id))}</span>
-              ${c.autoFix ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" title="auto-fix"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>` : ''}
+              <span class="cron-name">${escHtml(taskName(c))}</span>
             </div>
-            ${c.desc ? `<div class="cron-desc">${escHtml(c.desc)}</div>` : ''}
           </div>
           <div style="display:flex;align-items:center;gap:5px" ${tok > 0 ? `title="${c.cost[3]}K tok/agent x ${c.cost[1]} apps x ${c.cost[2]} runs/day = ${tokLabel}"` : ''}>
             <div style="flex:1;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">
@@ -419,8 +429,8 @@ function openCronModal(id) {
     <div class="cron-modal-header">
       ${iconNum ? `<img src="/agents/${iconNum}.png" width="40" height="40" style="border-radius:50%;border:2px solid ${color};box-shadow:0 0 10px ${color}40">` : `<div style="width:40px;height:40px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>`}
       <div style="flex:1">
-        <div style="font-size:15px;font-weight:700;color:${color}">${escHtml(displayName(c.id))}</div>
-        <div style="font-size:11px;color:var(--muted)">${escHtml(c.desc || '')}</div>
+        <div style="font-size:15px;font-weight:700;color:${color}">${escHtml(taskName(c))}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.6)">${escHtml(c.desc || '')}</div>
       </div>
       <button onclick="closeCronModal()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px;line-height:1">&times;</button>
     </div>
@@ -451,8 +461,8 @@ function openCronModal(id) {
       </div>
       ${lines ? `
         <div style="margin-top:12px">
-          <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:6px">RECENT OUTPUT</div>
-          <div style="background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:10px;color:var(--muted);max-height:160px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;line-height:1.5;font-family:'SF Mono','Fira Code',monospace">${escHtml(lines)}</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.5);font-weight:600;margin-bottom:6px">RECENT OUTPUT</div>
+          <div style="background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:10px;color:rgba(255,255,255,0.8);max-height:160px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;line-height:1.5;font-family:'SF Mono','Fira Code',monospace">${escHtml(lines)}</div>
         </div>` : ''}
     </div>
     <div class="cron-modal-actions">
@@ -544,6 +554,11 @@ function timeAgo(iso) {
 
 function displayName(id) {
   return id.replace(/^agent-/, '').replace(/^nightly-/, '');
+}
+
+function taskName(c) {
+  if (!c.desc) return displayName(c.id);
+  return c.desc.replace(/^.*?\s—\s/, '');
 }
 
 function escHtml(s) {
