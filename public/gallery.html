@@ -41,6 +41,12 @@
   .dot-s.up { background: #22c55e; box-shadow: 0 0 4px #22c55e; }
   .dot-s.down { background: #ef4444; }
   .dot-s.unknown { background: var(--muted); }
+  .app-hide { display:none; background:none; border:none; color:var(--muted); cursor:pointer; font-size:11px; padding:2px 4px; border-radius:4px; margin-left:auto; transition:all 0.12s; line-height:1; }
+  .app-item:hover .app-hide { display:block; }
+  .app-hide:hover { color:#f87171; background:rgba(248,113,113,0.1); }
+  .app-item.hidden-app { opacity:0.3; }
+  .show-hidden-toggle { font-size:10px; color:var(--muted); padding:6px 10px; cursor:pointer; border:none; background:none; font-family:inherit; transition:color 0.12s; }
+  .show-hidden-toggle:hover { color:var(--text); }
 
   /* Main content */
   .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -106,7 +112,10 @@
 
 <div class="layout">
   <aside class="sidebar" id="sidebar">
-    <div class="sidebar-label">Apps</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding-right:4px">
+      <div class="sidebar-label">Apps</div>
+      <button class="show-hidden-toggle" id="toggleHidden" onclick="toggleShowHidden()">Show hidden</button>
+    </div>
     <div id="appList"></div>
   </aside>
 
@@ -120,6 +129,8 @@
       <div class="tab-sep"></div>
       <button class="tab"        data-mode="gifs"            onclick="setMode('gifs')">🎬 GIFs</button>
       <span class="count-badge" id="countBadge"></span>
+      <button class="tab" id="retakeBtn" style="margin-left:auto;background:rgba(74,222,128,0.1);border-color:rgba(74,222,128,0.3);color:#4ade80" onclick="retakeAll()">📷 Retake</button>
+      <button class="tab" id="exportPdfBtn" style="background:rgba(99,102,241,0.1);border-color:var(--accent);color:var(--accent2)" onclick="exportPdf()">📄 Export PDF</button>
     </div>
     <div class="grid-wrap" id="gridWrap">
       <div class="empty"><div class="icon">🖼</div><div>Select an app to view screenshots</div></div>
@@ -139,29 +150,8 @@
   </div>
 </div>
 
+<script src="/shared.js"></script>
 <script>
-const FAVICONS = {
-  'bheng':       '/favicons/bheng.png',
-  'tools':       '/favicons/tools.png',
-  'diagrams':    '/favicons/diagrams.png',
-  'claude':      '/favicons/claude.png',
-  'stickies':    '/favicons/stickies.png',
-  'mindmaps':    '/favicons/mindmaps.png',
-  'safe':        '/favicons/safe.png',
-  'drop':        '/favicons/drop.png',
-  'ai-spinner':  '/favicons/ai-spinner.png',
-  'moments':     '/favicons/moments.png',
-  'frames':      '/favicons/frames.png',
-  'audit':       '/favicons/audit.png',
-  'workflows':   '/favicons/workflows.png',
-  'system-design':'/favicons/system-design.png',
-  '3pi-poc':     '/favicons/3pi-poc.png',
-  '3pi':         '/favicons/3pi.svg',
-  'drop-web':    '/favicons/drop.svg',
-  'claude-live': '/favicons/claude-live.svg',
-  'recap':       '/favicons/recap.svg',
-};
-
 let allApps = [];
 let appData = {};   // id → index.json data
 let gifData = {};   // id → gifs/index.json data
@@ -170,12 +160,20 @@ let currentApp = null;
 let currentMode = 'desktop';
 let currentShots = [];
 let lbIdx = 0;
+let hiddenApps = JSON.parse(localStorage.getItem('gallery-hidden') || '[]');
+let showHidden = false;
+
+let appNames = {};
 
 async function init() {
-  // Load master index
-  const idx = await fetch('/screenshots/index.json').then(r => r.json()).catch(() => []);
-  // Load status to get dot colors
-  const status = await fetch('/api/status').then(r => r.json()).catch(() => ({ apps: [] }));
+  await _sharedReady;
+  // Load master index + app names from API
+  const [idx, appsApi, status] = await Promise.all([
+    fetch('/screenshots/index.json').then(r => r.json()).catch(() => []),
+    fetch('/api/apps').then(r => r.json()).catch(() => []),
+    fetch('/api/status').then(r => r.json()).catch(() => ({ apps: [] })),
+  ]);
+  appsApi.forEach(a => { appNames[a.id] = a.name; });
   const statusMap = {};
   (status.apps || []).forEach(a => statusMap[a.id] = a.status);
 
@@ -207,16 +205,23 @@ async function init() {
 
 function renderSidebar(statusMap) {
   const list = document.getElementById('appList');
-  list.innerHTML = allApps.map(a => {
+  const toggleBtn = document.getElementById('toggleHidden');
+  const hasHidden = hiddenApps.length > 0;
+  toggleBtn.style.display = hasHidden ? '' : 'none';
+  toggleBtn.textContent = showHidden ? 'Hide hidden' : `Show hidden (${hiddenApps.length})`;
+
+  list.innerHTML = allApps.filter(a => showHidden || !hiddenApps.includes(a.id)).map(a => {
     const data = appData[a.id] || {};
     const gifs = (gifData[a.id] || []).length;
     const shots = (data.desktop || data.screenshots || []).length + (data.mobile || []).length + gifs;
     const favicon = FAVICONS[a.id] ? `<img src="${FAVICONS[a.id]}" onerror="this.style.display='none'">` : '';
-    const dot = statusMap[a.id] || 'unknown';
-    return `<div class="app-item" id="app-${a.id}" onclick="selectApp('${a.id}')">
+    const isHidden = hiddenApps.includes(a.id);
+    const name = appNames[a.id] || a.id;
+    return `<div class="app-item${isHidden ? ' hidden-app' : ''}" id="app-${a.id}" onclick="selectApp('${a.id}')">
       ${favicon}
-      <span class="app-label">${a.id}</span>
+      <span class="app-label">${name}</span>
       <span class="shot-count">${shots || ''}</span>
+      <button class="app-hide" onclick="event.stopPropagation();toggleHideApp('${a.id}')" title="${isHidden ? 'Unhide' : 'Hide'}">${isHidden ? '+' : '✕'}</button>
     </div>`;
   }).join('');
 }
@@ -377,6 +382,83 @@ async function deletShot(i, filename) {
     data[currentMode] = data[currentMode].filter(f => f !== filename);
   }
   renderGrid();
+}
+
+function toggleHideApp(id) {
+  if (hiddenApps.includes(id)) {
+    hiddenApps = hiddenApps.filter(x => x !== id);
+  } else {
+    hiddenApps.push(id);
+  }
+  localStorage.setItem('gallery-hidden', JSON.stringify(hiddenApps));
+  renderSidebar({});
+}
+
+function toggleShowHidden() {
+  showHidden = !showHidden;
+  renderSidebar({});
+}
+
+function exportPdf() {
+  if (!currentApp || !currentShots.length) return;
+  const name = appNames[currentApp] || currentApp;
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>${name} — Screenshots</title>
+<style>
+  @page { size: landscape; margin: 0.5in; }
+  @media print { .no-print { display:none; } }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,sans-serif; background:#fff; color:#000; }
+  h1 { font-size:20px; margin:20px 0 10px; }
+  .meta { font-size:12px; color:#666; margin-bottom:20px; }
+  .shot { page-break-inside:avoid; margin-bottom:24px; }
+  .shot img { width:100%; max-height:80vh; object-fit:contain; border:1px solid #ddd; border-radius:4px; }
+  .shot-name { font-size:11px; color:#888; margin-top:4px; }
+  .toolbar { position:fixed; top:10px; right:10px; z-index:100; }
+  .toolbar button { padding:8px 20px; font-size:13px; background:#6366f1; color:#fff; border:none; border-radius:6px; cursor:pointer; font-family:inherit; }
+</style></head><body>
+<div class="toolbar no-print"><button onclick="window.print()">Print / Save PDF</button></div>
+<h1>${name}</h1>
+<div class="meta">${currentMode} · ${currentShots.length} screenshots · ${new Date().toLocaleDateString()}</div>
+${currentShots.map(f => `<div class="shot"><img src="${location.origin}${shotUrl(currentApp, currentMode, f)}"><div class="shot-name">${f.replace('.png','')}</div></div>`).join('')}
+</body></html>`);
+  w.document.close();
+}
+
+async function retakeAll() {
+  if (!currentApp) return;
+  const btn = document.getElementById('retakeBtn');
+  btn.disabled = true;
+  btn.textContent = '⟳ Running…';
+  btn.style.color = '#facc15';
+  try {
+    const res = await fetch('/api/screenshots/' + currentApp, { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'already_running') {
+      btn.textContent = '⟳ Already running';
+    } else {
+      btn.textContent = '✓ Started';
+      // Poll for completion
+      const poll = setInterval(async () => {
+        const s = await fetch('/api/screenshots-status').then(r => r.json()).catch(() => ({}));
+        if (!s[currentApp]) {
+          clearInterval(poll);
+          btn.textContent = '📷 Retake';
+          btn.style.color = '#4ade80';
+          btn.disabled = false;
+          // Reload screenshots
+          try {
+            const d = await fetch(`/screenshots/${currentApp}/index.json`).then(r => r.json());
+            appData[currentApp] = d;
+          } catch {}
+          renderGrid();
+        }
+      }, 3000);
+    }
+  } catch {
+    btn.textContent = '❌ Error';
+  }
+  setTimeout(() => { btn.disabled = false; }, 3000);
 }
 
 init();

@@ -1,0 +1,146 @@
+{
+  "bheng": {
+    "about": "A production-grade developer portfolio built on the AWS Well-Architected Framework with 265 automated tests and perfect Lighthouse scores.",
+    "features": ["Perfect Lighthouse scores (P99 Desktop, A100, BP100, SEO100)", "265 automated tests across unit, E2E, smoke, accessibility, and security layers", "12-agent monitoring system with real-time admin dashboard", "OWASP Top 10 security coverage with 10/10 categories passing", "WebSocket-powered live session viewer with Rust binary proxy"],
+    "architect": "Built on Next.js 16 with React 19, TypeScript strict mode, and Tailwind CSS. Custom Node.js HTTP server wraps Next.js and adds a WebSocket layer that proxies to a Rust binary for live Claude session streaming. Supabase handles auth and data persistence. Bundle analysis via @next/bundle-analyzer, Istanbul code coverage, Vitest for unit tests, and Playwright for E2E.",
+    "deploy": "Clone the repo, run npm install, then npm run dev to start on port 3000. For production, npm run prod builds and starts the custom server. Deployed to Vercel on every push to main. Caddy reverse proxy provides bheng.localhost for local access.",
+    "security": ["Full security headers: CSP, HSTS (max-age 2yr), X-Frame-Options DENY, X-Content-Type-Options nosniff", "Supabase Auth with passwordless and biometric login; all /admin/* routes require authentication", "OWASP Top 10 coverage verified by automated E2E security tests", "Zero npm vulnerabilities enforced; npm audit before every push"],
+    "performance": ["Experimental inlineCss eliminates render-blocking stylesheets, saving ~300ms", "optimizePackageImports for lucide-react, framer-motion tree-shakes unused exports", "Immutable cache headers (1yr) on static assets; AVIF/WebP image formats", "Bundle analyzer integration and outputFileTracingExcludes to minimize serverless function size"]
+  },
+  "tools": {
+    "about": "A Swiss Army knife of 20+ standalone developer utilities -- from AI video analysis to color extraction to invoice generation -- all in one app.",
+    "features": ["20+ standalone tools: Responsive tester, YouTube Insight, Hex Detector, Invoice Prep, WebDrop", "AI-powered utilities via Claude API and OpenAI API", "PDF generation and parsing with jsPDF, pdf-lib, and pdfjs-dist", "3D visualization with Three.js and diagram editing with ReactFlow", "Cross-device file sharing via Supabase-backed WebDrop"],
+    "architect": "Next.js 16 App Router with React 19 and TypeScript. Each tool lives under its own route with zero cross-tool dependencies. Server components by default with client directives only when needed. API routes handle AI calls (Anthropic SDK, OpenAI), file processing, and Supabase operations.",
+    "deploy": "Run npm install && npm run dev to start on port 3001. Production build via npm run prod. Hosted on Vercel. Caddy provides tools.localhost for LAN access.",
+    "security": ["Supabase Auth with SSR cookie-based sessions (@supabase/ssr)", "Fingerprint.js for device-level identity tracking", "Server-side API routes protect all external API keys", "Zero cross-tool state isolation prevents data leakage between utilities"],
+    "performance": ["Each tool is a standalone route -- only the active tool's code is loaded", "Server Components by default reduce client-side JavaScript bundle", "Lazy-loaded heavy dependencies (Three.js, pdf-lib, ReactFlow) per-route", "Turbopack for fast dev builds; Vercel edge caching in production"]
+  },
+  "diagrams": {
+    "about": "AI-powered diagram generator -- describe what you want in plain English or paste Mermaid syntax and get beautiful rendered diagrams instantly.",
+    "features": ["AI diagram generation via Claude -- describe in plain English, get Mermaid syntax", "10+ diagram types: flowcharts, sequence, class, state, ER, Gantt, pie, mindmap, timeline", "Custom sequence renderer with colored lifelines, pill labels, icons, and step numbers", "Pan-and-zoom canvas with pinch-to-zoom on mobile", "Export as 2x retina PNG, SVG, JSON, or QR code sharing link"],
+    "architect": "Next.js 15 with React 19 and TypeScript. Mermaid.js handles diagram rendering with a custom sequence diagram renderer layered on top. Claude API powers natural-language-to-diagram generation. Supabase for persistence and auth with localhost bypass. Prism.js for syntax highlighting, lz-string for URL compression.",
+    "deploy": "Run npm install && npm run dev to start on port 3002. Production via npm run prod. Hosted on Vercel and Netlify. Requires ANTHROPIC_API_KEY and Supabase credentials in .env.local.",
+    "security": ["Supabase Auth with automatic localhost/LAN bypass for development", "Server-side API routes protect Claude API key from client exposure", "Production source maps disabled (productionBrowserSourceMaps: false)", "Auth callback routes with secure cookie handling"],
+    "performance": ["lz-string compresses diagram data in shareable URLs", "Turbo cache enabled for faster builds", "Client-side Mermaid rendering avoids server round-trips for preview", "React strict mode for catching side-effect bugs early"]
+  },
+  "claude": {
+    "about": "The missing GUI for Claude Code -- monitor sessions, tokens, context windows, memory, skills, hooks, and MCP servers from one local-first dashboard.",
+    "features": ["Real-time session monitoring with thinking state, tool calls, and SSE streaming", "Token analytics with daily charts, per-model pricing (Opus/Sonnet/Haiku), and plan-aware cost tracking", "Multi-machine support -- switch between Mac, Pi, VPS with data proxied from remote dashboards", "Memory browser, rules database, skills viewer, hooks inspector, and MCP server status", "Activity heatmap with GitHub-style contribution calendar and streaks"],
+    "architect": "Next.js 16 with React 19 and TypeScript. Zero-config local-first architecture -- reads Claude Code data directly from the filesystem with no database required. Optional SQLite for caching. Custom WebSocket server runs alongside Next.js for live session streaming.",
+    "deploy": "Clone the repo, run npm install && npm run dev to start on port 3003. No config, no database, no account needed. For full features run npm run dev:full which starts the WebSocket server alongside Next.js.",
+    "security": ["Local-first architecture -- no cloud dependency, all data stays on your machine", "poweredByHeader disabled to prevent server fingerprinting", "WebSocket connections scoped to localhost session proxying", "No authentication required -- designed for local/LAN use only"],
+    "performance": ["compress: true enables gzip/brotli for all responses", "optimizePackageImports for lucide-react and @heroicons/react tree-shakes unused icons", "SSE streaming for real-time session updates without polling", "React strict mode catches performance regressions early"]
+  },
+  "stickies": {
+    "about": "A real-time, AI-powered sticky notes board with folder organization, markdown rendering, and cross-device sync via WebSockets.",
+    "features": ["Colorful draggable sticky notes with folder organization and real-time sync via Pusher", "AI-powered content generation and Mermaid diagram creation via Claude API", "Markdown rendering with code syntax highlighting (Prism.js, highlight.js)", "Full REST API with CLI access, email sharing via Resend, Google Drive backup", "QR code sharing, PDF import, push notifications, and automation workflows"],
+    "architect": "Next.js 16 App Router with React 19 and TypeScript. Route groups separate the main board, auth, sharing, and tools. Supabase handles persistence and auth with Google OAuth plus automatic localhost/LAN bypass. Pusher WebSockets broadcast mutations for real-time sync. Claude API powers AI features. Resend for email delivery.",
+    "deploy": "Run npm install && npm run dev to start on port 4444. Production via npm run prod. Hosted on Vercel. Requires Supabase, Pusher, Anthropic, and Resend credentials in .env.local.",
+    "security": ["Supabase Auth with Google OAuth and session-based middleware", "Automatic localhost/LAN bypass via isLocal() check in middleware.ts", "Server-side API routes protect all external API keys (Claude, Pusher, Resend)", "Cookie-based auth with @supabase/ssr for secure session management"],
+    "performance": ["Pusher WebSockets for instant sync instead of polling", "Server Components by default -- client directive only for interactive board", "Lazy-loaded AI and diagram features -- only loaded when invoked", "Route groups split code bundles by feature (board, auth, sharing, tools)"]
+  },
+  "mindmaps": {
+    "about": "An installable PWA mind mapping tool with drag-and-drop nodes, multiple layout engines, offline support, and PDF export.",
+    "features": ["Interactive canvas with drag-and-drop node creation and repositioning", "Multiple layout algorithms: mindmap, fishbone, timeline, brace", "PWA -- installable, works offline with service worker caching and auto-update", "Export to PDF (jsPDF + html2canvas), JSON import/export, QR code sharing", "Zustand-powered state with undo/redo history and keyboard shortcuts"],
+    "architect": "React 19 SPA built with Vite 7 and TypeScript. Zustand manages nodes, edges, layout state, and undo/redo history. Custom SVG edge layer and draggable node components form the canvas. Multiple layout engines auto-arrange nodes. vite-plugin-pwa generates a full service worker for offline support.",
+    "deploy": "Run npm install && npm run dev to start on port 5173. Production via npm run prod. Hosted on Vercel. PWA auto-installs via service worker.",
+    "security": ["Supabase Auth for user authentication and map ownership", "Service worker scoped to same-origin requests only", "No server-side code exposure -- pure SPA with API calls to Supabase", "WebSocket connections limited to Supabase real-time channels"],
+    "performance": ["PWA service worker with Workbox: NetworkFirst for navigation, cached JS/CSS/PNG/SVG", "skipWaiting + clientsClaim ensures instant SW updates across tabs", "Supabase API responses cached for 24hr via runtimeCaching", "Vite tree-shaking and ES module splitting for minimal bundle size"]
+  },
+  "safe": {
+    "about": "A local-first secrets manager -- manage .env variables across all your projects from one dashboard, with AI-powered key analysis and multi-machine sync.",
+    "features": ["Full CRUD for environment variables with multi-project scanning across ~/Sites", "AI-powered analysis via Anthropic SDK -- detects duplicates, expired keys, and invalid patterns", "Multi-machine sync pulls keys from remote Safe instances via REST API", "Machine aliasing and side-by-side key comparison across machines", "Key status tracking: active, duplicate, stale, expired, invalid"],
+    "architect": "Next.js 16 with React 19 and TypeScript. Custom Node.js HTTP server wraps Next.js and binds to 0.0.0.0:6100 for LAN access. SQLite via better-sqlite3 in WAL mode for concurrent reads. Anthropic SDK powers AI key analysis.",
+    "deploy": "Run npm install && npm run dev to start on port 6100. The custom server automatically binds to 0.0.0.0 for LAN access. Data stored in data/safe.db (auto-created). No cloud dependency.",
+    "security": ["Local-only architecture -- no cloud, no SaaS, all secrets stay on your machine", "SQLite WAL mode ensures data integrity with concurrent reads", "LAN-accessible but designed for trusted local networks only", "Server-side API routes protect Anthropic API key from client exposure"],
+    "performance": ["better-sqlite3 with WAL mode for fast concurrent reads without a separate DB process", "serverExternalPackages prevents native module bundling issues", "Single-file SQLite storage -- no external database server needed", "Custom HTTP server avoids Next.js dev server overhead in production"]
+  },
+  "drop": {
+    "about": "LAN file transfer without the cloud -- drop files, text, and images between any device on your network in real time.",
+    "features": ["Real-time WebSocket sync broadcasts drops to all connected clients instantly", "Channel-based organization for multiple drop zones", "Supports any file type with MIME detection and clipboard recording", "Electron tray app for quick access from the system tray", "Auto-pruning keeps storage lean at 50 items per channel"],
+    "architect": "Next.js 15 with React 19 and TypeScript. Custom Node.js HTTP server handles both REST and WebSocket connections on port 4321. Channel-based pub/sub broadcasts drops via the ws library. SQLite stores drop history with auto-pruning. Electron wrapper provides a system tray app.",
+    "deploy": "Run npm install && npm run dev to start on port 4321. Production via npm run prod. Electron tray app available in the electron/ directory. No cloud dependency -- fully local SQLite.",
+    "security": ["No cloud dependency -- all data stays on your local network", "Channel-based isolation prevents cross-zone data leakage", "WebSocket channel names validated with regex (alphanumeric, max 64 chars)", "Content deduplication with 5-minute signature expiry prevents replay attacks"],
+    "performance": ["WebSocket pub/sub for instant real-time sync without polling", "Auto-pruning to 50 items per channel keeps SQLite lean", "In-memory dedup map with periodic cleanup (30s intervals)", "globalThis bridge avoids double-initialization between server and Next.js"]
+  },
+  "ai-spinner": {
+    "about": "AI content spinner that rewrites text with multiple variations while preserving meaning and tone.",
+    "features": ["AI-powered text rewriting with multiple output variations", "Tone and style preservation across rewrites", "Batch processing for bulk content spinning", "Copy-to-clipboard with one click", "History tracking for previous spins"],
+    "architect": "Lightweight web application with AI integration for text transformation. Uses Claude API for natural language rewriting. Minimal frontend with Tailwind CSS for styling.",
+    "deploy": "Clone the repo, install dependencies, and run the dev server. Requires ANTHROPIC_API_KEY in environment variables.",
+    "security": ["Server-side API routes protect AI API keys from client exposure", "No persistent data storage -- all processing is ephemeral", "Local-only access designed for trusted networks", "Input sanitization before sending to AI API"],
+    "performance": ["Single-purpose design keeps bundle size minimal", "Streaming AI responses for instant feedback", "No database overhead -- stateless processing", "Client-side caching of recent results"]
+  },
+  "moments": {
+    "about": "Turn any spare screen into a beautiful digital photo frame with Sharp-powered image processing and always-on ambient display.",
+    "features": ["Digital photo frame display optimized for always-on screens", "Sharp-powered image processing with resize, transform, and style filters", "Responsive layout adapts to any screen size and orientation", "Image upload and transformation API", "Clean, distraction-free slideshow UI"],
+    "architect": "Next.js 16 with React 19, TypeScript, and Tailwind CSS. Sharp handles all server-side image manipulation. No database -- images are processed on-the-fly or served from the filesystem. Designed for ambient displays like iPads or spare monitors.",
+    "deploy": "Run npm install && npm run dev to start. Point any browser (iPad, spare monitor) at the server URL. No configuration needed.",
+    "security": ["No external network calls -- all image processing happens locally", "File-based storage with no database attack surface", "Designed for trusted local networks only", "No user authentication needed -- ambient display use case"],
+    "performance": ["Sharp handles image processing in native C++ for maximum speed", "On-the-fly image transformation avoids pre-processing storage overhead", "No database queries -- direct filesystem reads", "Responsive CSS adapts to display without JavaScript layout calculations"]
+  },
+  "frames": {
+    "about": "Generate stunning device mockups -- upload any screenshot and wrap it in pixel-perfect iPhone, iPad, or MacBook frames instantly.",
+    "features": ["Device mockup generation for iPhone, iPad, MacBook, and more", "Server-side image compositing via Sharp for production-quality output", "Client-side html2canvas capture for instant real-time preview", "Multiple device templates with accurate bezels and dimensions", "Export as high-resolution PNG"],
+    "architect": "Next.js 16 with React 19, TypeScript, and Tailwind CSS. Dual rendering pipeline: Sharp composites images server-side for high-quality output, while html2canvas captures client-side preview for instant feedback. Stateless design with no database.",
+    "deploy": "Run npm install && npm run dev to start. No configuration or database needed. Stateless -- every mockup is generated fresh.",
+    "security": ["Stateless design -- no data persistence, no database attack surface", "Server-side image compositing prevents malicious client-side manipulation", "No external API calls -- all processing is local", "No user authentication needed -- utility tool use case"],
+    "performance": ["Sharp native C++ image compositing for fast server-side rendering", "html2canvas client-side preview avoids server round-trip for drafts", "Stateless design -- no database queries, no session management overhead", "Static device templates cached by the browser on first load"]
+  },
+  "audit": {
+    "about": "Paste any GitHub repo URL and get instant architectural analysis with auto-generated Mermaid diagrams -- your codebase X-ray.",
+    "features": ["Instant architectural analysis from any GitHub repo URL", "Auto-generated Mermaid diagrams: dependency graphs, module relationships, file structure", "Markdown-rendered analysis reports with Heroicons", "Stateless -- no data stored, everything generated on-the-fly", "LAN-accessible for team use"],
+    "architect": "Next.js 16 with React 19, TypeScript, and Tailwind CSS 3. Stateless analysis service -- user submits a GitHub repo URL, the server fetches metadata and source structure via the GitHub API, then generates reports with embedded Mermaid.js diagrams.",
+    "deploy": "Run npm install && npm run dev to start on port 3007. No environment variables needed for core functionality. No database required.",
+    "security": ["Stateless -- no data stored, nothing to breach", "Server-side GitHub API calls protect any tokens from client exposure", "No user accounts or sessions to manage", "LAN auto-detection in dev script for controlled access"],
+    "performance": ["Stateless design -- zero database overhead, pure compute", "On-the-fly generation avoids storage and cache invalidation complexity", "Client-side Mermaid.js rendering offloads diagram work to the browser", "Tailwind CSS 3 with PurgeCSS for minimal stylesheet size"]
+  },
+  "workflows": {
+    "about": "A drag-and-drop visual workflow builder with a node-based graph editor for designing automation flows.",
+    "features": ["Drag-and-drop visual workflow builder with bezier-curved connections", "Multiple node types for different automation steps", "React Flow canvas with pan, zoom, and selection", "Export and import workflow definitions as JSON", "Fully client-side -- no server-side persistence needed"],
+    "architect": "Next.js 15 with React 19, TypeScript, and Tailwind CSS 3. @xyflow/react (React Flow) powers the node-based graph editor with typed nodes and bezier-curved edges. All state lives client-side in React Flow's internal store.",
+    "deploy": "Run npm install && npm run dev to start on port 3008. No environment variables needed. No database required. Pure client-side application.",
+    "security": ["No server-side state or database -- nothing to breach", "Client-side only -- no API keys or secrets needed", "No network requests beyond initial page load", "JSON export format is human-readable and auditable"],
+    "performance": ["Client-side rendering with React Flow's optimized canvas", "No database queries or API calls during workflow editing", "Tailwind CSS 3 with PurgeCSS for minimal stylesheet", "JSON import/export avoids heavy serialization overhead"]
+  },
+  "system-design": {
+    "about": "Interactive AWS and distributed system architecture diagramming tool with AI generation, auto-layout, and JIRA integration.",
+    "features": ["AI-powered diagram generation via Claude -- describe your architecture in plain English", "50+ AWS and infrastructure icons (servers, databases, load balancers, CDNs)", "Auto-layout with Dagre algorithm for clean node arrangement", "JIRA integration -- pull system design data directly from Atlassian tickets", "Drag-and-drop component placement with React Flow canvas"],
+    "architect": "Vite-powered React 19 SPA with TypeScript. @xyflow/react for the visual flow editor, @dagrejs/dagre for automatic graph layout. Express backend handles Claude API calls for AI-powered diagram generation. Vite dev proxy forwards JIRA API requests to Atlassian.",
+    "deploy": "Run npm install && npm run dev for the Vite dev server, and npm run api for the Express backend. Requires ANTHROPIC_API_KEY and optionally JIRA credentials in .env.",
+    "security": ["Express backend proxies Claude API key -- never exposed to the client", "Vite proxy handles JIRA Basic Auth credentials server-side", "CORS enabled on the Express server for controlled access", "No persistent data storage -- diagrams are ephemeral until exported"],
+    "performance": ["Vite ES module bundling with hot module replacement for fast dev cycles", "Dagre auto-layout computes node positions in milliseconds", "React Flow's optimized canvas handles hundreds of nodes smoothly", "html-to-image export renders client-side without server round-trips"]
+  },
+  "kactus-qa": {
+    "about": "QA testing dashboard for the Kactus platform -- automated test execution, reporting, and regression tracking.",
+    "features": ["Automated QA test execution and result tracking", "Regression detection across test runs", "Visual test reporting with pass/fail dashboards", "Integration with CI/CD pipeline for continuous testing", "Historical test data for trend analysis"],
+    "architect": "Web-based QA dashboard for managing and visualizing test results from the Kactus platform. Integrates with existing CI/CD infrastructure for automated test execution and reporting.",
+    "deploy": "Clone the repo, install dependencies, and start the dev server. Connects to the Kactus platform API for test data.",
+    "security": ["Scoped to internal QA use only -- no public-facing endpoints", "Read-only access to test results by default", "No credentials stored client-side", "Local network access only"],
+    "performance": ["Lightweight dashboard focused on data visualization", "Paginated test result loading for large test suites", "Client-side filtering avoids repeated API calls", "Minimal dependency footprint"]
+  },
+  "local-apps": {
+    "about": "A self-healing app monitor that tracks all your local apps, auto-restarts crashes, runs nightly tests, and deploys AI agents to fix failures.",
+    "features": ["Live dashboard with status, hostnames, LAN/Tailscale/Vercel links for all apps", "Auto-restart crashed apps every 30s via launchctl + AI agents fix stubborn failures", "Nightly test suite runs 858 tests across 11 repos with auto-fix agents", "Screenshot bot captures desktop + mobile with device frames, plus 30s GIF recordings", "Multi-machine hub/agent architecture with Tailscale and Cloudflare remote access"],
+    "architect": "Express 4 server with SQLite (better-sqlite3) for app registry and state. Hub/agent architecture -- hub orchestrates bots and monitoring, agents report status. Playwright captures screenshots and GIF recordings. Sharp processes images and generates favicons. Compression middleware for responses.",
+    "deploy": "Run npm install && npm start to launch on port 9876. Add apps via POST to /api/apps. Machine role configurable via MACHINE_ROLE env var or machine-role.json (hub or agent).",
+    "security": ["Caddy validates config before reloading -- never serves with broken configuration", "Channel-based WebSocket validation with regex patterns", "Hub/agent role separation limits what each machine can do", "Auto security scan via AI agents flags vulnerabilities"],
+    "performance": ["Compression middleware (gzip) on all Express responses", "Static asset caching with 1-hour Cache-Control headers, busted by ?v= timestamp", "SQLite for fast local reads -- no external database server needed", "30s health check interval with quick-fix-first approach before deploying AI agents"]
+  },
+  "clip": {
+    "about": "Tiny clipboard sync daemon -- seamlessly share your clipboard between two Macs over LAN in real time.",
+    "features": ["Real-time clipboard sync between two machines via WebSocket", "SHA-256 hash comparison polls every 400ms for instant detection", "SQLite-backed clipboard history with deduplication", "Echo prevention with 2-second cooldown after receiving", "launchd service for always-on background operation"],
+    "architect": "Node.js Express server with WebSocket (ws library) for peer-to-peer clipboard sync. Polls pbpaste every 400ms and compares SHA-256 hashes to detect changes. SQLite stores clipboard history with dedup logic. launchd plist for macOS service management.",
+    "deploy": "Run CLIP_NAME=M4 CLIP_PEER=<peer-ip>:4545 CLIP_TOKEN=<secret> node src/server.js on each machine. Install as a persistent launchd service.",
+    "security": ["Shared token (CLIP_TOKEN) authenticates peer connections", "Never stores clipboard content in plaintext -- only SHA-256 hashes for comparison", "LAN-only peer connections -- no cloud relay", "Echo prevention stops infinite sync loops between machines"],
+    "performance": ["SHA-256 hash comparison avoids transferring unchanged clipboard content", "400ms polling interval balances responsiveness with CPU efficiency", "In-memory dedup with periodic SQLite flush minimizes disk I/O", "WebSocket persistent connection eliminates HTTP handshake overhead per sync"]
+  },
+  "cl-poster": {
+    "about": "Craigslist post manager with 100 templates, weekly auto-rotation, Playwright automation, and 48-hour cooldown enforcement.",
+    "features": ["100 post templates with 10/week auto-rotation to avoid duplicate detection", "Playwright CLI for semi-automated Craigslist posting", "48-hour cooldown enforcement per category", "Title and description rotation for variation", "Post history tracking with status dashboard"],
+    "architect": "Next.js 16 with React 19, TypeScript, and Tailwind CSS 4. SQLite (better-sqlite3) stores templates, rotation state, and posting history. Playwright automates browser-based posting flows via a CLI. Husky for pre-commit hooks.",
+    "deploy": "Run npm install && npx playwright install chromium && npm run dev to start on port 3009. CLI available via npx ts-node cli/post.ts for listing, posting, rotating, and checking cooldowns.",
+    "security": ["Security headers: X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, Permissions-Policy", "Local-only SQLite storage -- no cloud data exposure", "Husky pre-commit hooks enforce code quality gates", "No external API keys or credentials stored in the app"],
+    "performance": ["SQLite for instant local reads -- no network database latency", "Tailwind CSS 4 with automatic tree-shaking for minimal stylesheet", "Playwright runs headless Chromium for fast automated posting", "Next.js 16 with Turbopack for fast dev builds"]
+  }
+}

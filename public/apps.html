@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apps - Local Apps</title>
+<style>
+:root { --bg:#0e0e10; --surface:#18181b; --border:#27272a; --text:#e4e4e7; --muted:#71717a; --accent:#3b82f6; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; }
+
+.sidebar { width:180px; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; position:fixed; top:0; bottom:0; z-index:10; }
+.sidebar-header { padding:16px 16px 12px; border-bottom:1px solid var(--border); }
+.sidebar-ip { font-size:11px; color:var(--muted); font-family:'SF Mono',monospace; }
+.sidebar-nav { padding:12px 8px; display:flex; flex-direction:column; gap:1px; }
+.sidebar-nav a { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:7px; font-size:12px; color:var(--muted); text-decoration:none; transition:all 0.12s; font-weight:500; }
+.sidebar-nav a:hover { background:rgba(255,255,255,0.05); color:var(--text); }
+.sidebar-nav a.active { background:rgba(255,255,255,0.08); color:#fff; font-weight:600; }
+.sidebar-nav a svg { opacity:0.45; flex-shrink:0; }
+.sidebar-nav a.active svg { opacity:0.9; }
+.sidebar-footer { margin-top:auto; padding:12px 16px; border-top:1px solid var(--border); font-size:10px; color:var(--muted); font-family:'SF Mono',monospace; }
+
+.main { margin-left:180px; flex:1; padding:32px; }
+h1 { font-size:20px; font-weight:700; margin-bottom:24px; }
+
+.logo-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:20px; }
+.logo-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; transition:border-color 0.15s; }
+.logo-card:hover { border-color:rgba(255,255,255,0.15); }
+.logo-header { display:flex; align-items:center; gap:14px; padding:16px 18px; border-bottom:1px solid var(--border); }
+.logo-header img { width:48px; height:48px; border-radius:10px; }
+.logo-header .name { font-size:15px; font-weight:600; }
+.logo-header .desc { font-size:11px; color:var(--muted); margin-top:2px; }
+
+/* Tabs */
+.card-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); overflow-x:auto; }
+.card-tabs::-webkit-scrollbar { display:none; }
+.card-tab { background:none; border:none; border-bottom:2px solid transparent; color:var(--muted); font-family:inherit; font-size:10px; font-weight:600; padding:8px 12px; cursor:pointer; transition:all 0.12s; white-space:nowrap; text-transform:uppercase; letter-spacing:0.04em; }
+.card-tab:hover { color:var(--text); }
+.card-tab.active { color:#fff; border-bottom-color:#fff; }
+
+/* Tab panels */
+.card-panel { display:none; padding:14px 18px; min-height:120px; }
+.card-panel.active { display:block; }
+.card-panel p { font-size:11px; color:rgba(255,255,255,0.6); line-height:1.7; }
+.card-panel ul { list-style:none; padding:0; margin:6px 0 0; }
+.card-panel ul li { font-size:11px; color:rgba(255,255,255,0.6); line-height:1.7; padding:2px 0; }
+.card-panel ul li::before { content:''; display:inline-block; width:4px; height:4px; border-radius:50%; background:var(--accent); margin-right:8px; vertical-align:middle; }
+.card-panel .oneliner { font-size:13px; color:var(--text); font-weight:500; margin-bottom:10px; line-height:1.5; }
+.card-panel .security-item::before { background:#22c55e; }
+.card-panel .perf-item::before { background:#eab308; }
+
+.copy-btn { margin-top:10px; background:rgba(255,255,255,0.06); border:1px solid var(--border); color:var(--muted); font-size:10px; padding:5px 12px; border-radius:5px; cursor:pointer; transition:all 0.12s; }
+.copy-btn:hover { background:rgba(255,255,255,0.1); color:var(--text); }
+
+/* Copy icon button */
+.copy-icon { position:absolute; top:10px; right:10px; background:rgba(255,255,255,0.06); border:1px solid var(--border); color:var(--muted); width:26px; height:26px; border-radius:5px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.12s; opacity:0; }
+.card-panel:hover .copy-icon { opacity:1; }
+.copy-icon:hover { background:rgba(255,255,255,0.12); color:var(--text); border-color:var(--text); }
+.card-panel { position:relative; }
+
+/* Dynamic Island toast */
+@keyframes islandIn { 0% { transform:translateX(-50%) translateY(-20px) scale(0.8); opacity:0; } 100% { transform:translateX(-50%) translateY(0) scale(1); opacity:1; } }
+@keyframes islandOut { 0% { opacity:1; transform:translateX(-50%) scale(1); } 100% { opacity:0; transform:translateX(-50%) scale(0.8) translateY(-10px); } }
+.island-toast { position:fixed; top:20px; left:50%; transform:translateX(-50%); z-index:9999; pointer-events:none; animation:islandIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards; }
+.island-toast.out { animation:islandOut 0.25s ease-in forwards; }
+.island-pill { display:inline-flex; align-items:center; gap:6px; padding:6px 14px 6px 10px; border-radius:20px; background:#34C759; color:#fff; font-size:12px; font-weight:600; font-family:inherit; box-shadow:0 8px 26px rgba(52,199,89,0.4); border:1px solid rgba(52,199,89,0.6); }
+.island-pill .pill-icon { width:20px; height:20px; border-radius:50%; background:rgba(0,0,0,0.12); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+</style>
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-header">
+    <span class="sidebar-ip" id="sidebarIp">localhost</span>
+  </div>
+  <div class="sidebar-nav">
+    <a href="/">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Status
+    </a>
+    <a href="/routines.html">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Cron Jobs
+    </a>
+    <a href="/gallery.html">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      Screenshots
+    </a>
+    <a href="/apps.html" class="active">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Apps
+    </a>
+    <a href="/readmes.html">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      READMEs
+    </a>
+    <a href="/docs.html">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      API Docs
+    </a>
+  </div>
+  <div class="sidebar-footer">localhost:9876</div>
+</nav>
+
+<div class="main">
+  <h1>Apps</h1>
+  <div class="logo-grid" id="logoGrid"></div>
+</div>
+
+<script src="/shared.js"></script>
+<script>
+const TABS = ['about','architect','deploy','security','performance','prompt'];
+
+const PROMPTS = {
+  'tools': { prompt: 'Design a 1024x1024 app icon for "Tools", a collection of 30+ developer utilities. A pixelated Swiss Army knife with colorful rainbow tools (wrench, pliers, blade, terminal) fanning out. Dark carbon fiber background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'diagrams': { prompt: 'Design a 1024x1024 app icon for "Diagrams", a sequence diagram and visual workflow tool. Show a vertical sequence diagram with colored lifeline bars (purple, cyan, pink) connected by horizontal arrow messages flowing between them. Deep purple (#8B5CF6) gradient fading to violet background with rounded iOS corners. Add glowing neon connection lines and small colored dots at intersection points. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'claude': { prompt: 'Design a 1024x1024 app icon for "Claude Dashboard", an AI session and memory manager. A gold hexagon containing a circuit-board brain with glowing nodes, bar charts and pie chart accents. Dark charcoal background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'stickies': { prompt: 'Design a 1024x1024 app icon for "Stickies", a collaborative sticky notes board. Stacked yellow sticky notes with a red pushpin, checkmark, and colorful small cards. Warm orange background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'mindmaps': { prompt: 'Design a 1024x1024 app icon for "Mindmaps", a visual mind mapping tool. A glowing central node with radiating branches like a neuron, small colored dots at endpoints. Indigo (#6366F1) to purple gradient background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'safe': { prompt: 'Design a 1024x1024 app icon for "Safe", a local secrets manager. A steel shield with a vault dial and green (#22C55E) glowing key slot. Dark gunmetal background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'drop': { prompt: 'Design a 1024x1024 app icon for "Drop", a LAN file transfer app. A parachute dropping a package box with motion lines. Green (#16A34A) to teal gradient background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'ai-spinner': { prompt: 'Design a 1024x1024 app icon for "AI Spinner", an AI activity indicator. A glowing neon atom with orbiting rings in pink (#F92672), yellow (#E6DB74), cyan (#66D9EF) with a bright core. Dark space/navy background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'moments': { prompt: 'Design a 1024x1024 app icon for "Moments", a digital photo frame app. A gold camera aperture blending into a picture frame with a warm sunset inside. Dark black background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'frames': { prompt: 'Design a 1024x1024 app icon for "Frames", a device mockup generator. Overlapping silver Apple device silhouettes - MacBook, iPhone, iPad. Dark (#0E0E10) background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'bheng': { prompt: 'Design a 1024x1024 app icon for "bheng", a developer portfolio. Minimalist letter B stylized as a code bracket with electric blue glow. Black background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'audit': { prompt: 'Design a 1024x1024 app icon for "Audit", a GitHub repo analyzer that generates diagrams instantly. A magnifying glass over a code repository structure with Mermaid-style flowchart lines radiating out. Red (#DC2626) and dark charcoal palette with glowing scan lines. Dark background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'workflows': { prompt: 'Design a 1024x1024 app icon for "Workflows", a visual drag-and-drop automation builder. Connected workflow nodes with curved bezier lines flowing left to right, glowing connection points. Cyan (#06B6D4) and electric blue palette on a dark background. Rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'system-design': { prompt: 'Design a 1024x1024 app icon for "System Design", an interactive architecture diagram tool for AWS and distributed systems. Show cloud infrastructure icons (server, database, load balancer) connected by network lines in a layered architecture. Purple (#B45CF6) and orange accent palette on a dark background. Rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'kactus-qa': { prompt: 'Design a 1024x1024 app icon for "KACTUS QA", a QA testing dashboard. A cactus silhouette made of geometric shapes with a small checkmark badge in the bottom-right corner. Dark green (#166534) gradient background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'local-apps': { prompt: 'Design a 1024x1024 app icon for "Local Apps", a process manager and monitoring dashboard. A grid of 4 small rounded squares (2x2) in different muted colors (teal, purple, amber, coral) representing multiple apps, with thin connection lines between them. Dark charcoal (#1a1a1a) background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'clip': { prompt: 'Design a 1024x1024 app icon for "Clip", a clipboard history and media clip manager. A paperclip shape merged with a play button triangle, suggesting media clipping. Deep indigo (#312E81) gradient background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'cl-poster': { prompt: 'Design a 1024x1024 app icon for "idesign4u", a Craigslist post manager with automated weekly rotation. A classified ad card with a refresh/rotation arrow looping around it, suggesting auto-reposting. Amber (#F59E0B) and warm orange palette on a dark charcoal background. Rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'pixel': { prompt: 'Design a 1024x1024 app icon for "Pixel", a visual regression testing tool. A magnifying glass over two overlapping screenshots with a red diff highlight between them. Electric purple (#8B5CF6) and cyan palette on a dark background. Rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+  'kactus-qa': { prompt: 'Design a 1024x1024 app icon for "KACTUS QA", a QA testing dashboard. A cactus silhouette made of geometric shapes with a small checkmark badge in the bottom-right corner. Dark green (#166534) gradient background with rounded iOS corners. No white background, no border, no text, no watermark. Single centered icon, clean edges.' },
+};
+
+const APP_PROFILES = {};
+
+// FAVICONS loaded from /shared.js
+
+const _v = Date.now();
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function switchCardTab(cardId, tab) {
+  const card = document.getElementById(cardId);
+  card.querySelectorAll('.card-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  card.querySelectorAll('.card-panel').forEach(p => p.classList.toggle('active', p.dataset.tab === tab));
+}
+
+const COPY_SVG = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
+function panelText(id, tab, profile, prompt) {
+  if (tab === 'about') {
+    const about = profile?.about || '';
+    const features = (profile?.features || []).join('\n- ');
+    return about + (features ? '\n\n- ' + features : '');
+  }
+  if (tab === 'prompt') return prompt?.prompt || '';
+  if (tab === 'architect') return profile?.architect || '';
+  if (tab === 'deploy') return profile?.deploy || '';
+  if (tab === 'security') return (profile?.security || []).join('\n');
+  if (tab === 'performance') return (profile?.performance || []).join('\n');
+  return '';
+}
+
+function copyBtn(id, tab) {
+  return `<button class="copy-icon" onclick="event.stopPropagation();copyPanel('${id}','${tab}')" title="Copy">${COPY_SVG}</button>`;
+}
+
+function renderPanel(id, tab, profile, prompt) {
+  const cb = copyBtn(id, tab);
+  if (tab === 'about') {
+    const about = profile?.about || 'A powerful local-first app.';
+    const features = profile?.features || [];
+    return cb + `<div class="oneliner">${escHtml(about)}</div>${features.length ? '<ul>' + features.map(f => `<li>${escHtml(f)}</li>`).join('') + '</ul>' : ''}`;
+  }
+  if (tab === 'prompt') {
+    const p = prompt?.prompt || '';
+    return p ? cb + `<p>${escHtml(p)}</p>` : '<p style="color:var(--muted)">No prompt yet</p>';
+  }
+  if (tab === 'architect') {
+    return cb + `<p>${escHtml(profile?.architect || 'Architecture details coming soon.')}</p>`;
+  }
+  if (tab === 'deploy') {
+    return cb + `<p>${escHtml(profile?.deploy || 'Deploy details coming soon.')}</p>`;
+  }
+  if (tab === 'security') {
+    const items = profile?.security || [];
+    return items.length ? cb + '<ul>' + items.map(s => `<li class="security-item">${escHtml(s)}</li>`).join('') + '</ul>' : '<p style="color:var(--muted)">Security details coming soon.</p>';
+  }
+  if (tab === 'performance') {
+    const items = profile?.performance || [];
+    return items.length ? cb + '<ul>' + items.map(p => `<li class="perf-item">${escHtml(p)}</li>`).join('') + '</ul>' : '<p style="color:var(--muted)">Performance details coming soon.</p>';
+  }
+  return '';
+}
+
+function copyPanel(id, tab) {
+  const profile = APP_PROFILES[id] || {};
+  const prompt = PROMPTS[id] || {};
+  const text = panelText(id, tab, profile, prompt);
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'));
+}
+
+function showToast(msg) {
+  const existing = document.querySelector('.island-toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.className = 'island-toast';
+  el.innerHTML = `<div class="island-pill"><span class="pill-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span>${escHtml(msg)}</div>`;
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add('out'), 2000);
+  setTimeout(() => el.remove(), 2300);
+}
+
+async function load() {
+  await _sharedReady;
+  const res = await fetch('/api/apps');
+  const apps = await res.json();
+
+  // Also try to load profiles from API
+  try {
+    const pRes = await fetch('/api/app-profiles');
+    const profiles = await pRes.json();
+    Object.assign(APP_PROFILES, profiles);
+  } catch {}
+
+  const grid = document.getElementById('logoGrid');
+  grid.innerHTML = apps.map(app => {
+    const prompt = PROMPTS[app.id] || {};
+    const icon = FAVICONS[app.id] || '';
+    const profile = APP_PROFILES[app.id] || {};
+    const cardId = 'card-' + app.id;
+    const desc = profile.about || prompt.desc || '';
+
+    return `
+    <div class="logo-card" id="${cardId}">
+      <div class="logo-header">
+        ${icon ? `<img src="${icon}" alt="${app.name}">` : ''}
+        <div>
+          <div class="name">${app.name}</div>
+          <div class="desc">${escHtml(desc).substring(0, 60)}</div>
+        </div>
+      </div>
+      <div class="card-tabs">
+        ${TABS.map(t => `<button class="card-tab${t === 'about' ? ' active' : ''}" data-tab="${t}" onclick="switchCardTab('${cardId}','${t}')">${t}</button>`).join('')}
+      </div>
+      ${TABS.map(t => `<div class="card-panel${t === 'about' ? ' active' : ''}" data-tab="${t}">${renderPanel(app.id, t, profile, prompt)}</div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+load();
+</script>
+</body>
+</html>
+</content>
+</invoke>

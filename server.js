@@ -489,6 +489,23 @@ app.delete('/api/apps/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Auto-generated FAVICONS map from /public/favicons/ ---
+app.get('/api/favicons', (req, res) => {
+  const dir = path.join(__dirname, 'public', 'favicons');
+  const map = {};
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      if (/\.(png|svg|ico)$/.test(f)) {
+        const id = f.replace(/\.(png|svg|ico)$/, '');
+        const mtime = fs.statSync(path.join(dir, f)).mtimeMs;
+        map[id] = '/favicons/' + f + '?v=' + Math.floor(mtime);
+      }
+    }
+  } catch {}
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  res.json(map);
+});
+
 // --- Companion app helpers (Drop Menu / Drop Dock) ---
 app.get('/api/process-check/:proc', (req, res) => {
   try {
@@ -502,6 +519,23 @@ app.post('/api/process-kill/:proc', (req, res) => {
     execSync(`pkill -f "${req.params.proc}"`, { timeout: 3000 });
     res.json({ ok: true });
   } catch { res.json({ ok: true }); }
+});
+
+// --- App profiles (about, architect, deploy, security, performance) ---
+const PROFILES_PATH = path.join(__dirname, 'data', 'app-profiles.json');
+app.get('/api/app-profiles', (req, res) => {
+  try {
+    const data = JSON.parse(fs.readFileSync(PROFILES_PATH, 'utf8'));
+    res.json(data);
+  } catch { res.json({}); }
+});
+app.put('/api/app-profiles/:id', (req, res) => {
+  let data = {};
+  try { data = JSON.parse(fs.readFileSync(PROFILES_PATH, 'utf8')); } catch {}
+  data[req.params.id] = req.body;
+  fs.mkdirSync(path.dirname(PROFILES_PATH), { recursive: true });
+  fs.writeFileSync(PROFILES_PATH, JSON.stringify(data, null, 2));
+  res.json({ ok: true });
 });
 
 app.post('/api/companion-start', (req, res) => {
