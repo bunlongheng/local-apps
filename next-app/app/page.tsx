@@ -106,6 +106,7 @@ export default function StatusPage() {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [activeMachine, setActiveMachine] = useState<string | null>(null);
   const [localInfo, setLocalInfo] = useState<{ hostname?: string; model?: string; ip?: string }>({});
+  const [activeInfo, setActiveInfo] = useState<{ hostname?: string; model?: string; ip?: string }>({});
   const [machineOnline, setMachineOnline] = useState<Record<string, boolean>>({});
   const [screenshots, setScreenshots] = useState<Screenshot | null>(null);
   const [screenshotsLoading, setScreenshotsLoading] = useState(false);
@@ -168,14 +169,16 @@ export default function StatusPage() {
         }));
         setApps(rewritten);
         setMachineOnline((prev) => ({ ...prev, [m.id]: true }));
-        setLocalInfo({ hostname: m.hostname || m.ip, model: m.model, ip: m.ip });
+        setActiveInfo({ hostname: m.hostname || m.ip, model: m.model, ip: m.ip });
       } else {
         const res = await fetch("/api/status");
         if (!res.ok) throw new Error("fail");
         const data: StatusResponse = await res.json();
         setApps(data.apps);
         const hostname = data.apps[0]?.hostname || "";
-        setLocalInfo({ hostname, model: data.machineModel, ip: data.lanIp });
+        const info = { hostname, model: data.machineModel, ip: data.lanIp };
+        setLocalInfo(info);
+        setActiveInfo(info);
       }
       setLoading(false);
       setError(false);
@@ -322,8 +325,8 @@ export default function StatusPage() {
   const downCount = apps.filter((a) => a.status !== "up").length;
   const filteredApps = filter === "all" ? apps : apps.filter((a) => (filter === "up" ? a.status === "up" : a.status !== "up"));
 
-  const shortHost = (localInfo.hostname || "").replace(".local", "") || "Local";
-  const headerIcon = isTailscale ? "/devices/tailscale.svg" : deviceIcon(localInfo.model);
+  const shortHost = (activeInfo.hostname || "").replace(".local", "") || "Local";
+  const headerIcon = isTailscale ? "/devices/tailscale.svg" : deviceIcon(activeInfo.model);
 
   async function handleStart(id: string) {
     setStartingApps((prev) => new Set(prev).add(id));
@@ -493,7 +496,7 @@ export default function StatusPage() {
             {headerIcon && <img src={headerIcon} width={28} height={28} alt="" style={{ opacity: 0.85 }} className="col-hostname" />}
             <div>
               <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.5px", color: "#fff" }}>{shortHost}</h1>
-              {localInfo.ip && <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 11, marginTop: 2 }}>{localInfo.ip}</div>}
+              {activeInfo.ip && <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 11, marginTop: 2 }}>{activeInfo.ip}</div>}
             </div>
           </div>
 
