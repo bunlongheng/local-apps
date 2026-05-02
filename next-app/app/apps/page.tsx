@@ -336,11 +336,14 @@ export default function AppsPage() {
         }
         .panel-hover:hover .copy-icon-btn { opacity: 1 !important; }
         .copy-icon-btn:hover { background: rgba(255,255,255,0.12) !important; color: var(--text, #e4e4e7) !important; border-color: var(--text, #e4e4e7) !important; }
+        .apps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        @media (max-width: 1200px) { .apps-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 768px) { .apps-grid { grid-template-columns: 1fr; } }
       `}</style>
 
       <div style={{ padding: 32 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24, color: "#fff" }}>Apps</h1>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+        <div className="apps-grid">
           {apps.map((app) => (
             <AppCard key={app.id} app={app} profile={profiles[app.id] || {}} onCopy={showToast} />
           ))}

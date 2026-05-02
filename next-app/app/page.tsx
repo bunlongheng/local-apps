@@ -370,8 +370,23 @@ export default function StatusPage() {
     setCapturing(true);
     try {
       await fetch(`/api/screenshots/${id}`, { method: "POST" });
+      // Poll for completion
+      const poll = setInterval(async () => {
+        try {
+          const s = await fetch("/api/screenshots-status").then((r) => r.json());
+          if (!s[id]) {
+            clearInterval(poll);
+            setCapturing(false);
+            setToast("Screenshots captured");
+            setTimeout(() => setToast(null), 3000);
+            loadScreenshotsForApp(id);
+          }
+        } catch {}
+      }, 3000);
     } catch {
       setCapturing(false);
+      setToast("Capture failed");
+      setTimeout(() => setToast(null), 3000);
     }
   }
 
@@ -473,9 +488,9 @@ export default function StatusPage() {
       {/* Header */}
       <header style={{ padding: "20px 0", borderBottom: "1px solid var(--border)" }}>
         <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          {/* Left: device icon + hostname (#9) */}
+          {/* Left: hamburger (mobile) + device icon + hostname (#9) */}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {headerIcon && <img src={headerIcon} width={28} height={28} alt="" style={{ opacity: 0.85 }} />}
+            {headerIcon && <img src={headerIcon} width={28} height={28} alt="" style={{ opacity: 0.85 }} className="col-hostname" />}
             <div>
               <h1 style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.5px", color: "#fff" }}>{shortHost}</h1>
               {localInfo.ip && <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 11, marginTop: 2 }}>{localInfo.ip}</div>}

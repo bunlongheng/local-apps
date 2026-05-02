@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 const NAV_ITEMS = [
   {
@@ -69,23 +70,48 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
 
   return (
     <>
-      <nav
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          bottom: 0,
-          width: 200,
-          background: "#111",
-          borderRight: "1px solid var(--border)",
-          display: "flex",
-          flexDirection: "column",
-          zIndex: 100,
-        }}
+      {/* Mobile hamburger — visible globally */}
+      <button
+        onClick={() => setOpen(!open)}
+        aria-label="Menu"
+        className="hamburger-btn"
       >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          {open ? (
+            <>
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </>
+          ) : (
+            <>
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </>
+          )}
+        </svg>
+      </button>
+
+      {/* Overlay */}
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 99,
+          }}
+          className="sidebar-overlay"
+        />
+      )}
+
+      {/* Sidebar */}
+      <nav className={`sidebar-nav-root ${open ? "open" : ""}`}>
         <div
           style={{
             padding: 16,
@@ -106,6 +132,7 @@ export default function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => setOpen(false)}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -138,6 +165,47 @@ export default function Sidebar() {
           localhost:9876
         </div>
       </nav>
+
+      <style>{`
+        .sidebar-nav-root {
+          position: fixed;
+          top: 0;
+          left: 0;
+          bottom: 0;
+          width: 200px;
+          background: #111;
+          border-right: 1px solid var(--border);
+          display: flex;
+          flex-direction: column;
+          z-index: 100;
+          transition: transform 0.2s ease;
+        }
+        .hamburger-btn {
+          display: none;
+          background: none;
+          border: none;
+          color: var(--text);
+          cursor: pointer;
+          padding: 4px;
+          line-height: 1;
+          width: 24px;
+          height: 24px;
+          flex-shrink: 0;
+        }
+        @media (max-width: 768px) {
+          .sidebar-nav-root {
+            transform: translateX(-100%);
+          }
+          .sidebar-nav-root.open {
+            transform: translateX(0);
+          }
+          .hamburger-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+        }
+      `}</style>
     </>
   );
 }

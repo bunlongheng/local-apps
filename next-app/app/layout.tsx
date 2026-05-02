@@ -14,9 +14,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="manifest" href="/api/manifest" />
+        <meta name="theme-color" content="#0d0d0d" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Local Apps" />
+        <link rel="apple-touch-icon" href="/favicons/local-apps.png" />
+      </head>
       <body>
         <Sidebar />
-        <div style={{ marginLeft: 200 }}>{children}</div>
+        <div className="main-content">{children}</div>
       </body>
     </html>
   );
