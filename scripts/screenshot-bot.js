@@ -13,7 +13,6 @@
 const { chromium, devices } = require('playwright');
 const fs   = require('fs');
 const path = require('path');
-const sharp = require('sharp');
 
 const ROOT        = path.join(__dirname, '..');
 const db          = require(path.join(ROOT, 'db'));
@@ -58,70 +57,59 @@ async function isVisible(locator) {
   return locator.isVisible({ timeout: 1500 }).catch(() => false);
 }
 
-// ─── device framing ──────────────────────────────────────────────────────────
+// ─── device framing via Frames API ──────────────────────────────────────────
 
-const FRAMES_DIR   = path.join(__dirname, 'frames');
-const IPHONE_FRAME = path.join(FRAMES_DIR, 'iphone.png');
-const MACBOOK_FRAME= path.join(FRAMES_DIR, 'macbook.png');
+const FRAMES_API = 'http://localhost:3005/api/frame';
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-// iPhone 15 Pro Max frame: 1490x2996, screen area x=99 y=243 w=1290 h=2653
-const IPHONE_SCREEN = { x: 99, y: 243, w: 1290, h: 2653 };
-// MacBook Air frame: 2664x1816, screen area x=52 y=52 w=2560 h=1600
-const MACBOOK_SCREEN = { x: 52, y: 52, w: 2560, h: 1600 };
-
-async function addIPhoneFrame(inputPath, outputPath) {
-  const { x, y, w, h } = IPHONE_SCREEN;
-  // Resize screenshot to exactly fit the screen area
-  const screen = await sharp(inputPath)
-    .resize(w, h, { fit: 'cover', position: 'top' })
-    .png().toBuffer();
-
-  await sharp(IPHONE_FRAME)
-    .composite([{ input: screen, top: y, left: x }])
-    .png().toFile(outputPath);
-}
-
-async function addMacBookFrame(inputPath, outputPath) {
-  const { x, y, w, h } = MACBOOK_SCREEN;
-  const meta = await sharp(inputPath).metadata();
-  const srcW = meta.width, srcH = meta.height;
-  const frameAR = w / h;  // 16:10
-  const srcAR = srcW / srcH;
-
-  let screen;
-  if (srcAR >= frameAR) {
-    // Wider than frame — fit width, crop bottom if needed
-    screen = await sharp(inputPath)
-      .resize(w, h, { fit: 'cover', position: 'top' })
-      .png().toBuffer();
-  } else {
-    // Taller than frame (full-page scroll) — crop to frame AR from top, then resize
-    const cropH = Math.round(srcW / frameAR);
-    screen = await sharp(inputPath)
-      .extract({ left: 0, top: 0, width: srcW, height: Math.min(cropH, srcH) })
-      .resize(w, h, { fit: 'fill' })
-      .png().toBuffer();
+async function frameViaAPI(screenshotPath, device) {
+  const form = new FormData();
+  form.append('image', new Blob([fs.readFileSync(screenshotPath)], { type: 'image/png' }), path.basename(screenshotPath));
+  form.append('device', device);
+  const res = await fetch(FRAMES_API, { method: 'POST', body: form, signal: AbortSignal.timeout(60000) });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Frames API ${res.status}: ${text.slice(0, 100)}`);
   }
-
-  await sharp(MACBOOK_FRAME)
-    .composite([{ input: screen, top: y, left: x }])
-    .png().toFile(outputPath);
+  const chunks = [];
+  for await (const chunk of res.body) chunks.push(chunk);
+  return Buffer.concat(chunks);
 }
 
-async function frameAll(srcDir, dstDir, type) {
+let _framesAvailable = null;
+async function checkFramesAPI() {
+  if (_framesAvailable !== null) return _framesAvailable;
+  try {
+    const res = await fetch(FRAMES_API, { method: 'GET', signal: AbortSignal.timeout(10000) });
+    _framesAvailable = res.ok;
+    if (_framesAvailable) console.log('    🖼   Frames API ready');
+    else console.log('    ⚠️   Frames API returned ' + res.status + ' — skipping framing');
+  } catch (err) {
+    _framesAvailable = false;
+    console.log('    ⚠️   Frames API not available (' + (err.message || 'timeout') + ') — skipping framing');
+  }
+  return _framesAvailable;
+}
+
+async function frameAll(srcDir, dstDir, device) {
+  if (!await checkFramesAPI()) return [];
   ensureDir(dstDir);
   const pngs = fs.readdirSync(srcDir).filter(f => f.endsWith('.png')).sort();
+  const framed = [];
   for (const f of pngs) {
     const src = path.join(srcDir, f);
     const dst = path.join(dstDir, f);
     try {
-      if (type === 'iphone') await addIPhoneFrame(src, dst);
-      else                   await addMacBookFrame(src, dst);
+      const buf = await frameViaAPI(src, device);
+      fs.writeFileSync(dst, buf);
+      framed.push(f);
     } catch (err) {
       console.log(`    ✗   frame ${f}: ${err.message.slice(0, 60)}`);
     }
+    await sleep(1000); // 1s cooldown — let CPU breathe
   }
-  console.log(`    🖼   ${pngs.length} ${type} frame(s) → ${path.basename(dstDir)}/`);
+  console.log(`    🖼   ${framed.length}/${pngs.length} ${device} frame(s) → ${path.basename(dstDir)}/`);
+  return framed;
 }
 
 // ─── login ──────────────────────────────────────────────────────────────────
@@ -846,20 +834,23 @@ async function runApp(browser, cfg, creds, rules) {
   // Desktop
   console.log(`    🖥   desktop`);
   const desktopShots = await runMode(browser, cfg, creds, rules, desktopDir, false);
-  await frameAll(desktopDir, desktopFramedDir, 'macbook');
+  const desktopFramed = await frameAll(desktopDir, desktopFramedDir, 'macbook');
 
   // Mobile
   console.log(`    📱   mobile`);
   const mobileShots = await runMode(browser, cfg, creds, rules, mobileDir, true);
-  await frameAll(mobileDir, mobileFramedDir, 'iphone');
+  const mobileFramed = await frameAll(mobileDir, mobileFramedDir, 'iphone');
 
   // Master index
+  const indexData = {
+    id: cfg.id, name: cfg.name, capturedAt: new Date().toISOString(),
+    desktop: desktopShots, mobile: mobileShots,
+  };
+  if (desktopFramed.length) indexData['desktop-framed'] = desktopFramed;
+  if (mobileFramed.length)  indexData['mobile-framed']  = mobileFramed;
   fs.writeFileSync(
     path.join(appDir, 'index.json'),
-    JSON.stringify({
-      id: cfg.id, name: cfg.name, capturedAt: new Date().toISOString(),
-      desktop: desktopShots, mobile: mobileShots,
-    }, null, 2)
+    JSON.stringify(indexData, null, 2)
   );
 }
 

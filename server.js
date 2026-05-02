@@ -17,7 +17,7 @@ app.use((req, res, next) => {
   }
   next();
 });
-const PORT = 9876;
+const PORT = 9875;  // API-only, Next.js frontend on 9876
 const CHECK_INTERVAL = 30000;
 
 // Machine role: "hub" (full orchestrator + bots) or "agent" (status reporting only)
@@ -215,6 +215,37 @@ function setupInfra(id, data) {
 function teardownInfra(id) {
   removeCaddyEntry(id);
   removeLaunchAgent(id);
+
+  // Clean up screenshots
+  const ssDir = path.join(__dirname, 'public', 'screenshots', id);
+  if (fs.existsSync(ssDir)) {
+    fs.rmSync(ssDir, { recursive: true, force: true });
+    console.log(`  🗑 screenshots: ${id}`);
+  }
+
+  // Remove from gallery index
+  const idxPath = path.join(__dirname, 'public', 'screenshots', 'index.json');
+  if (fs.existsSync(idxPath)) {
+    try {
+      const idx = JSON.parse(fs.readFileSync(idxPath, 'utf8'));
+      const filtered = idx.filter(a => a.id !== id);
+      if (filtered.length !== idx.length) {
+        fs.writeFileSync(idxPath, JSON.stringify(filtered, null, 2));
+        console.log(`  🗑 gallery index: ${id}`);
+      }
+    } catch {}
+  }
+
+  // Kill any running process
+  try {
+    const app = db.getApp ? db.getApp(id) : null;
+    if (app && app.localUrl) {
+      const port = new URL(app.localUrl).port;
+      if (port) execSync(`lsof -ti :${port} | xargs kill -9 2>/dev/null`);
+    }
+  } catch {}
+
+  console.log(`  ✅ full cleanup: ${id}`);
 }
 
 function getLanIp() {
@@ -1351,6 +1382,181 @@ app.post('/api/claude/command/:plugin/:command', (req, res) => {
     fs.mkdirSync(cmdDir, { recursive: true });
     fs.writeFileSync(path.join(cmdDir, command + '.md'), content, 'utf-8');
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Portfolio Preview ---
+app.get('/api/portfolio/preview', (req, res) => {
+  try {
+    const { appId } = req.query;
+    if (!appId) return res.status(400).json({ error: 'appId required' });
+
+    const appData = db.getApp(appId);
+    if (!appData) return res.status(404).json({ error: 'App not found' });
+
+    const slug = appData.id;
+    const ssBase = path.join(__dirname, 'public', 'screenshots', slug);
+    const screenshots = [];
+    for (const subdir of ['desktop-framed', 'mobile-framed']) {
+      const dir = path.join(ssBase, subdir);
+      if (!fs.existsSync(dir)) continue;
+      const files = fs.readdirSync(dir).filter(f => f.endsWith('.png')).sort();
+      for (const f of files) {
+        screenshots.push({ path: `/screenshots/${slug}/${subdir}/${f}`, name: f, type: subdir });
+      }
+    }
+
+    const architect = appData.architect || '';
+    const TAG_PATTERNS = [
+      'Next.js', 'React', 'TypeScript', 'JavaScript', 'Tailwind', 'Supabase',
+      'Vite', 'SQLite', 'PostgreSQL', 'Node.js', 'Express', 'Electron',
+      'WebSocket', 'Redis', 'Docker', 'Swift', 'Python', 'Rust', 'Go',
+      'Vue', 'Svelte', 'Angular', 'MongoDB', 'Prisma', 'Drizzle',
+    ];
+    const tags = TAG_PATTERNS.filter(t => architect.toLowerCase().includes(t.toLowerCase()));
+
+    const description = [appData.about || appData.name];
+    if (appData.features) {
+      try {
+        const features = typeof appData.features === 'string' ? JSON.parse(appData.features) : appData.features;
+        if (Array.isArray(features)) description.push(...features);
+      } catch {}
+    }
+
+    res.json({
+      title: appData.name,
+      slug,
+      type: 'professional',
+      tags,
+      description,
+      url: appData.prodUrl || null,
+      icon: appData.icon || null,
+      screenshots,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Add to Portfolio ---
+// Reads bheng Supabase creds from bheng/.env.local, uploads framed screenshots, creates portfolio entry
+app.post('/api/portfolio', async (req, res) => {
+  try {
+    const { appId } = req.body;
+    if (!appId) return res.status(400).json({ error: 'appId required' });
+
+    // 1. Get app data from DB
+    const appData = db.getApp(appId);
+    if (!appData) return res.status(404).json({ error: 'App not found' });
+
+    // 2. Read bheng Supabase creds
+    const envPath = path.join('/Users/bheng/Sites/bheng', '.env.local');
+    if (!fs.existsSync(envPath)) return res.status(500).json({ error: 'bheng .env.local not found' });
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    const getEnv = (key) => {
+      const m = envContent.match(new RegExp(`^${key}="?([^"\\n]+)"?`, 'm'));
+      return m ? m[1] : null;
+    };
+    const SUPABASE_URL = getEnv('NEXT_PUBLIC_SUPABASE_URL');
+    const SERVICE_KEY = getEnv('SUPABASE_SERVICE_ROLE_KEY');
+    if (!SUPABASE_URL || !SERVICE_KEY) return res.status(500).json({ error: 'Missing Supabase creds in bheng .env.local' });
+
+    // 3. Find framed screenshots
+    const slug = appData.id;
+    const ssBase = path.join(__dirname, 'public', 'screenshots', slug);
+    const uploadFiles = [];
+    for (const subdir of ['desktop-framed', 'mobile-framed']) {
+      const dir = path.join(ssBase, subdir);
+      if (!fs.existsSync(dir)) continue;
+      const files = fs.readdirSync(dir).filter(f => f.endsWith('.png')).sort();
+      for (const f of files) uploadFiles.push({ path: path.join(dir, f), name: f, type: subdir });
+    }
+    if (uploadFiles.length === 0) return res.status(400).json({ error: 'No framed screenshots found. Run Capture first.' });
+
+    // 4. Upload each to Supabase storage
+    const uploadedFilenames = [];
+    for (const file of uploadFiles) {
+      const buffer = fs.readFileSync(file.path);
+      const filename = `${Date.now()}-${file.type}-${file.name.replace('.png', '')}.png`;
+      const storagePath = `${slug}/${filename}`;
+
+      const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/portfolio/${storagePath}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SERVICE_KEY}`,
+          'Content-Type': 'image/png',
+          'x-upsert': 'false',
+        },
+        body: buffer,
+      });
+      if (!uploadRes.ok) {
+        const err = await uploadRes.text();
+        return res.status(500).json({ error: `Upload failed for ${file.name}: ${err}` });
+      }
+      uploadedFilenames.push(filename);
+      // Small delay to ensure unique timestamps
+      await new Promise(r => setTimeout(r, 50));
+    }
+
+    // 5. Extract tags from architect field
+    const architect = appData.architect || '';
+    const TAG_PATTERNS = [
+      'Next.js', 'React', 'TypeScript', 'JavaScript', 'Tailwind', 'Supabase',
+      'Vite', 'SQLite', 'PostgreSQL', 'Node.js', 'Express', 'Electron',
+      'WebSocket', 'Redis', 'Docker', 'Swift', 'Python', 'Rust', 'Go',
+      'Vue', 'Svelte', 'Angular', 'MongoDB', 'Prisma', 'Drizzle',
+    ];
+    const tags = TAG_PATTERNS.filter(t => architect.toLowerCase().includes(t.toLowerCase()));
+
+    // 6. Build description array
+    const description = [appData.about || appData.name];
+    if (appData.features) {
+      try {
+        const features = typeof appData.features === 'string' ? JSON.parse(appData.features) : appData.features;
+        if (Array.isArray(features)) description.push(...features);
+      } catch {}
+    }
+
+    // 7. Create portfolio entry via Supabase REST
+    const portfolioBody = {
+      slug,
+      title: appData.name,
+      type: 'professional',
+      tags,
+      description,
+      images: uploadedFilenames,
+      thumbnail: uploadedFilenames[0],
+      url: appData.prodUrl || null,
+    };
+
+    // Get next sort_order
+    const orderRes = await fetch(`${SUPABASE_URL}/rest/v1/portfolios?select=sort_order&order=sort_order.desc&limit=1`, {
+      headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${SERVICE_KEY}` },
+    });
+    const orderRows = await orderRes.json();
+    const nextOrder = (orderRows[0]?.sort_order ?? 0) + 1;
+    portfolioBody.sort_order = nextOrder;
+
+    const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/portfolios`, {
+      method: 'POST',
+      headers: {
+        'apikey': SERVICE_KEY,
+        'Authorization': `Bearer ${SERVICE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation',
+      },
+      body: JSON.stringify(portfolioBody),
+    });
+
+    if (!insertRes.ok) {
+      const err = await insertRes.text();
+      return res.status(500).json({ error: `Portfolio insert failed: ${err}` });
+    }
+
+    const created = await insertRes.json();
+    res.json({ ok: true, portfolio: created[0] || created, images: uploadedFilenames.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

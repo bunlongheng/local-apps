@@ -1,9 +1,34 @@
-// Shared data loaded once, used by all pages
+// ─── Single source of truth: all app data from DB ───────────────────────
 let FAVICONS = {};
-const _sharedReady = fetch('/api/favicons').then(r => r.json()).then(m => { FAVICONS = m; }).catch(() => {});
+let APP_LIST = [];
+let APP_MAP = {};  // id → { id, name, icon, localUrl, ... }
 
-// Sidebar nav counts — auto-inject after DOM ready
+const _sharedReady = Promise.all([
+  fetch('/api/favicons').then(r => r.json()).then(m => { FAVICONS = m; }).catch(() => {}),
+  fetch('/api/apps').then(r => r.json()).then(apps => {
+    APP_LIST = apps;
+    apps.forEach(a => { APP_MAP[a.id] = a; });
+  }).catch(() => {}),
+]);
+
+// ─── Helpers: consistent name + icon everywhere ─────────────────────────
+function getAppName(id) {
+  return APP_MAP[id]?.name || id;
+}
+
+function getAppIcon(id) {
+  return FAVICONS[id] || '';
+}
+
+function appIconHtml(id, size = 20) {
+  const src = getAppIcon(id);
+  if (!src) return '';
+  return `<img src="${src}" width="${size}" height="${size}" style="border-radius:${Math.round(size/5)}px;object-fit:contain;flex-shrink:0" onerror="this.style.display='none'" alt="">`;
+}
+
+// ─── Sidebar nav counts ─────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  await _sharedReady;
   try {
     const [status, crons, screenshots] = await Promise.all([
       fetch('/api/status').then(r => r.json()).catch(() => ({ apps: [] })),

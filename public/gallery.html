@@ -163,17 +163,13 @@ let lbIdx = 0;
 let hiddenApps = JSON.parse(localStorage.getItem('gallery-hidden') || '[]');
 let showHidden = false;
 
-let appNames = {};
-
 async function init() {
   await _sharedReady;
-  // Load master index + app names from API
-  const [idx, appsApi, status] = await Promise.all([
+  // Load master index + status (app names come from shared.js APP_MAP)
+  const [idx, status] = await Promise.all([
     fetch('/screenshots/index.json').then(r => r.json()).catch(() => []),
-    fetch('/api/apps').then(r => r.json()).catch(() => []),
     fetch('/api/status').then(r => r.json()).catch(() => ({ apps: [] })),
   ]);
-  appsApi.forEach(a => { appNames[a.id] = a.name; });
   const statusMap = {};
   (status.apps || []).forEach(a => statusMap[a.id] = a.status);
 
@@ -214,9 +210,9 @@ function renderSidebar(statusMap) {
     const data = appData[a.id] || {};
     const gifs = (gifData[a.id] || []).length;
     const shots = (data.desktop || data.screenshots || []).length + (data.mobile || []).length + gifs;
-    const favicon = FAVICONS[a.id] ? `<img src="${FAVICONS[a.id]}" onerror="this.style.display='none'">` : '';
+    const favicon = appIconHtml(a.id, 20);
     const isHidden = hiddenApps.includes(a.id);
-    const name = appNames[a.id] || a.id;
+    const name = getAppName(a.id);
     return `<div class="app-item${isHidden ? ' hidden-app' : ''}" id="app-${a.id}" onclick="selectApp('${a.id}')">
       ${favicon}
       <span class="app-label">${name}</span>
@@ -401,7 +397,7 @@ function toggleShowHidden() {
 
 function exportPdf() {
   if (!currentApp || !currentShots.length) return;
-  const name = appNames[currentApp] || currentApp;
+  const name = getAppName(currentApp);
   const w = window.open('', '_blank');
   w.document.write(`<!DOCTYPE html><html><head><title>${name} — Screenshots</title>
 <style>

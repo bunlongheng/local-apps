@@ -231,7 +231,7 @@ async function load() {
   const grid = document.getElementById('logoGrid');
   grid.innerHTML = apps.map(app => {
     const prompt = PROMPTS[app.id] || {};
-    const icon = FAVICONS[app.id] || '';
+    const icon = getAppIcon(app.id);
     const profile = APP_PROFILES[app.id] || {};
     const cardId = 'card-' + app.id;
     const desc = profile.about || prompt.desc || '';

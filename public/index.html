@@ -298,7 +298,8 @@
       <h2 style="font-size:15px;font-weight:700">AI Instruction</h2>
       <button onclick="copyBlock('helpAI',this)" style="background:rgba(255,255,255,0.08);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:11px;padding:5px 14px;border-radius:6px;cursor:pointer;transition:all 0.15s;font-weight:600">Copy</button>
     </div>
-    <div class="help-code" id="helpAI">Register this app with the local-apps monitor:
+    <div class="help-code" id="helpAI">Register this app with the local-apps monitor.
+Include ALL fields so the Apps page is fully populated.
 
 POST http://localhost:9876/api/apps
 Content-Type: application/json
@@ -308,26 +309,46 @@ Required:
 - "name": display name
 - "localPath": absolute path to project root
 
-Optional (auto-generated if omitted):
-- "localUrl": defaults to next available port (http://localhost:PORT)
+Infrastructure (auto-generated if omitted):
+- "localUrl": defaults to next available port
 - "healthUrl": defaults to localUrl
 - "repo": GitHub URL
 - "startCommand": defaults to "npm run dev"
 - "logPath": defaults to /tmp/{id}.log
 - "prodUrl": production URL
-- "icon": favicon path
 - "noScreenshot": skip screenshots (boolean)
+
+App Profile (AI should generate these):
+- "about": one compelling sentence describing the app
+- "features": JSON array of 3-5 top features
+- "architect": paragraph on tech stack and architecture
+- "deploy": paragraph on how to deploy and run
+- "security": JSON array of 3-4 security measures
+- "performance": JSON array of 3-4 performance optimizations
+- "prompt": Gemini image gen prompt for the app icon
 
 The monitor will automatically:
 1. Assign a dedicated port if not provided
 2. Create a Caddy reverse proxy at http://{id}.localhost
 3. Create a macOS LaunchAgent plist
 4. Begin health-checking every 10s
+5. Show app on all dashboard pages with full profile
 
-Example:
+Example with full profile:
 curl -X POST http://localhost:9876/api/apps \
   -H "Content-Type: application/json" \
-  -d '{"id":"my-app","name":"My App","localPath":"/path/to/my-app"}'</div>
+  -d '{
+  "id":"my-app",
+  "name":"My App",
+  "localPath":"/path/to/my-app",
+  "about":"A powerful tool that does amazing things.",
+  "features":["Feature one","Feature two","Feature three"],
+  "architect":"Built with Next.js 16 and TypeScript.",
+  "deploy":"Run npm install && npm run dev.",
+  "security":["Security headers","Auth required"],
+  "performance":["Server components","Lazy loading"],
+  "prompt":"Design a 1024x1024 app icon for My App..."
+}'</div>
   </div>
 </div>
 
@@ -604,8 +625,7 @@ function iconImg(src, id, name) {
 }
 
 function appIcon(app) {
-  if (app.icon) return iconImg(app.icon, app.id, app.name);
-  const src = FAVICONS[app.id];
+  const src = app.icon || getAppIcon(app.id);
   if (src) return iconImg(src, app.id, app.name);
   return letterAvatar(app.id, app.name);
 }
@@ -613,7 +633,7 @@ function appIcon(app) {
 function faviconImg(id) {
   const app = apps.find(a => a.id === id);
   if (app) return appIcon(app);
-  const src = FAVICONS[id];
+  const src = getAppIcon(id);
   if (src) return iconImg(src, id, id);
   return letterAvatar(id, id);
 }

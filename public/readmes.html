@@ -166,10 +166,9 @@ async function load() {
 
   const tabs = document.getElementById('appTabs');
   tabs.innerHTML = apps.map(app => {
-    const icon = FAVICONS[app.id] || '';
     return `<button class="app-tab" data-id="${app.id}" onclick="selectApp('${app.id}')">
-      ${icon ? `<img src="${icon}" alt="">` : ''}
-      ${esc(app.name || app.id)}
+      ${appIconHtml(app.id, 20)}
+      ${esc(getAppName(app.id))}
     </button>`;
   }).join('');
 
@@ -196,14 +195,13 @@ async function selectApp(id) {
     const data = await res.json();
 
     const app = apps.find(a => a.id === id);
-    const icon = FAVICONS[id] || '';
     const repo = app?.repo || `https://github.com/bunlongheng/${id}`;
 
     wrap.innerHTML = `
       <div class="readme-meta">
-        ${icon ? `<img src="${icon}" alt="">` : ''}
+        ${appIconHtml(id, 36)}
         <div>
-          <div class="meta-name">${esc(app?.name || id)}</div>
+          <div class="meta-name">${esc(getAppName(id))}</div>
           <div class="meta-repo"><a href="${repo}" target="_blank">${repo}</a></div>
         </div>
       </div>

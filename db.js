@@ -35,6 +35,52 @@ db.exec(`
 try { db.exec(`ALTER TABLE apps ADD COLUMN start_command TEXT DEFAULT 'npm run dev'`); } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE apps ADD COLUMN icon TEXT`); } catch { /* already exists */ }
 
+// Migration: add app-profile columns
+const profileColumns = [
+  ['about', 'TEXT'],
+  ['features', 'TEXT'],        // JSON array
+  ['architect', 'TEXT'],
+  ['deploy', 'TEXT'],
+  ['security', 'TEXT'],        // JSON array
+  ['performance', 'TEXT'],     // JSON array
+  ['prompt', 'TEXT'],
+  ['sort_order', 'INTEGER DEFAULT 0'],
+];
+for (const [col, type] of profileColumns) {
+  try { db.exec(`ALTER TABLE apps ADD COLUMN ${col} ${type}`); } catch { /* already exists */ }
+}
+
+// Migrate data from app-profiles.json into the new columns
+const PROFILES_FILE = path.join(__dirname, 'data', 'app-profiles.json');
+if (fs.existsSync(PROFILES_FILE)) {
+  const profiles = JSON.parse(fs.readFileSync(PROFILES_FILE, 'utf8'));
+  const updateProfile = db.prepare(`
+    UPDATE apps SET
+      about = @about,
+      features = @features,
+      architect = @architect,
+      deploy = @deploy,
+      security = @security,
+      performance = @performance,
+      updated_at = datetime('now')
+    WHERE id = @id AND about IS NULL
+  `);
+  const txProfiles = db.transaction((profiles) => {
+    for (const [id, p] of Object.entries(profiles)) {
+      updateProfile.run({
+        id,
+        about: p.about || null,
+        features: p.features ? JSON.stringify(p.features) : null,
+        architect: p.architect || null,
+        deploy: p.deploy || null,
+        security: p.security ? JSON.stringify(p.security) : null,
+        performance: p.performance ? JSON.stringify(p.performance) : null,
+      });
+    }
+  });
+  txProfiles(profiles);
+}
+
 
 // --- Machines table ---
 db.exec(`
@@ -177,6 +223,14 @@ function rowToApp(row) {
     startCommand: row.start_command,
     icon: row.icon,
     noScreenshot: !!row.no_screenshot,
+    about: row.about,
+    features: row.features ? JSON.parse(row.features) : null,
+    architect: row.architect,
+    deploy: row.deploy,
+    security: row.security ? JSON.parse(row.security) : null,
+    performance: row.performance ? JSON.parse(row.performance) : null,
+    prompt: row.prompt,
+    sortOrder: row.sort_order || 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -201,11 +255,17 @@ function upsertApp(data) {
       localPath: 'local_path', logPath: 'log_path', repo: 'repo',
       launchAgent: 'launch_agent', launchAgentPath: 'launch_agent_path',
       startCommand: 'start_command', icon: 'icon', noScreenshot: 'no_screenshot',
+      about: 'about', features: 'features', architect: 'architect',
+      deploy: 'deploy', security: 'security', performance: 'performance',
+      prompt: 'prompt', sortOrder: 'sort_order',
     };
+    const jsonFields = new Set(['features', 'security', 'performance']);
     for (const [camel, col] of Object.entries(map)) {
       if (camel in data) {
         fields.push(`${col} = @${camel}`);
-        params[camel] = camel === 'noScreenshot' ? (data[camel] ? 1 : 0) : data[camel];
+        if (camel === 'noScreenshot') params[camel] = data[camel] ? 1 : 0;
+        else if (jsonFields.has(camel) && Array.isArray(data[camel])) params[camel] = JSON.stringify(data[camel]);
+        else params[camel] = data[camel];
       }
     }
     if (fields.length === 0) return rowToApp(existing);
