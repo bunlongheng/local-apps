@@ -1,0 +1,42 @@
+[
+  {
+    "id": "my-app",
+    "name": "My App",
+    "healthUrl": "http://localhost:3000",
+    "localUrl": "http://localhost:3000",
+    "processCheck": null,
+    "caddyUrl": "http://my-app.localhost",
+    "prodUrl": "https://my-app.vercel.app",
+    "localPath": "/Users/me/Sites/my-app",
+    "logPath": "/tmp/my-app.log",
+    "repo": "https://github.com/me/my-app",
+    "launchAgent": "com.example.my-app",
+    "launchAgentPath": "/Users/me/Library/LaunchAgents/com.example.my-app.plist",
+    "startCommand": "npm run dev",
+    "icon": null,
+    "noScreenshot": false,
+    "disabled": false,
+    "tabColor": "#3B82F6",
+    "sortOrder": 0
+  },
+  {
+    "id": "api-service",
+    "name": "API Service",
+    "healthUrl": "http://localhost:4000/health",
+    "localUrl": "http://localhost:4000",
+    "processCheck": null,
+    "caddyUrl": "http://api-service.localhost",
+    "prodUrl": null,
+    "localPath": "/Users/me/Sites/api-service",
+    "logPath": "/tmp/api-service.log",
+    "repo": "https://github.com/me/api-service",
+    "launchAgent": "com.example.api-service",
+    "launchAgentPath": "/Users/me/Library/LaunchAgents/com.example.api-service.plist",
+    "startCommand": "npm start",
+    "icon": null,
+    "noScreenshot": true,
+    "disabled": false,
+    "tabColor": "#10B981",
+    "sortOrder": 1
+  }
+]

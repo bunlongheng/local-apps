@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+*.db
+*.db-shm
+*.db-wal
+data
+public/screenshots
+*.log
+.env
+.env.*
+!.env.example
+docs/screenshots

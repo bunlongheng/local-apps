@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <!-- body -->
+  <rect x="3" y="2" width="10" height="8" fill="#cc6b45"/>
+  <!-- left arm -->
+  <rect x="1" y="4" width="2" height="2" fill="#cc6b45"/>
+  <!-- right arm -->
+  <rect x="13" y="4" width="2" height="2" fill="#cc6b45"/>
+  <!-- left eye -->
+  <rect x="5" y="4" width="2" height="2" fill="#1a1a1a"/>
+  <!-- right eye -->
+  <rect x="9" y="4" width="2" height="2" fill="#1a1a1a"/>
+  <!-- left leg -->
+  <rect x="5" y="10" width="2" height="4" fill="#cc6b45"/>
+  <!-- right leg -->
+  <rect x="9" y="10" width="2" height="4" fill="#cc6b45"/>
+</svg>
