@@ -23,3 +23,7 @@ apps.config.json
 *.log
 *-state.json
 machine-role.json
+
+# Local backups (DB + config snapshots - never publish)
+*.bak
+*.bak.*
