@@ -124,9 +124,10 @@ interface AppProfile {
   performance?: string[] | null;
   prompt?: string | null;
 }
-type ModalTab = "info" | "about" | "architect" | "deploy" | "security" | "performance";
+type ModalTab = "info" | "screenshots" | "about" | "architect" | "deploy" | "security" | "performance";
 const PROFILE_TABS: { key: ModalTab; label: string }[] = [
   { key: "info", label: "Info" },
+  { key: "screenshots", label: "Screenshots" },
   { key: "about", label: "About" },
   { key: "architect", label: "Architect" },
   { key: "deploy", label: "Deploy" },
@@ -1140,10 +1141,11 @@ export default function StatusPage() {
                 </div>
               </div>
             )}
+            </>)}
 
-            {/* Screenshots in modal (#4) */}
-            {!activeMachine && (
-              <div style={{ marginTop: 16 }}>
+            {/* Screenshots tab (#4) */}
+            {modalTab === "screenshots" && !activeMachine && (
+              <div style={{ marginTop: 4 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 14, borderTop: "1px solid var(--border)" }}>
                   <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)", fontWeight: 600 }}>
                     Screenshots
@@ -1198,7 +1200,6 @@ export default function StatusPage() {
                 )}
               </div>
             )}
-            </>)}
           </div>
         </div>
       )}
