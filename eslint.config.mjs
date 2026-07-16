@@ -1,5 +1,6 @@
 // Lint the Node/CommonJS backend (server.js, lib/, db.js, scripts, tests).
-// The Next/React frontend under app/ + components/ is type-checked by tsc strict.
+// The Next/React frontend under app/ + components/ is type-checked by tsc strict
+// (frontend ESLint via eslint-config-next is a follow-up - needs the plugin installed).
 import js from '@eslint/js';
 
 export default [

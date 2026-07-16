@@ -302,6 +302,13 @@ function deleteRemoteApps(machineId) {
 }
 
 // --- Helpers (camelCase output) ---
+// A malformed JSON string in a profile column (e.g. written through a pass-through
+// PUT) must not throw here - that would take down getApps() and with it /api/status,
+// /api/apps, and the checkAll health loop. Degrade to null instead.
+function safeParse(s) {
+  if (!s) return null;
+  try { return JSON.parse(s); } catch { return null; }
+}
 function rowToApp(row) {
   if (!row) return null;
   return {
@@ -322,11 +329,11 @@ function rowToApp(row) {
     noScreenshot: !!row.no_screenshot,
     disabled: !!row.disabled,
     about: row.about,
-    features: row.features ? JSON.parse(row.features) : null,
+    features: safeParse(row.features),
     architect: row.architect,
     deploy: row.deploy,
-    security: row.security ? JSON.parse(row.security) : null,
-    performance: row.performance ? JSON.parse(row.performance) : null,
+    security: safeParse(row.security),
+    performance: safeParse(row.performance),
     prompt: row.prompt,
     tabColor: row.tab_color || null,
     tabIcon: row.tab_icon || null,

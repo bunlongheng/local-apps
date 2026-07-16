@@ -18,7 +18,7 @@ interface App {
   noScreenshot: boolean;
   lastChecked: string | null;
   hasScreenshots: boolean;
-  launchAgent: boolean;
+  launchAgent: string | null;
   logPath: string | null;
   startCommand: string | null;
   hostname?: string;
@@ -114,12 +114,68 @@ function detectStartupPhase(lines: string[]): StartupState {
   return best;
 }
 
+// --- App profile (merged in from the former /apps page) ---
+interface AppProfile {
+  about?: string | null;
+  features?: string[] | null;
+  architect?: string | null;
+  deploy?: string | null;
+  security?: string[] | null;
+  performance?: string[] | null;
+  prompt?: string | null;
+}
+type ModalTab = "info" | "about" | "architect" | "deploy" | "security" | "performance";
+const PROFILE_TABS: { key: ModalTab; label: string }[] = [
+  { key: "info", label: "Info" },
+  { key: "about", label: "About" },
+  { key: "architect", label: "Architect" },
+  { key: "deploy", label: "Deploy" },
+  { key: "security", label: "Security" },
+  { key: "performance", label: "Performance" },
+];
+
+/** Render one profile tab's body (bulleted lists for features/security/perf, prose otherwise). */
+function ProfilePanel({ tab, profile }: { tab: ModalTab; profile: AppProfile }) {
+  const prose = (v?: string | null, fallback = "Not documented yet.") => (
+    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", lineHeight: 1.7, margin: 0 }}>{v || fallback}</p>
+  );
+  const bullets = (items?: string[] | null, dot = "#3b82f6", fallback = "Not documented yet.") => {
+    if (!items || !items.length) return prose(null, fallback);
+    return (
+      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        {items.map((s, i) => (
+          <li key={i} style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", lineHeight: 1.7, padding: "2px 0" }}>
+            <span style={{ display: "inline-block", width: 4, height: 4, borderRadius: "50%", background: dot, marginRight: 8, verticalAlign: "middle" }} />
+            {s}
+          </li>
+        ))}
+      </ul>
+    );
+  };
+  switch (tab) {
+    case "about":
+      return (
+        <div>
+          {prose(profile.about, "No description yet.")}
+          <div style={{ marginTop: 10 }}>{bullets(profile.features, "#3b82f6", "")}</div>
+        </div>
+      );
+    case "architect": return prose(profile.architect);
+    case "deploy": return prose(profile.deploy);
+    case "security": return bullets(profile.security, "#22c55e");
+    case "performance": return bullets(profile.performance, "#eab308");
+    default: return null;
+  }
+}
+
 export default function StatusPage() {
   const [apps, setApps] = useState<App[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState<"all" | "up" | "down">("all");
   const [modalApp, setModalApp] = useState<App | null>(null);
+  const [modalTab, setModalTab] = useState<ModalTab>("info");
+  const [profiles, setProfiles] = useState<Record<string, AppProfile>>({});
   const [logLines, setLogLines] = useState<string[]>([]);
   const [logLoading, setLogLoading] = useState(false);
   const [startingApps, setStartingApps] = useState<Set<string>>(new Set());
@@ -162,6 +218,14 @@ export default function StatusPage() {
       const saved = localStorage.getItem("activeMachine");
       if (saved) setActiveMachine(saved);
     }
+  }, []);
+
+  // Load app profiles once (about/architect/deploy/security/performance) for the modal tabs.
+  useEffect(() => {
+    fetch("/api/app-profiles")
+      .then((r) => r.json())
+      .then((p) => setProfiles(p || {}))
+      .catch(() => setProfiles({}));
   }, []);
 
   // Persist machine selection
@@ -699,10 +763,19 @@ export default function StatusPage() {
                 const hostnameUrl = (access.mode === "lan" || access.mode === "remote") ? (app.lanUrl || app.localUrl || "#") : (app.caddyUrl || app.localUrl || "#");
                 const lanUrl = isTailscale ? (app.tailscaleUrl || "#") : (app.lanUrl || app.localUrl || "#");
                 const isLast = idx === filteredApps.length - 1;
+                const openAppModal = () => { setModalTab("info"); setModalApp(app); };
                 return (
                   <tr
                     key={app.id}
-                    onClick={() => setModalApp(app)}
+                    onClick={openAppModal}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openAppModal();
+                      }
+                    }}
                     style={{ cursor: "pointer", transition: "background 0.1s" }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.025)")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "")}
@@ -799,7 +872,7 @@ export default function StatusPage() {
           onClick={(e) => { if (e.target === e.currentTarget) setModalApp(null); }}
           onKeyDown={(e) => { if (e.key === "Escape") setModalApp(null); }}
         >
-          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, width: 680, maxWidth: "94vw", maxHeight: "85vh", overflowY: "auto", padding: 24, position: "relative" }}>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, width: 680, maxWidth: "94vw", minHeight: "min(620px, 82vh)", maxHeight: "85vh", overflowY: "auto", padding: 24, position: "relative" }}>
             {/* Close */}
             <button onClick={() => setModalApp(null)} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>
               ✕
@@ -920,7 +993,34 @@ export default function StatusPage() {
               </button>
             </div>
 
+            {/* Tab strip: Info + profile tabs (merged from the former /apps page) */}
+            <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", margin: "4px 0 14px", overflowX: "auto" }}>
+              {PROFILE_TABS.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={(e) => { e.stopPropagation(); setModalTab(t.key); }}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer", padding: "6px 8px",
+                    fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap",
+                    color: modalTab === t.key ? "var(--text, #fff)" : "var(--muted)",
+                    borderBottom: modalTab === t.key ? "2px solid #3b82f6" : "2px solid transparent",
+                    marginBottom: -1,
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Profile tab body (about/architect/deploy/security/performance) */}
+            {modalTab !== "info" && (
+              <div style={{ padding: "2px 20px 12px" }}>
+                <ProfilePanel tab={modalTab} profile={profiles[modalApp.id] || {}} />
+              </div>
+            )}
+
             {/* Rows with emoji icons (#11) */}
+            {modalTab === "info" && (<>
             <div style={{ display: "flex", flexDirection: "column" }}>
               {(() => {
                 const port = getPort(modalApp.localUrl);
@@ -1098,6 +1198,7 @@ export default function StatusPage() {
                 )}
               </div>
             )}
+            </>)}
           </div>
         </div>
       )}
@@ -1350,6 +1451,8 @@ curl -X POST http://localhost:9876/api/apps \\
 
       {/* Toast */}
       <div
+        role="status"
+        aria-live="polite"
         style={{
           position: "fixed",
           bottom: 32,

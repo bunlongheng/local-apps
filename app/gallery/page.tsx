@@ -490,6 +490,14 @@ function AppItem({
   return (
     <div
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -551,6 +559,8 @@ function Thumb({
   onDelete: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const actionsVisible = hovered || focused;
   const isMobile = thumbClass === "mobile";
   const aspectRatio = isMobile ? "9/19.5" : "16/10";
   const objectFit = "cover" as const;
@@ -609,54 +619,61 @@ function Thumb({
           cursor: "pointer",
         }}
       />
-      {hovered && (
-        <div style={{ position: "absolute", top: 6, right: 6, display: "flex", flexDirection: "column", gap: 5, zIndex: 2 }}>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onRetake();
-            }}
-            title="Mark for retake"
-            style={{
-              border: "none",
-              borderRadius: 6,
-              width: 28,
-              height: 28,
-              cursor: "pointer",
-              fontSize: 13,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: isRetake ? "#78350f" : "rgba(15,17,23,0.82)",
-              color: isRetake ? "#fbbf24" : "#94a3b8",
-            }}
-          >
-            &#x21A9;
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            title="Delete"
-            style={{
-              border: "none",
-              borderRadius: 6,
-              width: 28,
-              height: 28,
-              cursor: "pointer",
-              fontSize: 13,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "rgba(15,17,23,0.82)",
-              color: "#94a3b8",
-            }}
-          >
-            &#x2715;
-          </button>
-        </div>
-      )}
+      <div
+        style={{
+          position: "absolute", top: 6, right: 6, display: "flex", flexDirection: "column", gap: 5, zIndex: 2,
+          opacity: actionsVisible ? 1 : 0.35, transition: "opacity 0.15s",
+        }}
+      >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRetake();
+          }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          title="Mark for retake"
+          style={{
+            border: "none",
+            borderRadius: 6,
+            width: 28,
+            height: 28,
+            cursor: "pointer",
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: isRetake ? "#78350f" : "rgba(15,17,23,0.82)",
+            color: isRetake ? "#fbbf24" : "#94a3b8",
+          }}
+        >
+          &#x21A9;
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          title="Delete"
+          style={{
+            border: "none",
+            borderRadius: 6,
+            width: 28,
+            height: 28,
+            cursor: "pointer",
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(15,17,23,0.82)",
+            color: "#94a3b8",
+          }}
+        >
+          &#x2715;
+        </button>
+      </div>
       <div
         onClick={onOpen}
         style={{

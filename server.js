@@ -11,7 +11,6 @@ const makeCaddy = require('./lib/caddy');
 const makeLaunchd = require('./lib/launchd');
 const makeHealth = require('./lib/health');
 
-const { marked } = require('marked');
 const compression = require('compression');
 const app = express();
 app.use(compression());
@@ -46,6 +45,32 @@ const NPM_PATH = (() => {
 })();
 
 app.use(express.json());
+
+// --- Optional shared-secret gate ---------------------------------------------
+// When LOCAL_APPS_TOKEN is set, every mutating request (POST/PUT/DELETE) and every
+// sensitive read route requires a matching `x-local-apps-token` header. Unset -> fully
+// open (unchanged default), so this never breaks an existing single-machine setup; set
+// it to lock the LAN/tailnet surface. Sensitive GETs = shell dotfiles, ALL of /api/claude/*
+// (config, sessions, and the skill/command readers that return files holding live tokens),
+// and any log reader (/api/log/*, /api/*/log). NOTE: enabling the token currently requires
+// the caller to send the header; wiring the dashboard fetches to forward it from
+// localStorage is a tracked follow-up, so today the gate is meant for API/CLI clients.
+const crypto = require('crypto');
+const AUTH_TOKEN = process.env.LOCAL_APPS_TOKEN || '';
+const SENSITIVE_GET = /^\/api\/(shell|claude\/)|\/log(\/|$)/;
+function tokenOk(given) {
+  if (!given || given.length !== AUTH_TOKEN.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(given), Buffer.from(AUTH_TOKEN));
+}
+app.use((req, res, next) => {
+  if (!AUTH_TOKEN) return next();
+  const mutating = req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE';
+  const sensitive = req.method === 'GET' && SENSITIVE_GET.test(req.path);
+  if (!mutating && !sensitive) return next();
+  if (tokenOk(req.get('x-local-apps-token'))) return next();
+  return res.status(401).json({ error: 'unauthorized' });
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Caddy reverse-proxy management -> lib/caddy.js ---
@@ -179,12 +204,15 @@ function getLanIp() {
 }
 const LAN_IP = getLanIp();
 
-// --- Tailscale IP detection (re-checked each status call) ---
+// --- Tailscale IP detection (cached; refreshed on an interval, not per request) ---
 function getTailscaleIp() {
   try { return execSync('/usr/local/bin/tailscale ip -4 2>/dev/null').toString().trim(); }
   catch { return null; }
 }
 let TAILSCALE_IP = getTailscaleIp();
+// Refresh out-of-band so the hot /api/status path never shells out (execSync would
+// block the single-threaded event loop on every poll from every open tab).
+setInterval(() => { TAILSCALE_IP = getTailscaleIp(); }, 60000);
 
 // --- Machine model detection ---
 const MACHINE_MODEL = (() => {
@@ -218,7 +246,14 @@ function broadcast(data) {
 const { getState, clearState, tcpCheck, processCheck, checkSingle } = makeHealth({ broadcast });
 
 // --- Health check loop ---
+let checkAllRunning = false;
 async function checkAll() {
+  // Re-entrancy guard: a slow tick (serial tcp checks + auto-restart execSync) can
+  // outlast the 30s interval; overlapping runs would stack restart attempts and block
+  // the event loop further. Skip a tick if the previous one is still in flight.
+  if (checkAllRunning) return;
+  checkAllRunning = true;
+  try {
   const apps = db.getApps();
   for (const appCfg of apps) {
     const s = getState(appCfg.id);
@@ -288,7 +323,9 @@ async function checkAll() {
             // Module not found -> npm install
             if (logTail.includes('Cannot find module') || logTail.includes('MODULE_NOT_FOUND')) {
               console.log(`  [L3] npm install: ${appCfg.id}`);
-              try { execSync(`cd "${dir}" && npm install 2>/dev/null`, { timeout: 60000 }); } catch {}
+              // --ignore-scripts: a registered app dir is attacker-influencable, so never
+              // run its package lifecycle scripts (preinstall/postinstall) during auto-heal.
+              try { execSync(`cd "${dir}" && npm install --ignore-scripts 2>/dev/null`, { timeout: 60000 }); } catch (e) { console.warn(`  [L3] npm install failed: ${appCfg.id}: ${e.message}`); }
             }
             // Build cache corrupt -> clear .next
             if (logTail.includes('.next') || logTail.includes('ENOENT') || logTail.includes('Build error')) {
@@ -332,6 +369,7 @@ async function checkAll() {
       s.restartAttempts = 0;
     }
   }
+  } finally { checkAllRunning = false; }
 }
 
 // --- Status route (dashboard) ---
@@ -353,7 +391,6 @@ setInterval(refreshScreenshotCache, 60000);
 
 app.get('/api/status', (req, res) => {
   res.header('Access-Control-Allow-Origin', '*');
-  TAILSCALE_IP = getTailscaleIp();
   const apps = db.getApps().map(a => {
     const s = getState(a.id);
     return {
@@ -1479,21 +1516,6 @@ app.get('/api/crons/:id/log', (req, res) => {
   } catch { res.type('text').send('No log file yet'); }
 });
 
-// --- README API ---
-app.get('/api/readme/:id', (req, res) => {
-  const appConfig = db.getApps().find(a => a.id === req.params.id);
-  const localPath = appConfig?.localPath;
-  if (!localPath) return res.status(404).json({ error: 'app not found' });
-
-  const readmePath = path.join(localPath, 'README.md');
-  try {
-    const md = fs.readFileSync(readmePath, 'utf8');
-    const html = marked(md);
-    res.json({ markdown: md, html });
-  } catch {
-    res.status(404).json({ error: 'no README.md' });
-  }
-});
 
 // --- Screenshot ZIP download ---
 app.get('/api/screenshots/:id/download', (req, res) => {
@@ -2135,10 +2157,13 @@ app.get('/api/capabilities', (req, res) => {
 // into the dashboard app at :3003 (POST /api/a2a). local-apps is monitoring-only - do not
 // re-add an A2A endpoint here. The single A2A server lives in ~/Sites/claude.
 
-// Global error handler — no stack traces leaked
+// Global error handler — no stack traces leaked, but honest status codes.
+// A thrown error with an explicit .status keeps it (400/404/...); everything else is
+// a real server fault -> 500, so clients and monitoring can tell the two apart.
 app.use((err, req, res, _next) => {
   console.error(err.message);
-  res.status(400).json({ error: 'Bad request' });
+  const status = Number.isInteger(err.status) ? err.status : 500;
+  res.status(status).json({ error: status < 500 ? err.message : 'Internal error' });
 });
 
 // Bind the control API to localhost only. The network-facing dashboard (Next, 9876)

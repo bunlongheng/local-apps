@@ -21,10 +21,10 @@ Self-healing, multi-machine orchestrator that monitors, tests, screenshots, and 
 - These three can fight each other - if an app the user turned off keeps respawning, check KeepAlive first, then auto-restart.json, then resource-audit.
 
 ## Key API endpoints
-- GET/POST /api/apps, PUT/DELETE /api/apps/:id, GET /api/status, POST /api/start/:id, GET /api/next-port
+- GET/POST /api/apps, PUT/DELETE /api/apps/:id, GET /api/status, POST /api/start/:id
 - GET /api/machines, GET /api/machines/:id/status, GET /api/machines/:id/apps
 - GET/POST/DELETE /api/screenshots(/:id)
-- GET /api/events (SSE), GET /api/logs/:id
+- GET /api/events (SSE), GET /api/log/:id
 
 ## Screenshots and tests
 - Screenshots: `public/screenshots/{app}/desktop|mobile(-framed)/` + index.json manifest, gallery at http://localhost:9876/gallery.html

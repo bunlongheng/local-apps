@@ -102,10 +102,6 @@ export async function GET() {
         description: "Enable or disable a cron job",
       },
 
-      "GET /api/readme/:id": {
-        description: "Get parsed README for an app",
-      },
-
       "GET /api/machines": {
         description: "List registered remote machines",
       },

@@ -132,25 +132,6 @@ const CATEGORIES: Category[] = [
         body: "Returns hostname, model, LAN IP, port, and app count.",
         tryUrl: "/api/machine",
       },
-      {
-        method: "GET",
-        path: "/api/apps/export",
-        desc: "Portable app list for syncing",
-        body: "Returns app list without machine-specific paths. Used by /api/sync.",
-        tryUrl: "/api/apps/export",
-      },
-      {
-        method: "POST",
-        path: "/api/sync",
-        desc: "Pull apps from another machine",
-        body: "Connects to a remote Local Apps instance and merges its app list. Adds missing apps, syncs ports/repos/icons.",
-        params: [
-          { name: "remote", type: "string", required: true, desc: 'IP or IP:port of remote machine (e.g. "192.168.1.50")' },
-        ],
-        example: `curl -X POST http://localhost:9876/api/sync \\
-  -H "Content-Type: application/json" \\
-  -d '{"remote":"192.168.1.50"}'`,
-      },
     ],
   },
   {
@@ -242,7 +223,7 @@ function ParamsTable({ params }: { params: Param[] }) {
             <td style={styles.td}>{p.name}</td>
             <td style={styles.td}>{p.type}</td>
             <td style={styles.td}>
-              <span style={{ color: p.required ? "#f87171" : "#555", fontSize: 9 }}>
+              <span style={{ color: p.required ? "#f87171" : "#8a8a8a", fontSize: 9 }}>
                 {p.required ? "required" : "optional"}
               </span>
             </td>
@@ -281,7 +262,7 @@ function TryIt({ url, label, copiedId, setCopied }: { url: string; label?: strin
         {label || "Send"}
       </button>
       {loading && (
-        <pre style={{ ...styles.pre, color: "#555", marginTop: 8 }}>Loading...</pre>
+        <pre style={{ ...styles.pre, color: "#8a8a8a", marginTop: 8 }}>Loading...</pre>
       )}
       {result && (
         <pre style={{ ...styles.pre, marginTop: 8, color: result.startsWith("Error:") ? "#f87171" : "#a5b4fc" }}>
@@ -301,10 +282,22 @@ function TryIt({ url, label, copiedId, setCopied }: { url: string; label?: strin
 function EndpointCard({ ep, copiedId, setCopied }: { ep: Endpoint; copiedId: string | null; setCopied: (v: string | null) => void }) {
   const [open, setOpen] = useState(false);
   const mc = METHOD_COLORS[ep.method] || METHOD_COLORS.GET;
+  const toggleOpen = () => setOpen(!open);
 
   return (
     <div style={styles.endpoint}>
-      <div style={styles.epHeader} onClick={() => setOpen(!open)}>
+      <div
+        style={styles.epHeader}
+        onClick={toggleOpen}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggleOpen();
+          }
+        }}
+      >
         <span
           style={{
             fontSize: 10,
@@ -322,11 +315,11 @@ function EndpointCard({ ep, copiedId, setCopied }: { ep: Endpoint; copiedId: str
           {ep.method}
         </span>
         <span style={{ fontSize: 13, color: "#fff", fontWeight: 600 }}>{ep.path}</span>
-        <span style={{ color: "#555", fontSize: 11, marginLeft: "auto" }}>{ep.desc}</span>
+        <span style={{ color: "#8a8a8a", fontSize: 11, marginLeft: "auto" }}>{ep.desc}</span>
       </div>
       {open && (
         <div style={styles.epBody}>
-          {ep.body && <p style={{ fontSize: 11, color: "#555", margin: "12px 0 8px" }}>{ep.body}</p>}
+          {ep.body && <p style={{ fontSize: 11, color: "#8a8a8a", margin: "12px 0 8px" }}>{ep.body}</p>}
           {ep.params && (
             <>
               <div style={styles.label}>Body</div>
@@ -379,7 +372,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     textTransform: "uppercase",
     letterSpacing: "0.08em",
-    color: "#555",
+    color: "#8a8a8a",
     fontWeight: 600,
     margin: "32px 0 12px",
   },
@@ -406,7 +399,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 9,
     textTransform: "uppercase",
     letterSpacing: "0.08em",
-    color: "#555",
+    color: "#8a8a8a",
     fontWeight: 600,
     margin: "14px 0 6px",
   },
@@ -428,7 +421,7 @@ const styles: Record<string, React.CSSProperties> = {
     right: 8,
     background: "rgba(255,255,255,0.08)",
     border: "1px solid #222",
-    color: "#555",
+    color: "#8a8a8a",
     fontFamily: "inherit",
     fontSize: 10,
     padding: "2px 8px",
@@ -443,7 +436,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   th: {
     textAlign: "left",
-    color: "#555",
+    color: "#8a8a8a",
     fontSize: 9,
     textTransform: "uppercase",
     letterSpacing: "0.06em",

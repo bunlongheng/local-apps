@@ -110,6 +110,7 @@ function TokenBar({ pct, label }: { pct: number; label: string }) {
    ══════════════════════════════════════════════════════════ */
 export default function RoutinesPage() {
   const [crons, setCrons] = useState<Cron[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [tab, setTab] = useState<"config" | "logs" | "tokens">("config");
   const [modalCron, setModalCron] = useState<Cron | null>(null);
   const [expandedLogs, setExpandedLogs] = useState<Set<number>>(new Set([0]));
@@ -121,6 +122,8 @@ export default function RoutinesPage() {
       setCrons(Array.isArray(data) ? data : data.crons || []);
     } catch {
       setCrons([]);
+    } finally {
+      setLoaded(true);
     }
   }, []);
 
@@ -235,17 +238,28 @@ export default function RoutinesPage() {
       {/* ── Configuration Tab ── */}
       {tab === "config" && (
         <div style={{ padding: "10px 0" }}>
-          {crons.length === 0 ? (
+          {!loaded ? (
             <div style={{ textAlign: "center", padding: 60, color: "var(--muted)" }}>Loading...</div>
+          ) : crons.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 60, color: "var(--muted)" }}>No routines configured</div>
           ) : (
             crons.map((c) => {
               const tok = cronTokDaily(c);
               const pct = maxTok > 0 ? Math.round((tok / maxTok) * 100) : 0;
               const tokLabel = tok > 0 ? (tok / 1000).toFixed(1) + "M" : "0";
+              const openCronModal = () => setModalCron(c);
               return (
                 <div key={c.id} style={{ borderBottom: "1px solid var(--border)" }}>
                   <div
-                    onClick={() => setModalCron(c)}
+                    onClick={openCronModal}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openCronModal();
+                      }
+                    }}
                     style={{
                       display: "grid", gridTemplateColumns: "100px 36px 1fr 100px",
                       alignItems: "center", gap: 8, padding: "12px 0", cursor: "pointer", userSelect: "none",

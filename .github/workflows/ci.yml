@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - name: Install
         run: npm ci
@@ -22,6 +22,8 @@ jobs:
         run: npm run lint
       - name: Unit tests
         run: npm run test:unit
+      - name: Build
+        run: npm run build
       - name: Audit (warn only)
         run: npm audit --audit-level=high || true
 # Note: the e2e suite (tests/e2e) requires a running instance on :9876,
