@@ -917,7 +917,7 @@ export default function StatusPage() {
                     });
                   }
                   return (
-                    <div style={{ display: "flex", gap: 3, marginLeft: 4 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 3, marginLeft: 4 }}>
                       {badges.map((b) => {
                         const inner = (
                           <span
@@ -934,7 +934,7 @@ export default function StatusPage() {
                           </span>
                         );
                         return b.href ? (
-                          <a key={b.label} href={b.href} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} style={{ textDecoration: "none" }}>{inner}</a>
+                          <a key={b.label} href={b.href} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}>{inner}</a>
                         ) : inner;
                       })}
                     </div>
