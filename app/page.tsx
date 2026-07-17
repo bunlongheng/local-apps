@@ -130,9 +130,9 @@ const PROFILE_TABS: { key: ModalTab; label: string }[] = [
   { key: "screenshots", label: "Screenshots" },
   { key: "about", label: "About" },
   { key: "architect", label: "Architect" },
-  { key: "deploy", label: "Deploy" },
   { key: "security", label: "Security" },
   { key: "performance", label: "Performance" },
+  { key: "deploy", label: "Deploy" },
 ];
 
 /** Render one profile tab's body (bulleted lists for features/security/perf, prose otherwise). */
@@ -621,7 +621,7 @@ export default function StatusPage() {
 
   // Row emojis for modal (#11)
   const ROW_EMOJI: Record<string, string> = {
-    Port: "\u{1F50C}",
+    Host: "\u{1F50C}",
     Local: "\u{1F310}",
     LAN: "\u{1F4E1}",
     Tailscale: "\u{1F517}",
@@ -733,10 +733,10 @@ export default function StatusPage() {
         <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--border)" }}>
-              <th style={{ width: "38%", textAlign: "left", padding: "8px 12px", color: "var(--muted)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>App</th>
-              <th style={{ width: "22%", textAlign: "left", padding: "8px 12px", color: "var(--muted)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }} className="col-hostname">Hostname</th>
-              <th style={{ width: "20%", textAlign: "left", padding: "8px 12px", color: "var(--muted)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }} className="col-lan">LAN</th>
-              <th style={{ width: "20%", textAlign: "center", padding: "8px 12px", color: "var(--muted)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>Actions</th>
+              <th style={{ width: "38%", textAlign: "left", padding: "8px 12px", color: "var(--muted)", fontSize: 10, fontWeight: 600 }}>App</th>
+              <th style={{ width: "22%", textAlign: "left", padding: "8px 12px", color: "var(--muted)", fontSize: 10, fontWeight: 600 }} className="col-hostname">Hostname</th>
+              <th style={{ width: "20%", textAlign: "left", padding: "8px 12px", color: "var(--muted)", fontSize: 10, fontWeight: 600 }} className="col-lan">LAN</th>
+              <th style={{ width: "20%", textAlign: "center", padding: "8px 12px", color: "var(--muted)", fontSize: 10, fontWeight: 600 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -967,7 +967,7 @@ export default function StatusPage() {
 
             {/* On/Off toggle */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0 12px", borderBottom: "1px solid var(--border)", marginBottom: 4 }}>
-              <span style={{ fontSize: 10, color: modalApp.disabled ? "var(--down)" : "var(--up)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              <span style={{ fontSize: 10, color: modalApp.disabled ? "var(--down)" : "var(--up)", fontWeight: 600 }}>
                 {modalApp.disabled ? "OFF" : "ON"}
               </span>
               <button
@@ -995,14 +995,14 @@ export default function StatusPage() {
             </div>
 
             {/* Tab strip: Info + profile tabs (merged from the former /apps page) */}
-            <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", margin: "4px 0 14px", overflowX: "auto" }}>
+            <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", margin: "4px 0 14px", overflowX: "auto", overflowY: "hidden" }}>
               {PROFILE_TABS.map((t) => (
                 <button
                   key={t.key}
                   onClick={(e) => { e.stopPropagation(); setModalTab(t.key); }}
                   style={{
                     background: "none", border: "none", cursor: "pointer", padding: "6px 8px",
-                    fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap",
+                    fontFamily: "inherit", fontSize: 13, whiteSpace: "nowrap",
                     color: modalTab === t.key ? "var(--text, #fff)" : "var(--muted)",
                     borderBottom: modalTab === t.key ? "2px solid #3b82f6" : "2px solid transparent",
                     marginBottom: -1,
@@ -1031,9 +1031,12 @@ export default function StatusPage() {
                 const rows: { label: string; value: string; url?: string; extra?: React.ReactNode }[] = [];
 
                 if (port) {
+                  const host = modalApp.caddyUrl
+                    ? modalApp.caddyUrl.replace(/^https?:\/\//, "")
+                    : `${modalApp.id}.localhost`;
                   rows.push({
-                    label: "Port",
-                    value: port,
+                    label: "Host",
+                    value: host,
                     extra: modalApp.launchAgent ? (
                       isDown ? (
                         <button
@@ -1057,7 +1060,6 @@ export default function StatusPage() {
                 if (modalApp.localUrl) rows.push({ label: "Local", value: modalApp.localUrl, url: modalApp.localUrl });
                 if (modalApp.lanUrl) rows.push({ label: "LAN", value: modalApp.lanUrl, url: modalApp.lanUrl });
                 if (modalApp.tailscaleUrl) rows.push({ label: "Tailscale", value: modalApp.tailscaleUrl, url: modalApp.tailscaleUrl });
-                if (modalApp.caddyUrl) rows.push({ label: "Caddy", value: modalApp.caddyUrl, url: modalApp.caddyUrl });
                 if (modalApp.prodUrl) rows.push({ label: "Prod", value: modalApp.prodUrl.replace("https://", ""), url: modalApp.prodUrl });
                 if (modalApp.repo) rows.push({ label: "GitHub", value: modalApp.repo.replace("https://github.com/", ""), url: modalApp.repo });
                 // Screenshots gallery link row (#5)
@@ -1068,7 +1070,7 @@ export default function StatusPage() {
                   const isLast = i === rows.length - 1;
                   return (
                     <div key={r.label} style={{ display: "flex", alignItems: "center", padding: "10px 0", borderBottom: isLast ? "none" : "1px solid var(--border)", gap: 16 }}>
-                      <span style={{ color: "var(--muted)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap", flexShrink: 0, width: 110 }}>
+                      <span style={{ color: "var(--muted)", fontSize: 12, whiteSpace: "nowrap", flexShrink: 0, width: 110 }}>
                         {emoji ? `${emoji} ` : ""}{r.label}
                       </span>
                       <span style={{ fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, flex: 1 }}>
@@ -1147,7 +1149,7 @@ export default function StatusPage() {
             {modalTab === "screenshots" && !activeMachine && (
               <div style={{ marginTop: 4 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 14, borderTop: "1px solid var(--border)" }}>
-                  <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)", fontWeight: 600 }}>
+                  <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 600 }}>
                     Screenshots
                     {screenshots?.screenshots?.length ? ` (${screenshots.screenshots.length})` : ""}
                     {screenshots?.capturedAt ? ` \u00B7 ${new Date(screenshots.capturedAt).toLocaleString()}` : ""}
@@ -1349,7 +1351,7 @@ curl -X POST http://localhost:9876/api/apps \\
             <div style={{ display: "flex", gap: 0 }}>
               {/* Left: Screenshots */}
               <div style={{ flex: "1 1 55%", padding: 20, borderRight: "1px solid rgba(255,255,255,0.06)" }}>
-                <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)", marginBottom: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: "var(--muted)", marginBottom: 10 }}>
                   Screenshots ({portfolioPreview.screenshots.length})
                 </div>
                 {portfolioPreview.screenshots.length > 0 ? (
@@ -1380,7 +1382,7 @@ curl -X POST http://localhost:9876/api/apps \\
               <div style={{ flex: "1 1 45%", padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
                 {/* Tags */}
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)", marginBottom: 6 }}>Tags</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Tags</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                     {portfolioPreview.tags.length > 0 ? portfolioPreview.tags.map((tag) => {
                       const colors: Record<string, string> = {
@@ -1402,7 +1404,7 @@ curl -X POST http://localhost:9876/api/apps \\
 
                 {/* Description */}
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)", marginBottom: 6 }}>Description</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Description</div>
                   <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 6, padding: "10px 12px", fontSize: 11, color: "rgba(255,255,255,0.7)", lineHeight: 1.5 }}>
                     {portfolioPreview.description.map((line, i) => (
                       <div key={i} style={{ marginBottom: i === 0 ? 8 : 2 }}>
@@ -1415,7 +1417,7 @@ curl -X POST http://localhost:9876/api/apps \\
                 {/* URL */}
                 {portfolioPreview.url && (
                   <div>
-                    <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)", marginBottom: 6 }}>Production URL</div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Production URL</div>
                     <a href={portfolioPreview.url} target="_blank" rel="noopener" style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none" }}>
                       {portfolioPreview.url}
                     </a>
@@ -1424,7 +1426,7 @@ curl -X POST http://localhost:9876/api/apps \\
 
                 {/* Slug */}
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)", marginBottom: 6 }}>Slug</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>Slug</div>
                   <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontFamily: "'SF Mono','Fira Code',monospace" }}>{portfolioPreview.slug}</span>
                 </div>
               </div>
