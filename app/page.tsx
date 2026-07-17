@@ -884,7 +884,7 @@ export default function StatusPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span className={`dot ${modalApp.disabled ? 'disabled' : modalApp.status === 'up' ? 'up' : 'starting-up'}`} />
                 <AppIcon id={modalApp.id} name={modalApp.name} icon={modalApp.icon} size={32} />
-                <span style={{ fontSize: 16, fontWeight: 700 }}>{modalApp.name}</span>
+                <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1 }}>{modalApp.name}</span>
                 {/* Capability badges: MCP / API / CLI + icon sync */}
                 {(() => {
                   const caps = capabilities[modalApp.id] || {};
