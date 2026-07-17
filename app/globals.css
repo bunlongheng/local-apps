@@ -42,14 +42,11 @@ body {
   background: rgba(255, 255, 255, 0.25);
 }
 
+/* No sidebar - the dashboard is a single Status view centered on the page. */
 .main-content {
-  margin-left: var(--sidebar-w, 200px);
-  transition: margin-left 0.2s ease;
-}
-@media (max-width: 768px) {
-  .main-content {
-    margin-left: 0;
-  }
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 clamp(14px, 4vw, 40px);
 }
 
 a {

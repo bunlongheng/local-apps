@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Sidebar from "../components/Sidebar";
 
 export const metadata: Metadata = {
   title: "Local Apps",
@@ -23,7 +22,6 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/favicons/local-apps.png" />
       </head>
       <body suppressHydrationWarning>
-        <Sidebar />
         <div className="main-content">{children}</div>
       </body>
     </html>
