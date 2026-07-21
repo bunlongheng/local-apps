@@ -10,7 +10,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:9876",
+      "url": "http://localhost:9875",
       "description": "Local development"
     }
   ],
@@ -196,7 +196,7 @@
                     },
                     "lanIp": { "type": "string", "example": "192.168.1.50" },
                     "machineModel": { "type": "string", "example": "Mac mini", "nullable": true },
-                    "monitorUrl": { "type": "string", "example": "http://192.168.1.50:9876" }
+                    "monitorUrl": { "type": "string", "example": "http://192.168.1.50:9875" }
                   }
                 }
               }
@@ -304,7 +304,7 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "url": { "type": "string", "example": "http://192.168.1.50:9876" },
+                    "url": { "type": "string", "example": "http://192.168.1.50:9875" },
                     "dataUrl": { "type": "string", "description": "Base64 PNG data URL" }
                   }
                 }
@@ -753,7 +753,7 @@
           "id": { "type": "string", "example": "Bunlongs-Mac-mini.local" },
           "hostname": { "type": "string", "example": "Bunlongs-Mac-mini.local", "nullable": true },
           "ip": { "type": "string", "example": "192.168.1.50" },
-          "port": { "type": "integer", "example": 9876 },
+          "port": { "type": "integer", "example": 9875 },
           "model": { "type": "string", "example": "Mac mini", "nullable": true },
           "last_seen": { "type": "string", "format": "date-time" }
         }
@@ -764,7 +764,7 @@
           "hostname": { "type": "string", "example": "Bunlongs-Mac-mini.local" },
           "model": { "type": "string", "example": "Mac mini", "nullable": true },
           "lanIp": { "type": "string", "example": "192.168.1.50" },
-          "port": { "type": "integer", "example": 9876 },
+          "port": { "type": "integer", "example": 9875 },
           "appCount": { "type": "integer", "example": 10 }
         }
       },

@@ -120,7 +120,7 @@ db.exec(`
     id TEXT PRIMARY KEY,
     hostname TEXT,
     ip TEXT NOT NULL,
-    port INTEGER DEFAULT 9876,
+    port INTEGER DEFAULT 9875,
     model TEXT,
     last_seen TEXT DEFAULT CURRENT_TIMESTAMP
   )
@@ -434,7 +434,7 @@ function upsertMachine(data) {
     id: data.id,
     hostname: data.hostname || null,
     ip: data.ip,
-    port: data.port || 9876,
+    port: data.port || 9875,
     model: data.model || null,
   });
   return db.prepare('SELECT * FROM machines WHERE id = ?').get(data.id);

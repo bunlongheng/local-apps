@@ -31,7 +31,7 @@ echo "========================================" >> "$LOG"
 # ── Step 1: Ensure infrastructure is up ──────────────────────────────────────
 
 # Check local-apps monitor
-if ! curl -s -o /dev/null -w "" --max-time 3 http://localhost:9876/api/status 2>/dev/null; then
+if ! curl -s -o /dev/null -w "" --max-time 3 http://localhost:9875/api/status 2>/dev/null; then
   echo "  ↻ Starting local-apps monitor..." >> "$LOG"
   cd $HOME/Sites/local-apps
   node server.js > /tmp/local-apps.log 2>&1 &
@@ -52,7 +52,7 @@ fi
 # ── Step 2: Check all apps ───────────────────────────────────────────────────
 
 APPS=()
-while IFS= read -r line; do APPS+=("$line"); done < <(curl -s "http://localhost:9876/api/apps" | jq -r '.[] | select(.localPath) | "\(.id)|\(.localUrl|split(":")|last)|\(.localPath)|http"' 2>/dev/null)
+while IFS= read -r line; do APPS+=("$line"); done < <(curl -s "http://localhost:9875/api/apps" | jq -r '.[] | select(.localPath) | "\(.id)|\(.localUrl|split(":")|last)|\(.localPath)|http"' 2>/dev/null)
 
 for entry in "${APPS[@]}"; do
   IFS='|' read -r name port dir check_type <<< "$entry"

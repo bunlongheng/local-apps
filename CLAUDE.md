@@ -1,12 +1,12 @@
-# local-apps - Local app hub/monitor (port 9876, local-apps.localhost)
+# local-apps - Local app hub/monitor (port 9875, local-apps.localhost)
 
 ## What this is
 Self-healing, multi-machine orchestrator that monitors, tests, screenshots, and auto-fixes 14+ local web apps via Claude Code AI agents. Hub + Agent architecture: hub (Mac Mini) runs all bots; agents (e.g. MacBook Pro) only report status.
 
 ## Run
-- Dashboard (Next.js): `npm run dev` (port 9876)
-- Monitor server (Express): `npm run server` (node --watch server.js)
-- Build: `npm run build` / Start: `npm run start`
+- One service: Express (`node server.js`) serves the dashboard UI (static `public/`) AND the control API on port 9875. No Next.js, no build step.
+- Dev (watch mode): `npm run dev` (= `node --watch server.js`); prod: `npm run start`
+- launchd `com.bheng.local-apps-next` runs `start.sh` (`exec node server.js`); KeepAlive is the watchdog.
 - Screenshot bot: `npm run screenshots`
 
 ## Architecture rules
@@ -27,6 +27,6 @@ Self-healing, multi-machine orchestrator that monitors, tests, screenshots, and 
 - GET /api/events (SSE), GET /api/log/:id
 
 ## Screenshots and tests
-- Screenshots: `public/screenshots/{app}/desktop|mobile(-framed)/` + index.json manifest, gallery at http://localhost:9876/gallery.html
+- Screenshots: `public/screenshots/{app}/desktop|mobile(-framed)/` + index.json manifest; view them in the app's Status modal -> Screenshots tab
 - Tests: `npm test` (node --test tests/unit/ tests/e2e/), or `npm run test:unit` / `npm run test:e2e`
 - Nightly test suite (1am, hub only): `scripts/nightly-tests.sh` runs npm test across 11 repos, auto-fixes failures

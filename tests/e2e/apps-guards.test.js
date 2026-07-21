@@ -9,7 +9,7 @@ const MISSING = 'zzz-not-a-real-app-xyz';
 
 before(async () => {
   if (!await serverUp()) {
-    throw new Error('local-apps server not reachable on 9876 - start it first (npm run dev)');
+    throw new Error('local-apps server not reachable on 9875 - start it first (npm run dev)');
   }
 });
 

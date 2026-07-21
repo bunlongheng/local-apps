@@ -1,7 +1,7 @@
 // Tiny fetch helper for e2e tests against the running local-apps server.
-// Tests hit the live instance on 9876 (the always-on dashboard) and only ever
+// Tests hit the live instance on 9875 (the always-on dashboard) and only ever
 // send inputs that trip the safety guards, so nothing real is killed or mutated.
-const BASE = process.env.LOCAL_APPS_URL || 'http://localhost:9876';
+const BASE = process.env.LOCAL_APPS_URL || 'http://localhost:9875';
 
 async function api(method, p, body) {
   const opts = { method, headers: {} };
@@ -18,7 +18,7 @@ async function api(method, p, body) {
 
 async function serverUp() {
   try {
-    const r = await fetch(BASE + '/api/loops', { signal: AbortSignal.timeout(3000) });
+    const r = await fetch(BASE + '/api/status', { signal: AbortSignal.timeout(3000) });
     return r.ok;
   } catch { return false; }
 }

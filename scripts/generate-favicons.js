@@ -37,6 +37,7 @@ const APP_SOURCES = {
   'flash-cards':        { paths: ['public/logo512.png'] },
   'score-card':         { paths: ['app/icon.svg'] },
   'norden-study':       { paths: ['public/icon.png'] },
+  'pixy':               { paths: ['app/icon.png'] },
   'local-apps':         { skip: true },
   'pm2026':             { letter: 'P', gradient: ['#0891b2', '#22d3ee'] },
   'notes':              { letter: 'N', gradient: ['#ca8a04', '#facc15'] },

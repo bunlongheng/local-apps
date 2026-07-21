@@ -24,7 +24,7 @@ echo "Security & Performance Scan - $TIMESTAMP" >> "$LOG"
 echo "========================================" >> "$LOG"
 
 APPS=()
-while IFS= read -r line; do APPS+=("$line"); done < <(curl -s "http://localhost:9876/api/apps" | jq -r '.[] | select(.localPath) | "\(.id)|\(.localPath)|\(.localUrl|split(":")|last)"' 2>/dev/null)
+while IFS= read -r line; do APPS+=("$line"); done < <(curl -s "http://localhost:9875/api/apps" | jq -r '.[] | select(.localPath) | "\(.id)|\(.localPath)|\(.localUrl|split(":")|last)"' 2>/dev/null)
 
 AGENT_PIDS=()
 AGENT_NAMES=()

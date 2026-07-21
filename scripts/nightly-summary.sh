@@ -63,7 +63,7 @@ if [ -f /tmp/nightly-scan-summary.json ]; then
 fi
 
 # App Status
-STATUS=$(curl -s http://localhost:9876/api/status 2>/dev/null | python3 -c "
+STATUS=$(curl -s http://localhost:9875/api/status 2>/dev/null | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 up=sum(1 for a in d['apps'] if a['status']=='up')

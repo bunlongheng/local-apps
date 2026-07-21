@@ -35,7 +35,7 @@ cd $HOME/Sites/local-apps
 
 - [ ] Register app:
   ```bash
-  curl -X POST http://localhost:9876/api/apps \
+  curl -X POST http://localhost:9875/api/apps \
     -H "Content-Type: application/json" \
     -d '{"id":"<app-id>","name":"<App Name>","localPath":"'$HOME'/Sites/<app-id>"}'
   ```
@@ -43,7 +43,7 @@ cd $HOME/Sites/local-apps
 - [ ] Verify Caddy proxy works: `http://<app-id>.localhost`
 - [ ] Verify LaunchAgent created: `ls ~/Library/LaunchAgents/com.local-apps.<app-id>.plist`
 - [ ] Verify health check shows green dot on dashboard
-- [ ] Generate favicon: `curl -X POST http://localhost:9876/api/generate-icons/<app-id>`
+- [ ] Generate favicon: `curl -X POST http://localhost:9875/api/generate-icons/<app-id>`
 - [ ] Write Gemini logo prompt in `public/logos.html` PROMPTS object (desc + prompt for the new app)
 - [ ] Generate logo with Gemini using the prompt (1024x1024, dark bg, rounded iOS corners, no text)
 - [ ] Process logo with sharp: resize to 256x256 PNG, keep rounded iOS corners, alpha channel
@@ -52,7 +52,7 @@ cd $HOME/Sites/local-apps
 - [ ] Add FAVICONS entry in `public/index.html`
 - [ ] Start the app: `launchctl load ~/Library/LaunchAgents/com.local-apps.<app-id>.plist`
 - [ ] Verify app is running: `curl -s -o /dev/null -w '%{http_code}' http://localhost:<port>`
-- [ ] Take first screenshot: `curl -X POST http://localhost:9876/api/screenshots/<app-id>`
+- [ ] Take first screenshot: `curl -X POST http://localhost:9875/api/screenshots/<app-id>`
 
 ## Phase 4: Vercel Deployment
 

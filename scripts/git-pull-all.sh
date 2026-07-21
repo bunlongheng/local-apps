@@ -23,7 +23,7 @@ echo "Git Pull All - $TIMESTAMP" >> "$LOG"
 echo "========================================" >> "$LOG"
 
 REPOS=()
-while IFS= read -r line; do REPOS+=("$line"); done < <(curl -s "http://localhost:9876/api/apps" | jq -r '.[].localPath // empty' 2>/dev/null)
+while IFS= read -r line; do REPOS+=("$line"); done < <(curl -s "http://localhost:9875/api/apps" | jq -r '.[].localPath // empty' 2>/dev/null)
 
 PULLED=0
 FAILED=0

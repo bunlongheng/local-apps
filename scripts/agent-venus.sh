@@ -32,7 +32,7 @@ TODAY=$(date '+%Y-%m-%d')
 YESTERDAY=$(date -v-1d '+%Y-%m-%d' 2>/dev/null || date -d 'yesterday' '+%Y-%m-%d' 2>/dev/null)
 
 APPS=()
-while IFS= read -r line; do APPS+=("$line"); done < <(curl -s "http://localhost:9876/api/apps" | jq -r '.[].id // empty' 2>/dev/null)
+while IFS= read -r line; do APPS+=("$line"); done < <(curl -s "http://localhost:9875/api/apps" | jq -r '.[].id // empty' 2>/dev/null)
 
 # ── Take fresh screenshots ────────────────────────────────────────────────
 

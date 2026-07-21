@@ -14,6 +14,26 @@ const makeHealth = require('./lib/health');
 const compression = require('compression');
 const app = express();
 app.use(compression());
+// Baseline security headers, ported from the former next.config so collapsing to a
+// single Express service (UI + API on :9875) keeps the same posture. HSTS is omitted:
+// this is served over plain http on the LAN/tailnet, and forcing HTTPS would break access.
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'none'",
+  ].join('; '));
+  next();
+});
 app.use((req, res, next) => {
   // Cache static files for 1 hour, busted by ?v= timestamp in JS
   if (req.path.match(/\.(ico|png|svg|jpg|css|js|woff2?)$/)) {
@@ -21,7 +41,7 @@ app.use((req, res, next) => {
   }
   next();
 });
-const PORT = 9875;  // API-only, Next.js frontend on 9876
+const PORT = 9875;  // serves UI + control API (Next.js removed)
 const CHECK_INTERVAL = 30000;
 
 // Machine role: "hub" (full orchestrator + bots) or "agent" (status reporting only)
@@ -417,7 +437,7 @@ app.get('/api/status', (req, res) => {
       tabIcon: a.tabIcon || null,
     };
   });
-  res.json({ apps, lanIp: LAN_IP, tailscaleIp: TAILSCALE_IP, machineModel: MACHINE_MODEL, machineRole: MACHINE_ROLE, monitorUrl: `http://${LAN_IP}:9876` });
+  res.json({ apps, lanIp: LAN_IP, tailscaleIp: TAILSCALE_IP, machineModel: MACHINE_MODEL, machineRole: MACHINE_ROLE, monitorUrl: `http://${LAN_IP}:${PORT}` });
 });
 
 // --- Tab Colors ---
@@ -679,7 +699,7 @@ app.get('/api/manifest', (req, res) => {
 
 // --- Other routes ---
 app.get('/api/qr', async (req, res) => {
-  const url = `http://${LAN_IP}:9876`;
+  const url = `http://${LAN_IP}:${PORT}`;
   const dataUrl = await QRCode.toDataURL(url, { width: 200, margin: 1, color: { dark: '#e2e8f0', light: '#1a1d27' } });
   res.json({ url, dataUrl });
 });
@@ -892,7 +912,7 @@ app.get('/api/machines/:id/apps', (req, res) => {
 app.get('/api/machines/:id/status', async (req, res) => {
   const m = db.getMachines().find(x => x.id === req.params.id);
   if (!m) return res.status(404).json({ error: 'machine not found' });
-  const url = `http://${m.ip}:${m.port || 9876}/api/status`;
+  const url = `http://${m.ip}:${m.port || 9875}/api/status`;
   try {
     const data = await new Promise((resolve, reject) => {
       http.get(url, { timeout: 5000 }, (resp) => {
@@ -1076,7 +1096,7 @@ async function startupSync() {
   for (const m of machines) {
     try {
       const info = await new Promise((resolve, reject) => {
-        http.get(`http://${m.ip}:${m.port || 9876}/api/machine`, { timeout: 3000 }, (resp) => {
+        http.get(`http://${m.ip}:${m.port || 9875}/api/machine`, { timeout: 3000 }, (resp) => {
           let data = '';
           resp.on('data', c => data += c);
           resp.on('end', () => { try { resolve(JSON.parse(data)); } catch { reject(); } });
@@ -1684,14 +1704,15 @@ app.use((err, req, res, _next) => {
   res.status(status).json({ error: status < 500 ? err.message : 'Internal error' });
 });
 
-// Bind the control API to localhost only. The network-facing dashboard (Next, 9876)
-// reaches it via a same-host proxy, so the raw exec/launchd/Caddy API is never
-// directly reachable from the LAN or tailnet. Override with API_BIND if you run a
-// trusted multi-machine setup that needs peer-to-peer sync.
-const API_BIND = process.env.API_BIND || '127.0.0.1';
+// This one Express process serves BOTH the dashboard UI (public/index.html) and the
+// control API, so it must be reachable on the LAN/tailnet for iPad access, the LAN QR,
+// and peer-machine sync. Bind 0.0.0.0 by default; set API_BIND=127.0.0.1 to lock it to
+// localhost-only (and front it with Caddy). The mutating API was already LAN-reachable
+// via the old Next proxy, so this is the same surface. Gate it with LOCAL_APPS_TOKEN.
+const API_BIND = process.env.API_BIND || '0.0.0.0';
 app.listen(PORT, API_BIND, () => {
-  console.log(`\n  Local Apps API (control plane) running at:`);
-  console.log(`  http://${API_BIND}:${PORT}  (dashboard: http://localhost:9876)`);
+  console.log(`\n  Local Apps (UI + control plane) running at:`);
+  console.log(`  http://${API_BIND}:${PORT}`);
   console.log(`  Role:   ${MACHINE_ROLE.toUpperCase()}${IS_HUB ? ' (bots + auto-fix enabled)' : ' (status reporting only)'}\n`);
   startupSync();
 });

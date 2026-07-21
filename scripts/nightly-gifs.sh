@@ -27,7 +27,7 @@ PAGES_ALL="/:dashboard /quality:quality /security:security /bugs:bugs /performan
 
 # Detect 3pi URL (LAN or local)
 URL="http://localhost:3333"
-LAN_URL=$(curl -s http://localhost:9876/api/machines | python3 -c "import sys,json; ms=json.load(sys.stdin); print(next((f'http://{m[\"ip\"]}:3333' for m in ms if m.get('ip')), ''))" 2>/dev/null)
+LAN_URL=$(curl -s http://localhost:9875/api/machines | python3 -c "import sys,json; ms=json.load(sys.stdin); print(next((f'http://{m[\"ip\"]}:3333' for m in ms if m.get('ip')), ''))" 2>/dev/null)
 if [ -n "$LAN_URL" ]; then
   code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 "$LAN_URL" 2>/dev/null)
   [ "$code" != "000" ] && URL="$LAN_URL"

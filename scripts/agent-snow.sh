@@ -94,7 +94,7 @@ if [ $TOTAL_ISSUES -gt 0 ]; then
 
   # Check for down apps
   APPS=()
-  while IFS= read -r line; do APPS+=("$line"); done < <(curl -s "http://localhost:9876/api/apps" | jq -r '.[] | select(.localPath) | "\(.id)|\(.localUrl|split(":")|last)|\(.localPath)"' 2>/dev/null)
+  while IFS= read -r line; do APPS+=("$line"); done < <(curl -s "http://localhost:9875/api/apps" | jq -r '.[] | select(.localPath) | "\(.id)|\(.localUrl|split(":")|last)|\(.localPath)"' 2>/dev/null)
 
   DOWN_APPS=()
   for entry in "${APPS[@]}"; do

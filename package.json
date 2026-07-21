@@ -4,9 +4,9 @@
   "private": true,
   "description": "Local app process monitor with web dashboard",
   "scripts": {
-    "dev": "next dev -p 9876 --hostname 0.0.0.0",
-    "build": "next build",
-    "start": "next start -p 9876 --hostname 0.0.0.0",
+    "dev": "node --watch server.js",
+    "build": "echo 'no build needed - static UI served by Express on :9875'",
+    "start": "node server.js",
     "server": "node --watch server.js",
     "screenshots": "node scripts/screenshot-bot.js",
     "icons": "node scripts/generate-favicons.js",

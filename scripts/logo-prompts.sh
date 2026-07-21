@@ -2,7 +2,7 @@
 # Logo Prompt Generator - scans all repos and outputs AI image generation prompts
 # Usage: bash scripts/logo-prompts.sh
 
-APPS_API="http://localhost:9876/api/apps"
+APPS_API="http://localhost:9875/api/apps"
 
 echo "========================================"
 echo "  Logo Prompt Generator for Local Apps"

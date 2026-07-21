@@ -40,8 +40,7 @@ Two processes: a Next.js dashboard for the UI and an Express control API that ow
 
 ```mermaid
 flowchart LR
-    Browser["Browser / phone (LAN, Tailscale)"] -->|http| Dash["Next.js dashboard :9876"]
-    Dash -->|/api/* proxy| API["Express control API :9875 (127.0.0.1)"]
+    Browser["Browser / phone (LAN, Tailscale)"] -->|http| API["Express :9875 - dashboard UI + control API"]
     API --> DB[("SQLite (better-sqlite3)")]
     API --> Caddy["Caddyfile - reverse proxy"]
     API --> Launchd["macOS LaunchAgents"]
@@ -91,17 +90,16 @@ git clone https://github.com/bunlongheng/local-apps.git
 cd local-apps
 npm install
 
-# start the dashboard (:9876) and the control API (:9875)
-npm run dev      # Next.js dashboard
-npm run server   # Express control API (separate terminal)
+# one service: dashboard UI + control API on :9875
+npm run dev      # node --watch server.js (or `npm run start` for prod)
 ```
 
-Open http://localhost:9876. On first run with no `apps.config.json`, it seeds a demo from `apps.config.example.json`.
+Open http://localhost:9875 (or http://local-apps.localhost via Caddy). On first run with no `apps.config.json`, it seeds a demo from `apps.config.example.json`.
 
 Register an app:
 
 ```bash
-curl -X POST http://localhost:9876/api/apps \
+curl -X POST http://localhost:9875/api/apps \
   -H "Content-Type: application/json" \
   -d '{"id":"my-app","localPath":"/Users/me/Sites/my-app"}'
 ```
@@ -143,7 +141,7 @@ Dockerfile      Dashboard + API in agent mode
 ## Testing
 
 ```bash
-npm test          # unit + e2e (e2e needs a running instance on :9876)
+npm test          # unit + e2e (e2e needs a running instance on :9875)
 npm run test:unit # unit only
 npm run lint      # ESLint on the Node backend
 ```

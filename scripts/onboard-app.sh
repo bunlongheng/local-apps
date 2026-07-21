@@ -22,7 +22,7 @@ YELLOW='\033[0;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-MONITOR="http://localhost:9876"
+MONITOR="http://localhost:9875"
 TABS_FILE="$HOME/.claude-tabs.sh"
 
 # --- Args ---

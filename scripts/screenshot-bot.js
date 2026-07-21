@@ -714,7 +714,7 @@ async function flow3piPoc(page, appDir) {
 }
 
 async function flowLocalApps(page, appDir) {
-  const base = 'http://localhost:9876';
+  const base = 'http://localhost:9875';
   const routes = [
     { path: '/',               name: '01-status' },
     { path: '/routines.html',  name: '02-routines' },

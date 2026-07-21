@@ -30,7 +30,7 @@ echo "Nightly Test Run — $TIMESTAMP" >> "$LOG"
 echo "========================================" >> "$LOG"
 
 APPS=()
-while IFS= read -r line; do APPS+=("$line"); done < <(curl -s "http://localhost:9876/api/apps" | jq -r '.[] | select(.localPath) | "\(.id)|\(.localPath)"' 2>/dev/null)
+while IFS= read -r line; do APPS+=("$line"); done < <(curl -s "http://localhost:9875/api/apps" | jq -r '.[] | select(.localPath) | "\(.id)|\(.localPath)"' 2>/dev/null)
 
 # ── Phase 1: Run all tests ──────────────────────────────────────────────────
 

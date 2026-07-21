@@ -24,7 +24,7 @@ echo "⚡ Zap — Bundle & Performance — $TIMESTAMP" >> "$LOG"
 echo "========================================" >> "$LOG"
 
 APPS=()
-while IFS= read -r line; do APPS+=("$line"); done < <(curl -s "http://localhost:9876/api/apps" | jq -r '.[] | select(.localPath) | "\(.id)|\(.localUrl|split(":")|last)|\(.localPath)"' 2>/dev/null)
+while IFS= read -r line; do APPS+=("$line"); done < <(curl -s "http://localhost:9875/api/apps" | jq -r '.[] | select(.localPath) | "\(.id)|\(.localUrl|split(":")|last)|\(.localPath)"' 2>/dev/null)
 
 # ── Check 1: Server Response Times (TTFB) ─────────────────────────────────
 
