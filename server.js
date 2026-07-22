@@ -442,7 +442,30 @@ app.get('/api/status', (req, res) => {
 
 // --- Tab Colors ---
 app.get('/api/tab-colors', (req, res) => {
-  res.json(db.getTabColors());
+  const out = {};
+  const toHex = (r, g, b) => '#' + [r, g, b].map((v) => (v | 0).toString(16).padStart(2, '0')).join('');
+  // Primary source: ~/.claude/tab-colors.json (the same file that drives the terminal
+  // _tab colors), so the dashboard chip and the claude tab always match.
+  try {
+    const json = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', 'tab-colors.json'), 'utf8'));
+    for (const k of Object.keys(json)) {
+      const e = json[k];
+      if (e && typeof e.r === 'number') out[k] = { label: e.label || k.toUpperCase(), color: toHex(e.r, e.g, e.b), icon: e.icon || '' };
+    }
+  } catch {}
+  // Fallback: DB tab colors for anything not defined in the json.
+  try {
+    const dbc = db.getTabColors() || {};
+    for (const k of Object.keys(dbc)) if (!out[k]) out[k] = dbc[k];
+  } catch {}
+  // Merge the shell alias (e.g. _bheng) per key from ~/.claude-tabs.sh.
+  try {
+    const sh = fs.readFileSync(path.join(os.homedir(), '.claude-tabs.sh'), 'utf8');
+    const re = /(_[A-Za-z0-9]+)\(\)\s*\{\s*_tab\s+"([^"]+)"/g;
+    let m;
+    while ((m = re.exec(sh))) if (out[m[2]] && !out[m[2]].alias) out[m[2]].alias = m[1];
+  } catch {}
+  res.json(out);
 });
 
 // --- CRUD: Apps ---

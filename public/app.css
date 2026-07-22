@@ -127,6 +127,11 @@ a.badge-link { text-decoration: none; display: inline-flex; align-items: center;
 .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0 12px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
 .toggle-group { display: flex; align-items: center; gap: 10px; }
 .modal-tab-title { font-size: 14px; font-weight: 700; color: #fff; }
+.tab-chip { margin-left: auto; margin-right: 30px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; cursor: pointer; flex-shrink: 0; box-shadow: 0 1px 6px rgba(0,0,0,0.35); transition: filter 0.15s; }
+.tab-chip:hover { filter: brightness(1.12); }
+.tab-chip-icon { font-size: 12px; line-height: 1; }
+.tab-chip-logo { width: 16px; height: 16px; border-radius: 4px; object-fit: contain; display: block; background: rgba(255,255,255,0.18); }
+.tab-chip-alias { font-size: 12px; font-weight: 700; color: #fff; letter-spacing: 0.02em; }
 .toggle-label { font-size: 10px; font-weight: 600; }
 .toggle-label.on { color: var(--up); }
 .toggle-label.off { color: var(--down); }

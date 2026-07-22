@@ -101,7 +101,7 @@
   var S = {
     apps: [], loading: true, error: false,
     machines: [], activeMachine: null, localInfo: {}, activeInfo: {}, machineOnline: {},
-    profiles: {}, capabilities: {}, iconSync: {},
+    profiles: {}, capabilities: {}, iconSync: {}, tabColors: {},
     startingApps: {}, startupState: {}, startTimes: {},
     modalApp: null, modalTab: "info", logLines: [], logLoading: false,
     screenshots: null, screenshotsLoading: false, capturing: false,
@@ -474,7 +474,19 @@
       return b.href ? '<a class="badge-link" href="' + esc(b.href) + '" target="_blank" rel="noopener" data-stop>' + span + "</a>" : span;
     }).join("") + "</div>";
     if (app.hasScreenshots) h += '<span class="gallery-icon" title="Screenshots">' + camSvg() + "</span>";
-    h += "</div></div>";
+    h += "</div>"; // close modal-head-inner
+    // claude-tab chip (top-right): the app's _alias, its color, click-to-copy the full launch command
+    var tc = S.tabColors[app.id];
+    if (tc && tc.alias) {
+      var cmd = tc.alias + " && cd ~/Sites/" + app.id + " && claude";
+      var fav = app.icon || faviconCache[app.id];
+      var chipLogo = fav
+        ? '<img class="tab-chip-logo" src="' + esc(fav) + '" alt="">'
+        : (tc.icon ? '<span class="tab-chip-icon">' + tc.icon + "</span>" : "");
+      h += '<span class="tab-chip" data-act="copy" data-copy="' + esc(cmd) + '" title="' + esc(cmd) + '" style="background:' + esc(tc.color || "#333") + '">' +
+        chipLogo + '<span class="tab-chip-alias">' + esc(tc.alias) + "</span></span>";
+    }
+    h += "</div>"; // close modal-head
     if (app.lastChecked) h += '<div class="modal-checked">' + esc(new Date(app.lastChecked).toLocaleString()) + "</div>";
     // toggle row: active-tab title on the left, ON/OFF label + switch grouped on the right
     var tabLabel = (PROFILE_TABS.filter(function (t) { return t.key === S.modalTab; })[0] || { label: "" }).label;
@@ -696,6 +708,7 @@
     api("/api/app-profiles").then(function (p) { S.profiles = p || {}; render(); }).catch(function () {});
     api("/api/capabilities").then(function (c) { S.capabilities = c || {}; render(); }).catch(function () {});
     api("/api/icon-sync").then(function (s) { S.iconSync = s || {}; render(); }).catch(function () {});
+    api("/api/tab-colors").then(function (t) { S.tabColors = t || {}; render(); }).catch(function () {});
   });
   setInterval(load, 15000);
   setInterval(loadMachines, 30000);
