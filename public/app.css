@@ -125,6 +125,8 @@ a.badge-link { text-decoration: none; display: inline-flex; align-items: center;
 .gallery-icon:hover { opacity: 1; }
 
 .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0 12px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.toggle-group { display: flex; align-items: center; gap: 10px; }
+.modal-tab-title { font-size: 14px; font-weight: 700; color: #fff; }
 .toggle-label { font-size: 10px; font-weight: 600; }
 .toggle-label.on { color: var(--up); }
 .toggle-label.off { color: var(--down); }
@@ -136,6 +138,9 @@ a.badge-link { text-decoration: none; display: inline-flex; align-items: center;
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 4px 0 14px; overflow-x: auto; overflow-y: hidden; }
 .tab { background: none; border: none; cursor: pointer; padding: 6px 8px; font-size: 13px; white-space: nowrap; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tab.active { color: #fff; border-bottom-color: #3b82f6; }
+.tab.tab-icon { padding: 8px 13px; display: inline-flex; align-items: center; }
+.tab.tab-icon svg { display: block; }
+.tab.tab-icon.active { color: #3b82f6; }
 
 .panel { padding: 2px 20px 12px; }
 .panel p { font-size: 12px; color: rgba(255,255,255,0.65); line-height: 1.7; margin: 0; }
@@ -188,6 +193,30 @@ a.badge-link { text-decoration: none; display: inline-flex; align-items: center;
 /* Toast */
 .toast { position: fixed; bottom: 32px; left: 50%; background: #22c55e; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 12px; font-weight: 700; transition: all 0.2s; pointer-events: none; z-index: 10000; opacity: 0; transform: translateX(-50%) translateY(20px); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Icon prompt tab */
+.prompt-block { position: relative; }
+.prompt-copy { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: var(--muted); font-size: 10px; padding: 3px 10px; border-radius: 4px; cursor: pointer; }
+.prompt-copy:hover { color: var(--text); }
+.prompt-text { background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; font-size: 12px; color: #a5b4fc; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+
+/* Cmd-K command palette */
+.cmdk-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); z-index: 400; display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; }
+.cmdk { width: 640px; max-width: 92vw; background: var(--surface); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; box-shadow: 0 0 0 1px rgba(255,255,255,0.05), 0 20px 60px rgba(0,0,0,0.6); overflow: hidden; }
+.cmdk-search { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); color: var(--muted); }
+.cmdk-input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--text); font-family: inherit; font-size: 16px; }
+.cmdk-input::placeholder { color: var(--muted); }
+.cmdk-esc { font-size: 10px; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 3px 7px; flex-shrink: 0; }
+.cmdk-results { max-height: 46vh; overflow-y: auto; padding: 8px; }
+.cmdk-item { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 10px; cursor: pointer; }
+.cmdk-item:hover { background: rgba(255,255,255,0.04); }
+.cmdk-meta { min-width: 0; flex: 1; }
+.cmdk-name { font-size: 15px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmdk-slug { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.cmdk-arrow { color: rgba(255,255,255,0.6); font-size: 16px; flex-shrink: 0; }
+.cmdk-empty { padding: 26px; text-align: center; color: var(--muted); font-size: 13px; }
+.cmdk-footer { display: flex; gap: 18px; padding: 12px 18px; border-top: 1px solid var(--border); color: var(--muted); font-size: 11px; }
+.cmdk-footer kbd { display: inline-block; min-width: 16px; text-align: center; padding: 2px 5px; margin-right: 3px; border: 1px solid var(--border); border-radius: 5px; background: rgba(255,255,255,0.04); font-family: inherit; font-size: 11px; color: var(--text); }
 
 @media (max-width: 1024px) { .col-hostname { display: none; } }
 @media (max-width: 768px) { .col-lan, .header-device-icon { display: none; } }

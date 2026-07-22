@@ -57,8 +57,19 @@
   var PROFILE_TABS = [
     { key: "info", label: "Info" }, { key: "screenshots", label: "Screenshots" }, { key: "about", label: "About" },
     { key: "architect", label: "Architect" }, { key: "security", label: "Security" },
-    { key: "performance", label: "Performance" }, { key: "deploy", label: "Deploy" },
+    { key: "performance", label: "Performance" }, { key: "prompt", label: "Prompt" }, { key: "deploy", label: "Deploy" },
   ];
+  // Compact icon per tab (Feather-style, drawn with currentColor). Label stays as the tooltip.
+  var TAB_ICONS = {
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11.5v4.5"/><path d="M12 7.6h.01"/>',
+    screenshots: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="3.5"/>',
+    about: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h6"/>',
+    architect: '<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>',
+    security: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    performance: '<path d="M22 12h-4l-3 8L9 4l-3 8H2"/>',
+    prompt: '<path d="M12 3l1.9 4.8L18.7 9l-4.8 1.9L12 15.6l-1.9-4.7L5.3 9l4.8-1.2z"/><path d="M18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>',
+    deploy: '<path d="M12 2s4.5 2.2 4.5 8.5c0 2.6-1.1 4.7-2.1 6.2H9.6c-1-1.5-2.1-3.6-2.1-6.2C7.5 4.2 12 2 12 2z"/><circle cx="12" cy="9" r="1.6"/><path d="M8.2 16l-2 4 3.2-1M15.8 16l2 4-3.2-1"/>',
+  };
 
   var faviconCache = {};
   // Render an app icon. When a src exists, render the IMAGE ALONE (no colored
@@ -366,6 +377,11 @@
     if (tab === "deploy") return prose(prof.deploy);
     if (tab === "security") return bullets(prof.security, "#22c55e");
     if (tab === "performance") return bullets(prof.performance, "#eab308");
+    if (tab === "prompt") {
+      if (!prof.prompt) return prose(null, "No icon prompt saved for this app yet.");
+      return '<div class="prompt-block"><button class="prompt-copy" data-act="copy" data-copy="' + esc(prof.prompt) + '">Copy</button>' +
+        '<div class="prompt-text">' + esc(prof.prompt) + "</div></div>";
+    }
     return "";
   }
 
@@ -460,12 +476,16 @@
     if (app.hasScreenshots) h += '<span class="gallery-icon" title="Screenshots">' + camSvg() + "</span>";
     h += "</div></div>";
     if (app.lastChecked) h += '<div class="modal-checked">' + esc(new Date(app.lastChecked).toLocaleString()) + "</div>";
-    // toggle
-    h += '<div class="toggle-row"><span class="toggle-label ' + (app.disabled ? "off" : "on") + '">' + (app.disabled ? "OFF" : "ON") + "</span>" +
-      '<button class="toggle ' + (app.disabled ? "off" : "on") + '" data-act="toggle" data-id="' + esc(app.id) + '" data-name="' + esc(app.name) + '"><span class="toggle-knob" style="left:' + (app.disabled ? 2 : 18) + 'px"></span></button></div>';
+    // toggle row: active-tab title on the left, ON/OFF label + switch grouped on the right
+    var tabLabel = (PROFILE_TABS.filter(function (t) { return t.key === S.modalTab; })[0] || { label: "" }).label;
+    h += '<div class="toggle-row"><span class="modal-tab-title">' + esc(tabLabel) + "</span>" +
+      '<div class="toggle-group"><span class="toggle-label ' + (app.disabled ? "off" : "on") + '">' + (app.disabled ? "OFF" : "ON") + "</span>" +
+      '<button class="toggle ' + (app.disabled ? "off" : "on") + '" data-act="toggle" data-id="' + esc(app.id) + '" data-name="' + esc(app.name) + '"><span class="toggle-knob" style="left:' + (app.disabled ? 2 : 18) + 'px"></span></button></div></div>';
     // tabs
     h += '<div class="tabs">' + PROFILE_TABS.map(function (t) {
-      return '<button class="tab' + (S.modalTab === t.key ? " active" : "") + '" data-act="tab" data-tab="' + t.key + '">' + t.label + "</button>";
+      var active = S.modalTab === t.key;
+      return '<button class="tab tab-icon' + (active ? " active" : "") + '" data-act="tab" data-tab="' + t.key + '" title="' + esc(t.label) + '" aria-label="' + esc(t.label) + '">' +
+        '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (TAB_ICONS[t.key] || "") + "</svg></button>";
     }).join("") + "</div>";
     if (S.modalTab !== "info" && S.modalTab !== "screenshots") h += '<div class="panel">' + panelHTML(S.modalTab, S.profiles[app.id]) + "</div>";
     if (S.modalTab === "info") h += infoRowsHTML(app);
@@ -535,7 +555,10 @@
     var root = document.getElementById("root");
     root.innerHTML = headerHTML(access) + machineTabsHTML() + tableHTML(access) +
       modalHTML() + helpHTML() + portfolioHTML() + lightboxHTML() + toastHTML();
-    // Image fallback: a broken app-icon <img> turns its span back into the letter avatar.
+    fixIconImgs(root);
+  }
+  // A broken app-icon <img> turns its span back into the letter avatar.
+  function fixIconImgs(root) {
     var imgs = root.querySelectorAll(".appicon img");
     for (var i = 0; i < imgs.length; i++) {
       (function (img) {
@@ -543,6 +566,72 @@
         if (img.complete && img.naturalWidth === 0) fallbackAvatar(img.parentNode);
       })(imgs[i]);
     }
+  }
+
+  // ---- Cmd-K command palette (mounted on <body>, outside render() so the input keeps focus) ----
+  var cmdk = { open: false, q: "", i: 0, matches: [] };
+  function cmdkFilter() {
+    var q = cmdk.q.trim().toLowerCase();
+    var apps = S.apps.slice();
+    if (q) {
+      apps = apps.filter(function (a) { return ((a.name || "") + " " + a.id).toLowerCase().indexOf(q) !== -1; })
+        .sort(function (a, b) {
+          var aS = ((a.name || "").toLowerCase().indexOf(q) === 0 || a.id.toLowerCase().indexOf(q) === 0);
+          var bS = ((b.name || "").toLowerCase().indexOf(q) === 0 || b.id.toLowerCase().indexOf(q) === 0);
+          if (aS !== bS) return aS ? -1 : 1;
+          return (a.name || a.id).localeCompare(b.name || b.id);
+        });
+    } else {
+      apps.sort(function (a, b) { return (a.name || a.id).localeCompare(b.name || b.id); });
+    }
+    cmdk.matches = apps.slice(0, 8);
+    if (cmdk.i >= cmdk.matches.length) cmdk.i = Math.max(0, cmdk.matches.length - 1);
+  }
+  function cmdkResultsHTML() {
+    if (!cmdk.matches.length) return '<div class="cmdk-empty">No apps match "' + esc(cmdk.q) + '"</div>';
+    return cmdk.matches.map(function (a, idx) {
+      var c = avatarColor(a.id), active = idx === cmdk.i;
+      return '<div class="cmdk-item' + (active ? " active" : "") + '" data-cmdk-i="' + idx + '"' +
+        (active ? ' style="background:' + c[0] + '26"' : "") + '>' +
+        appIcon(a.id, a.name, a.icon, 40) +
+        '<div class="cmdk-meta"><div class="cmdk-name">' + esc(a.name || a.id) + '</div><div class="cmdk-slug">/' + esc(a.id) + "</div></div>" +
+        (active ? '<span class="cmdk-arrow">→</span>' : "") + "</div>";
+    }).join("");
+  }
+  function renderCmdkResults() {
+    var r = document.getElementById("cmdk-results");
+    if (r) { r.innerHTML = cmdkResultsHTML(); fixIconImgs(r); }
+  }
+  function openCmdK() {
+    if (cmdk.open) return;
+    cmdk.open = true; cmdk.q = ""; cmdk.i = 0; cmdkFilter();
+    var ov = document.createElement("div");
+    ov.className = "cmdk-overlay"; ov.id = "cmdk-overlay";
+    ov.innerHTML =
+      '<div class="cmdk"><div class="cmdk-search">' +
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>' +
+      '<input id="cmdk-input" class="cmdk-input" placeholder="Search apps..." autocomplete="off" spellcheck="false">' +
+      '<span class="cmdk-esc">ESC</span></div>' +
+      '<div class="cmdk-results" id="cmdk-results">' + cmdkResultsHTML() + "</div>" +
+      '<div class="cmdk-footer"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>⌘</kbd><kbd>K</kbd> toggle</span></div></div>';
+    document.body.appendChild(ov);
+    fixIconImgs(ov);
+    ov.addEventListener("click", function (e) {
+      if (e.target === ov) return closeCmdK();
+      var it = e.target.closest("[data-cmdk-i]");
+      if (it) { cmdk.i = +it.getAttribute("data-cmdk-i"); cmdkOpenSelected(); }
+    });
+    var input = document.getElementById("cmdk-input");
+    input.addEventListener("input", function () { cmdk.q = input.value; cmdk.i = 0; cmdkFilter(); renderCmdkResults(); });
+    input.focus();
+  }
+  function closeCmdK() { cmdk.open = false; var ov = document.getElementById("cmdk-overlay"); if (ov) ov.remove(); }
+  function cmdkOpenSelected() { var a = cmdk.matches[cmdk.i]; if (!a) return; closeCmdK(); openModal(a.id); }
+  function cmdkMove(d) {
+    if (!cmdk.matches.length) return;
+    cmdk.i = (cmdk.i + d + cmdk.matches.length) % cmdk.matches.length;
+    renderCmdkResults();
+    var el = document.querySelector(".cmdk-item.active"); if (el) el.scrollIntoView({ block: "nearest" });
   }
 
   // ---- events -----------------------------------------------------------
@@ -575,6 +664,17 @@
     }
   });
   document.addEventListener("keydown", function (e) {
+    // Cmd/Ctrl-K toggles the command palette from anywhere.
+    if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault(); cmdk.open ? closeCmdK() : openCmdK(); return;
+    }
+    if (cmdk.open) {
+      if (e.key === "Escape") { e.preventDefault(); closeCmdK(); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); cmdkMove(1); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); cmdkMove(-1); }
+      else if (e.key === "Enter") { e.preventDefault(); cmdkOpenSelected(); }
+      return; // palette owns the keyboard while open
+    }
     if (e.key === "Escape") {
       if (S.lightboxSrc) { S.lightboxSrc = null; render(); }
       else if (S.portfolioPreview) { S.portfolioPreview = null; render(); }
