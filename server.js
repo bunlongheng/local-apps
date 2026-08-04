@@ -479,6 +479,21 @@ app.get('/api/apps/:id', (req, res) => {
   res.json(a);
 });
 
+// Consistency police: the same artifact matrix /onboard enforces (favicon, stickies
+// icon+registry, tab color+alias, caddy, launch-agent, profile, repo+prod). Backed by
+// scripts/consistency.js so onboard and the dashboard never drift. Optional ?id=<app>.
+app.get('/api/consistency', (req, res) => {
+  try {
+    const id = (req.query.id || '').replace(/[^a-z0-9-]/gi, '');
+    const args = [`${__dirname}/scripts/consistency.js`, '--json'];
+    if (id) args.push(id);
+    const out = execSync(`node ${args.map((a) => `'${a}'`).join(' ')}`, { encoding: 'utf8', timeout: 15000 });
+    res.json(JSON.parse(out));
+  } catch (e) {
+    res.status(500).json({ error: 'consistency check failed', detail: String(e.message || e) });
+  }
+});
+
 // Toggle app disabled state (excludes from auto-restart when disabled)
 app.post('/api/apps/:id/toggle', (req, res) => {
   const a = db.getApp(req.params.id);
