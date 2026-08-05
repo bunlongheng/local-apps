@@ -44,7 +44,8 @@ function apps(oneId) {
 function dbRow(id) {
   try {
     const q = `SELECT COALESCE(about,'') about, COALESCE(features,'') features, ` +
-              `COALESCE(repo,'') repo, COALESCE(prod_url,'') prod ` +
+              `COALESCE(repo,'') repo, COALESCE(prod_url,'') prod, ` +
+              `COALESCE(local_path,'') local_path ` +
               `FROM apps WHERE id='${id.replace(/'/g, "''")}';`;
     const out = execFileSync("sqlite3", ["-json", P.db, q], { encoding: "utf8" }).trim();
     return (out ? JSON.parse(out) : [])[0] || {};
@@ -65,6 +66,11 @@ function checkApp(id) {
   const hasCanon = aliasNames.includes(canonAlias);
   const shortcuts = aliasNames.filter((n) => n !== canonAlias);
 
+  // Vercel app? a deployed app has a .vercel/project.json in its repo. Only Vercel
+  // apps must carry a prod_url in the modal (owner rule 2026-08-05); local-only exempt.
+  const lp = row.local_path || path.join(H, "Sites", id);
+  const isVercel = exists(path.join(lp, ".vercel", "project.json"));
+
   const checks = [
     ["favicon",       exists(path.join(P.favDir, `${id}.png`))],
     ["stickies-icon", exists(path.join(P.saiDir, `${id}.png`))],
@@ -74,7 +80,8 @@ function checkApp(id) {
     ["caddy-host",    new RegExp(`${id}\\.localhost`).test(caddy)],
     ["launch-agent",  exists(path.join(P.laDir, `com.bheng.${id}.plist`))],
     ["profile",       !!(row.about && row.features && row.features !== "[]")],
-    ["repo+prod",     !!(row.repo && row.prod)],
+    ["repo",          !!row.repo],
+    ["prod-url",      !isVercel || !!row.prod],
   ];
   const note = shortcuts.length ? `shortcut alias ${shortcuts.join(",")} - want only ${canonAlias}`
              : (!hasCanon ? `missing alias ${canonAlias}` : "");
