@@ -400,7 +400,7 @@
     if (app.localUrl) rows.push({ label: "Local", value: app.localUrl, url: app.localUrl });
     if (app.lanUrl) rows.push({ label: "LAN", value: app.lanUrl, url: app.lanUrl });
     if (app.tailscaleUrl) rows.push({ label: "Tailscale", value: app.tailscaleUrl, url: app.tailscaleUrl });
-    if (app.prodUrl) rows.push({ label: "Prod", value: app.prodUrl.replace("https://", ""), url: app.prodUrl });
+    if (app.prodUrl) rows.push({ label: "Prod", value: app.prodUrl.replace("https://", ""), url: app.prodUrl, lock: !!app.login });
     if (app.repo) rows.push({ label: "GitHub", value: app.repo.replace("https://github.com/", ""), url: app.repo });
 
     var h = '<div class="info-rows">';
@@ -410,6 +410,7 @@
       h += '<span class="info-value">';
       if (r.url) h += '<a href="' + esc(r.url) + '" target="_blank" rel="noopener" data-stop>' + esc(r.value) + "</a>";
       else h += "<span>" + esc(r.value) + (r.extra || "") + "</span>";
+      if (r.lock) h += ' <span class="lock-badge" title="This deployment requires login">\u{1F512}</span>';
       h += "</span>";
       h += '<button class="copy-btn" data-act="copy" data-copy="' + esc(r.url || r.value) + '" title="Copy">' + copySvg() + "</button></div>";
     });
@@ -478,7 +479,7 @@
     // claude-tab chip (top-right): the app's _alias, its color, click-to-copy the full launch command
     var tc = S.tabColors[app.id];
     if (tc && tc.alias) {
-      var cmd = tc.alias + " && cd ~/Sites/" + app.id + " && claude";
+      var cmd = tc.alias; // the alias already cd's + launches a color-coded claude session
       var fav = app.icon || faviconCache[app.id];
       var chipLogo = fav
         ? '<img class="tab-chip-logo" src="' + esc(fav) + '" alt="">'

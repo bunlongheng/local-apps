@@ -31,6 +31,7 @@ db.exec(`
     launch_agent_path TEXT,
     start_command TEXT DEFAULT 'npm run dev',
     no_screenshot INTEGER DEFAULT 0,
+    login INTEGER DEFAULT 0,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
   )
@@ -38,6 +39,8 @@ db.exec(`
 
 // Migration: add start_command if missing (existing DBs)
 try { db.exec(`ALTER TABLE apps ADD COLUMN start_command TEXT DEFAULT 'npm run dev'`); } catch { /* already exists */ }
+// Migration: add login flag (apps whose prod URL requires a login - shows a lock badge)
+try { db.exec(`ALTER TABLE apps ADD COLUMN login INTEGER DEFAULT 0`); } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE apps ADD COLUMN icon TEXT`); } catch { /* already exists */ }
 
 // Migration: add disabled toggle
@@ -327,6 +330,7 @@ function rowToApp(row) {
     startCommand: row.start_command,
     icon: row.icon,
     noScreenshot: !!row.no_screenshot,
+    login: !!row.login,
     disabled: !!row.disabled,
     about: row.about,
     features: safeParse(row.features),

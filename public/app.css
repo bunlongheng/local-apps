@@ -26,7 +26,11 @@ button { font-family: inherit; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
 
-.main-content { max-width: 1000px; margin: 0 auto; padding: 0 clamp(14px, 4vw, 40px); }
+.main-content { max-width: 1000px; margin: 0 auto; padding:
+  calc(env(safe-area-inset-top) + 8px)
+  max(clamp(14px, 4vw, 40px), env(safe-area-inset-right))
+  env(safe-area-inset-bottom)
+  max(clamp(14px, 4vw, 40px), env(safe-area-inset-left)); }
 
 /* Header */
 .header { padding: 20px 0; border-bottom: 1px solid var(--border); }
@@ -225,3 +229,5 @@ a.badge-link { text-decoration: none; display: inline-flex; align-items: center;
 
 @media (max-width: 1024px) { .col-hostname { display: none; } }
 @media (max-width: 768px) { .col-lan, .header-device-icon { display: none; } }
+
+.lock-badge { font-size: 0.85em; opacity: 0.9; margin-left: 2px; cursor: help; }
