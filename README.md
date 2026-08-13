@@ -5,10 +5,10 @@ A self-healing dashboard for a fleet of local dev apps. Register an app and it a
 ![Local Apps dashboard](docs/screenshots/dashboard.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
-![React](https://img.shields.io/badge/React-19-149eca?logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript)
+![Node.js](https://img.shields.io/badge/Node.js-Express-339933?logo=node.js&logoColor=white)
+![Express](https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-better--sqlite3-003b57?logo=sqlite)
+![Playwright](https://img.shields.io/badge/Playwright-screenshots-2ead33?logo=playwright)
 ![Tests](https://img.shields.io/badge/tests-node%3Atest-6da55f?logo=node.js)
 
 ## Contents
@@ -36,7 +36,7 @@ A self-healing dashboard for a fleet of local dev apps. Register an app and it a
 
 ## Architecture
 
-Two processes: a Next.js dashboard for the UI and an Express control API that owns all OS orchestration, backed by SQLite. The dashboard is the only thing on the network - it proxies to the control API, which binds to localhost.
+One Node.js service: an Express server (`server.js`) that serves the static vanilla-JS dashboard and owns the control API and all OS orchestration, backed by SQLite. There is no separate frontend and no build step - the browser loads `public/` and talks to the same-origin `/api/*` routes on `:9875`.
 
 ```mermaid
 flowchart LR
@@ -49,8 +49,8 @@ flowchart LR
 
 | Layer | Role |
 |-------|------|
-| `app/` (Next.js) | Dashboard, gallery, docs, loops, routines - a thin client over the API |
-| `server.js` (Express) | Control plane: REST + SSE, provisioning, health loop |
+| `public/` (vanilla JS) | Dashboard, gallery, docs, loops, routines - a same-origin client over the API |
+| `server.js` (Express) | Control plane + static UI host: REST + SSE, provisioning, health loop |
 | `db.js` (SQLite) | Data layer - apps, machines, profiles; fully parameterized |
 | `lib/` | Focused, tested modules: `validate`, `caddy`, `launchd`, `health` |
 | `scripts/` | Screenshots, crawlers, icon generation, ops automations |
@@ -75,8 +75,8 @@ sequenceDiagram
 
 ## Tech stack
 
-- **Next.js 16** + **React 19** + **TypeScript** (strict) - dashboard UI
-- **Express 4** - the control-plane API (`server.js`)
+- **Node.js + Express 4** - one service (`server.js`) that serves the dashboard UI and the REST + SSE control API on `:9875`
+- **Vanilla JS** (`public/app.js`) - the dashboard is a same-origin client; no framework, no build step
 - **better-sqlite3** - embedded, synchronous SQLite via `db.js`
 - **Playwright** + **Sharp** - screenshots and image processing
 - **Caddy** - per-app `*.localhost` reverse proxies (host tool)
@@ -122,19 +122,19 @@ See `.env.example`. Role can also be set in `machine-role.json`.
 ## Project layout
 
 ```
-app/            Next.js dashboard (status, gallery, docs, loops, routines)
-components/     Shared React components
-server.js       Express control API: REST + SSE, provisioning, health loop
+server.js       Express control API + static UI host: REST + SSE, provisioning, health loop
 db.js           SQLite data layer (better-sqlite3)
+public/         Vanilla-JS dashboard (app.js), static assets, screenshot gallery
 lib/
   validate.js   Input validation + escaping
   caddy.js      Caddyfile reverse-proxy management
   launchd.js    macOS LaunchAgent create/remove
   health.js     Health-check primitives (state, tcp/process check)
+  api.ts        Shared API type definitions
 launchctl-cmds.js, launchd-parse.js   launchctl helpers
 scripts/        Screenshots, crawlers, icon generation, ops automations
 tests/          unit/ (helpers) + e2e/ (route guards)
-public/         Static assets, gallery
+docs/           Screenshots used by this README
 Dockerfile      Dashboard + API in agent mode
 ```
 
