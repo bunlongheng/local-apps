@@ -428,6 +428,7 @@ app.get('/api/status', (req, res) => {
       icon: a.icon || null,
       repo: a.repo || null,
       prodUrl: a.prodUrl || null,
+      prodUrl2: a.prodUrl2 || null,
       localPath: a.localPath || null,
       logPath: a.logPath || null,
       disabled: a.disabled || false,

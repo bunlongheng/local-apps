@@ -50,6 +50,22 @@ try { db.exec(`ALTER TABLE apps ADD COLUMN disabled INTEGER DEFAULT 0`); } catch
 try { db.exec(`ALTER TABLE apps ADD COLUMN tab_color TEXT`); } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE apps ADD COLUMN tab_icon TEXT`); } catch { /* already exists */ }
 
+// Migration: add a second prod URL (some apps have both a Vercel deploy and a custom domain)
+try { db.exec(`ALTER TABLE apps ADD COLUMN prod_url2 TEXT`); } catch { /* already exists */ }
+// Backfill prod_url2 from apps.config.json for existing rows still missing it.
+if (fs.existsSync(CONFIG_FILE)) {
+  try {
+    const cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    const setProdUrl2 = db.prepare(`UPDATE apps SET prod_url2 = @prodUrl2 WHERE id = @id AND prod_url2 IS NULL`);
+    const txProd2 = db.transaction((rows) => {
+      for (const a of rows) {
+        if (a.prodUrl2) setProdUrl2.run({ id: a.id, prodUrl2: a.prodUrl2 });
+      }
+    });
+    txProd2(cfg);
+  } catch { /* config unreadable - skip backfill */ }
+}
+
 // Migration: add app-profile columns
 const profileColumns = [
   ['about', 'TEXT'],
@@ -322,6 +338,7 @@ function rowToApp(row) {
     processCheck: row.process_check,
     caddyUrl: row.caddy_url,
     prodUrl: row.prod_url,
+    prodUrl2: row.prod_url2,
     localPath: row.local_path,
     logPath: row.log_path,
     repo: row.repo,
@@ -362,7 +379,7 @@ function upsertApp(data) {
     const params = { id: data.id };
     const map = {
       name: 'name', healthUrl: 'health_url', localUrl: 'local_url',
-      processCheck: 'process_check', caddyUrl: 'caddy_url', prodUrl: 'prod_url',
+      processCheck: 'process_check', caddyUrl: 'caddy_url', prodUrl: 'prod_url', prodUrl2: 'prod_url2',
       localPath: 'local_path', logPath: 'log_path', repo: 'repo',
       launchAgent: 'launch_agent', launchAgentPath: 'launch_agent_path',
       startCommand: 'start_command', icon: 'icon', noScreenshot: 'no_screenshot',

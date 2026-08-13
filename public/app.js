@@ -395,12 +395,13 @@
           ? '<button class="mini-btn start" data-act="start" data-id="' + esc(app.id) + '"' + (isStarting ? " disabled" : "") + '>' + (isStarting ? '<span class="spin-dot"></span> Starting' : "Start") + "</button>"
           : '<button class="mini-btn stop" data-act="stop" data-id="' + esc(app.id) + '">Stop</button>';
       }
-      rows.push({ label: "Host", value: host, extra: extra });
+      rows.push({ label: "Host", value: host, extra: extra, url: app.caddyUrl || ("http://" + host) });
     }
     if (app.localUrl) rows.push({ label: "Local", value: app.localUrl, url: app.localUrl });
     if (app.lanUrl) rows.push({ label: "LAN", value: app.lanUrl, url: app.lanUrl });
     if (app.tailscaleUrl) rows.push({ label: "Tailscale", value: app.tailscaleUrl, url: app.tailscaleUrl });
     if (app.prodUrl) rows.push({ label: "Prod", value: app.prodUrl.replace("https://", ""), url: app.prodUrl, lock: !!app.login });
+    if (app.prodUrl2) rows.push({ label: "Prod", value: app.prodUrl2.replace("https://", ""), url: app.prodUrl2, lock: !!app.login });
     if (app.repo) rows.push({ label: "GitHub", value: app.repo.replace("https://github.com/", ""), url: app.repo });
 
     var h = '<div class="info-rows">';
@@ -408,7 +409,7 @@
       var emoji = ROW_EMOJI[r.label] || "";
       h += '<div class="info-row"><span class="info-label">' + (emoji ? emoji + " " : "") + esc(r.label) + "</span>";
       h += '<span class="info-value">';
-      if (r.url) h += '<a href="' + esc(r.url) + '" target="_blank" rel="noopener" data-stop>' + esc(r.value) + "</a>";
+      if (r.url) h += '<a href="' + esc(r.url) + '" target="_blank" rel="noopener" data-stop>' + esc(r.value) + "</a>" + (r.extra || "");
       else h += "<span>" + esc(r.value) + (r.extra || "") + "</span>";
       if (r.lock) h += ' <span class="lock-badge" title="This deployment requires login">\u{1F512}</span>';
       h += "</span>";
