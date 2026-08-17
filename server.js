@@ -222,7 +222,10 @@ function getLanIp() {
   }
   return 'N/A';
 }
-const LAN_IP = getLanIp();
+let LAN_IP = getLanIp();
+// Boot can happen (via launchd KeepAlive) before the LAN interface is up, freezing
+// LAN_IP at 'N/A'. Refresh on an interval like TAILSCALE_IP so it self-heals.
+setInterval(() => { LAN_IP = getLanIp(); }, 60000);
 
 // --- Tailscale IP detection (cached; refreshed on an interval, not per request) ---
 function getTailscaleIp() {
