@@ -237,7 +237,7 @@
     }).catch(function () {});
   }
   function deleteApp(id, name) {
-    if (!confirm('Delete "' + name + '" and all its data? This removes:\n- Database entry\n- LaunchAgent\n- Caddy proxy\n- Screenshots\n- Kills running process\n\nThis cannot be undone.')) return;
+    if (!confirm('Delete "' + name + '" and all its data? This removes:\n- Database entry\n- LaunchAgent\n- Caddy proxy\n- Kills running process\n\nThis cannot be undone.')) return;
     api("/api/apps/" + id, { method: "DELETE" }).then(function () {
       S.apps = S.apps.filter(function (a) { return a.id !== id; }); S.modalApp = null; toast(name + " deleted", 3000); render();
     }, function () { toast("Delete failed", 3000); });
@@ -260,7 +260,6 @@
       '<rect x="13" y="16.5" width="2.5" height="2.5" fill="white"/><rect x="16.5" y="16.5" width="2.5" height="2.5" fill="white"/></svg>';
   }
   function copySvg() { return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'; }
-  function camSvg() { return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'; }
 
   function dotClass(app) { return app.disabled ? "disabled" : app.status === "up" ? "up" : "starting-up"; }
 
@@ -427,7 +426,6 @@
       var span = '<span class="badge' + (b.active ? " active" : "") + '" title="' + esc(b.title) + '">' + b.label + "</span>";
       return b.href ? '<a class="badge-link" href="' + esc(b.href) + '" target="_blank" rel="noopener" data-stop>' + span + "</a>" : span;
     }).join("") + "</div>";
-    if (app.hasScreenshots) h += '<span class="gallery-icon" title="Screenshots">' + camSvg() + "</span>";
     h += "</div>"; // close modal-head-inner
     // claude-tab chip (top-right): the app's _alias, its color, click-to-copy the full launch command
     var tc = S.tabColors[app.id];
@@ -462,7 +460,7 @@
     return h;
   }
 
-  var HELP_TEXT = "Register this app with the local-apps monitor.\nInclude ALL fields so the modal is fully populated.\n\nPOST http://local-apps.localhost/api/apps\nContent-Type: application/json\n\nRequired:\n- \"id\": app slug (lowercase, kebab-case)\n- \"name\": display name\n- \"localPath\": absolute path to project root\n\nInfrastructure (auto-generated if omitted):\n- \"localUrl\": defaults to next available port\n- \"healthUrl\": defaults to localUrl\n- \"repo\": GitHub URL\n- \"startCommand\": defaults to \"npm run dev\"\n- \"logPath\": defaults to /tmp/{id}.log\n- \"prodUrl\": production URL\n- \"noScreenshot\": skip screenshots (boolean)\n\nApp Profile (AI should generate these):\n- \"about\": one compelling sentence describing the app\n- \"features\": JSON array of 3-5 top features\n- \"architect\": paragraph on tech stack and architecture\n- \"deploy\": paragraph on how to deploy and run\n- \"security\": JSON array of 3-4 security measures\n- \"performance\": JSON array of 3-4 performance optimizations\n\nThe monitor will automatically:\n1. Assign a dedicated port if not provided\n2. Create a Caddy reverse proxy at http://{id}.localhost\n3. Create a macOS LaunchAgent plist\n4. Begin health-checking\n5. Show the app on the dashboard with its full profile";
+  var HELP_TEXT = "Register this app with the local-apps monitor.\nInclude ALL fields so the modal is fully populated.\n\nPOST http://local-apps.localhost/api/apps\nContent-Type: application/json\n\nRequired:\n- \"id\": app slug (lowercase, kebab-case)\n- \"name\": display name\n- \"localPath\": absolute path to project root\n\nInfrastructure (auto-generated if omitted):\n- \"localUrl\": defaults to next available port\n- \"healthUrl\": defaults to localUrl\n- \"repo\": GitHub URL\n- \"startCommand\": defaults to \"npm run dev\"\n- \"logPath\": defaults to /tmp/{id}.log\n- \"prodUrl\": production URL\n\nApp Profile (AI should generate these):\n- \"about\": one compelling sentence describing the app\n- \"features\": JSON array of 3-5 top features\n- \"architect\": paragraph on tech stack and architecture\n- \"deploy\": paragraph on how to deploy and run\n- \"security\": JSON array of 3-4 security measures\n- \"performance\": JSON array of 3-4 performance optimizations\n\nThe monitor will automatically:\n1. Assign a dedicated port if not provided\n2. Create a Caddy reverse proxy at http://{id}.localhost\n3. Create a macOS LaunchAgent plist\n4. Begin health-checking\n5. Show the app on the dashboard with its full profile";
 
   function helpHTML() {
     if (!S.helpOpen) return "";

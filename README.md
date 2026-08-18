@@ -28,7 +28,6 @@ A self-healing dashboard for a fleet of local dev apps. Register an app and it a
 - **Zero-config onboarding** - `POST /api/apps` with an id and it auto-assigns a free port, writes a Caddy reverse proxy at `<id>.localhost`, and creates a macOS LaunchAgent.
 - **Self-healing** - a 30s async health loop marks apps up/down; a down app is restarted via `launchctl`, with a bootstrap fallback and cache-corruption recovery.
 - **AI auto-fix (optional)** - when a restart does not stick, it can hand the failure to a Claude Code agent to diagnose and fix.
-- **Screenshots + gallery** - Playwright captures desktop and mobile framed shots into a browsable gallery.
 - **Multi-machine** - a hub runs the bots; agent machines report status only. Sync app lists across machines on the LAN.
 - **API + Swagger** - a documented REST + SSE control API.
 
@@ -47,11 +46,11 @@ flowchart LR
 
 | Layer | Role |
 |-------|------|
-| `public/` (vanilla JS) | Dashboard, gallery, docs, loops, routines - a same-origin client over the API |
+| `public/` (vanilla JS) | Dashboard - a same-origin client over the API |
 | `server.js` (Express) | Control plane + static UI host: REST + SSE, provisioning, health loop |
 | `db.js` (SQLite) | Data layer - apps, machines, profiles; fully parameterized |
 | `lib/` | Focused, tested modules: `validate`, `caddy`, `launchd`, `health` |
-| `scripts/` | Screenshots, crawlers, icon generation, ops automations |
+| `scripts/` | Icon generation, onboarding, ops automations |
 
 ## How a health check works
 
@@ -129,7 +128,7 @@ lib/
   health.js     Health-check primitives (state, tcp/process check)
   api.ts        Shared API type definitions
 launchctl-cmds.js, launchd-parse.js   launchctl helpers
-scripts/        Screenshots, crawlers, icon generation, ops automations
+scripts/        Icon generation, onboarding, ops automations
 tests/          unit/ (helpers) + e2e/ (route guards)
 docs/           Screenshots used by this README
 Dockerfile      Dashboard + API in agent mode

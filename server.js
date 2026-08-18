@@ -177,26 +177,6 @@ function teardownInfra(id) {
   removeCaddyEntry(id);
   removeLaunchAgent(id);
 
-  // Clean up screenshots
-  const ssDir = path.join(__dirname, 'public', 'screenshots', id);
-  if (fs.existsSync(ssDir)) {
-    fs.rmSync(ssDir, { recursive: true, force: true });
-    console.log(`  🗑 screenshots: ${id}`);
-  }
-
-  // Remove from gallery index
-  const idxPath = path.join(__dirname, 'public', 'screenshots', 'index.json');
-  if (fs.existsSync(idxPath)) {
-    try {
-      const idx = JSON.parse(fs.readFileSync(idxPath, 'utf8'));
-      const filtered = idx.filter(a => a.id !== id);
-      if (filtered.length !== idx.length) {
-        fs.writeFileSync(idxPath, JSON.stringify(filtered, null, 2));
-        console.log(`  🗑 gallery index: ${id}`);
-      }
-    } catch {}
-  }
-
   // Kill any running process
   try {
     const app = db.getApp ? db.getApp(id) : null;
@@ -256,7 +236,7 @@ const MACHINE_MODEL = (() => {
   return null;
 })();
 
-// --- HTTP client (used across peer sync, health checks, screenshots) ---
+// --- HTTP client (used across peer sync + health checks) ---
 const http = require('http');
 
 // --- SSE clients ---
@@ -397,7 +377,6 @@ async function checkAll() {
 }
 
 // --- Status route (dashboard) ---
-const screenshotCache = {};
 
 app.get('/api/status', (req, res) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -423,7 +402,6 @@ app.get('/api/status', (req, res) => {
       logPath: a.logPath || null,
       disabled: a.disabled || false,
       hostname: os.hostname(),
-      hasScreenshots: screenshotCache[a.id] || false,
       tabColor: a.tabColor || null,
       tabIcon: a.tabIcon || null,
     };
