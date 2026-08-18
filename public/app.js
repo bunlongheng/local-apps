@@ -53,16 +53,15 @@
   function stripProto(u) { return String(u || "").replace(/^https?:\/\//, ""); }
   function getPort(url) { try { return new URL(url).port || null; } catch (e) { return null; } }
 
-  var ROW_EMOJI = { Host: "\u{1F50C}", Local: "\u{1F310}", LAN: "\u{1F4E1}", Tailscale: "\u{1F517}", Caddy: "\u{1F3E0}", Prod: "\u{1F680}", GitHub: "\u{1F419}", Screenshots: "\u{1F4F8}" };
+  var ROW_EMOJI = { Host: "\u{1F50C}", Local: "\u{1F310}", LAN: "\u{1F4E1}", Tailscale: "\u{1F517}", Caddy: "\u{1F3E0}", Prod: "\u{1F680}", GitHub: "\u{1F419}" };
   var PROFILE_TABS = [
-    { key: "info", label: "Info" }, { key: "screenshots", label: "Screenshots" }, { key: "about", label: "About" },
+    { key: "info", label: "Info" }, { key: "about", label: "About" },
     { key: "architect", label: "Architect" }, { key: "security", label: "Security" },
     { key: "performance", label: "Performance" }, { key: "prompt", label: "Prompt" }, { key: "deploy", label: "Deploy" },
   ];
   // Compact icon per tab (Feather-style, drawn with currentColor). Label stays as the tooltip.
   var TAB_ICONS = {
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11.5v4.5"/><path d="M12 7.6h.01"/>',
-    screenshots: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="3.5"/>',
     about: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h6"/>',
     architect: '<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>',
     security: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
@@ -104,9 +103,7 @@
     profiles: {}, capabilities: {}, iconSync: {}, tabColors: {},
     startingApps: {}, startupState: {}, startTimes: {},
     modalApp: null, modalTab: "info", logLines: [], logLoading: false,
-    screenshots: null, screenshotsLoading: false, capturing: false,
-    qrData: null, qrOpen: false, helpOpen: false, lightboxSrc: null,
-    portfolioPreview: null, portfolioLoading: false, portfolioPreviewLoading: false,
+    qrData: null, qrOpen: false, helpOpen: false,
   };
   var startPolls = {}, toastTimer = null, sse = null;
 
@@ -186,7 +183,6 @@
           render();
         }
         if (msg.type === "reload") load();
-        if (msg.type === "screenshots_done" && S.modalApp && S.modalApp.id === msg.id) loadScreenshots(msg.id);
       };
       es.onerror = function () { es.close(); setTimeout(connect, 3000); };
     }
@@ -200,20 +196,12 @@
   }
   function scrollLog() { setTimeout(function () { var el = document.getElementById("logBody"); if (el) el.scrollTop = el.scrollHeight; }, 50); }
 
-  function loadScreenshots(id) {
-    S.screenshotsLoading = true; render();
-    Promise.all([api("/api/screenshots/" + id), api("/api/screenshots-status").catch(function () { return {}; })])
-      .then(function (r) { S.screenshots = r[0]; S.capturing = !!r[1][id]; S.screenshotsLoading = false; render(); },
-        function () { S.screenshots = null; S.screenshotsLoading = false; render(); });
-  }
-
   // ---- actions ----------------------------------------------------------
   function openModal(id) {
     var app = S.apps.filter(function (a) { return a.id === id; })[0]; if (!app) return;
     S.modalApp = app; S.modalTab = "info"; S.logLines = [];
     render();
     if (app.status === "down" && app.logPath) loadLog(id);
-    if (!S.activeMachine) loadScreenshots(id);
   }
   function closeModal() { S.modalApp = null; render(); }
 
@@ -253,28 +241,6 @@
     api("/api/apps/" + id, { method: "DELETE" }).then(function () {
       S.apps = S.apps.filter(function (a) { return a.id !== id; }); S.modalApp = null; toast(name + " deleted", 3000); render();
     }, function () { toast("Delete failed", 3000); });
-  }
-  function capture(id) {
-    S.capturing = true; render();
-    api("/api/screenshots/" + id, { method: "POST" }).then(function () {
-      var poll = setInterval(function () {
-        api("/api/screenshots-status").then(function (s) {
-          if (!s[id]) { clearInterval(poll); S.capturing = false; toast("Screenshots captured", 3000); loadScreenshots(id); }
-        }).catch(function () {});
-      }, 3000);
-    }, function () { S.capturing = false; toast("Capture failed", 3000); });
-  }
-  function addToPortfolio(id) {
-    S.portfolioPreviewLoading = true; render();
-    api("/api/portfolio/preview?appId=" + encodeURIComponent(id)).then(function (d) { S.portfolioPreview = d; },
-      function () { toast("Preview failed", 3000); }).then(function () { S.portfolioPreviewLoading = false; render(); });
-  }
-  function confirmPortfolio() {
-    if (!S.portfolioPreview) return;
-    S.portfolioLoading = true; render();
-    api("/api/portfolio", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appId: S.portfolioPreview.slug }) })
-      .then(function (d) { toast("Added to portfolio (" + d.images + " images)", 3000); }, function () { toast("Portfolio failed", 3000); })
-      .then(function () { S.portfolioLoading = false; S.portfolioPreview = null; render(); });
   }
   function toggleQR() {
     if (S.qrOpen) { S.qrOpen = false; render(); return; }
@@ -441,28 +407,6 @@
     return h;
   }
 
-  function screenshotsTabHTML(app) {
-    var ss = S.screenshots, has = ss && (ss.desktop && ss.desktop.length || ss.mobile && ss.mobile.length || ss.screenshots && ss.screenshots.length);
-    var h = '<div style="margin-top:4px"><div class="shots-head"><span class="shots-title">Screenshots' +
-      (ss && ss.screenshots && ss.screenshots.length ? " (" + ss.screenshots.length + ")" : "") +
-      (ss && ss.capturedAt ? " · " + esc(new Date(ss.capturedAt).toLocaleString()) : "") + "</span>";
-    h += '<div class="shots-actions">';
-    h += '<button class="shot-btn portfolio" data-act="portfolio" data-id="' + esc(app.id) + '"' + (S.portfolioPreviewLoading || !has ? " disabled" : "") + '>' + (S.portfolioPreviewLoading ? "Loading..." : "Add to Portfolio") + "</button>";
-    h += '<button class="shot-btn capture" data-act="capture" data-id="' + esc(app.id) + '"' + (S.capturing ? " disabled" : "") + '>' + (S.capturing ? "Running..." : "Capture") + "</button>";
-    h += "</div></div>";
-    if (S.screenshotsLoading) h += '<div style="color:var(--muted);font-size:11px;margin-top:10px;text-align:center;padding:20px 0">Loading screenshots...</div>';
-    else if (ss && ss.screenshots && ss.screenshots.length) {
-      h += '<div class="shots-grid">';
-      ss.screenshots.forEach(function (file) {
-        var src = "/screenshots/" + app.id + "/" + file;
-        var label = file.replace(".png", "").replace(/^\d+-/, "").replace(/-/g, " ");
-        h += '<div class="shot"><img src="' + esc(src) + '" alt="' + esc(label) + '" loading="lazy" data-act="lightbox" data-src="' + esc(src) + '"><div class="label">' + esc(label) + "</div></div>";
-      });
-      h += "</div>";
-    } else h += '<div style="color:var(--muted);font-size:11px;margin-top:10px;text-align:center;padding:20px 0">No screenshots yet - click Capture to generate</div>';
-    return h + "</div>";
-  }
-
   function modalHTML() {
     var app = S.modalApp; if (!app) return "";
     var caps = S.capabilities[app.id] || {}, sync = S.iconSync[app.id];
@@ -509,10 +453,11 @@
       return '<button class="tab tab-icon' + (active ? " active" : "") + '" data-act="tab" data-tab="' + t.key + '" title="' + esc(t.label) + '" aria-label="' + esc(t.label) + '">' +
         '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (TAB_ICONS[t.key] || "") + "</svg></button>";
     }).join("") + "</div>";
-    if (S.modalTab !== "info" && S.modalTab !== "screenshots") h += '<div class="panel">' + panelHTML(S.modalTab, S.profiles[app.id]) + "</div>";
-    if (S.modalTab === "info") h += infoRowsHTML(app);
-    if (S.modalTab === "screenshots" && !S.activeMachine) h += screenshotsTabHTML(app);
-    if (S.modalTab === "screenshots") h += '<div class="danger-zone"><button class="danger-btn" data-act="delete" data-id="' + esc(app.id) + '" data-name="' + esc(app.name) + '">Delete App</button></div>';
+    if (S.modalTab !== "info") h += '<div class="panel">' + panelHTML(S.modalTab, S.profiles[app.id]) + "</div>";
+    if (S.modalTab === "info") {
+      h += infoRowsHTML(app);
+      h += '<div class="danger-zone"><button class="danger-btn" data-act="delete" data-id="' + esc(app.id) + '" data-name="' + esc(app.name) + '">Delete App</button></div>';
+    }
     h += "</div></div>";
     return h;
   }
@@ -527,56 +472,13 @@
       '<div class="help-block">' + esc(HELP_TEXT) + "</div></div></div>";
   }
 
-  function portfolioHTML() {
-    var p = S.portfolioPreview; if (!p) return "";
-    var TAG_COLORS = { "Next.js": "#0070f3", "React": "#61dafb", "TypeScript": "#3178c6", "Tailwind": "#38bdf8", "Supabase": "#3ecf8e", "Node.js": "#68a063", "Express": "#ffffff", "SQLite": "#003b57", "Electron": "#9feaf9", "Vite": "#646cff", "Python": "#3776ab", "Rust": "#dea584" };
-    var h = '<div class="overlay" style="background:rgba(0,0,0,.8);z-index:350" data-act="overlay-portfolio"><div class="modal" style="width:780px;padding:0">';
-    h += '<div style="padding:20px 24px 16px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between">' +
-      '<div style="display:flex;align-items:center;gap:10px">' + (p.icon ? '<img src="' + esc(p.icon) + '" width="28" height="28" alt="" style="border-radius:6px">' : "") +
-      '<span style="font-size:16px;font-weight:700;color:#fff">' + esc(p.title) + "</span>" +
-      '<span style="font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px;background:rgba(59,130,246,.15);color:rgba(59,130,246,.9);text-transform:capitalize">' + esc(p.type) + "</span></div>" +
-      '<button class="modal-close" style="position:static" data-act="portfolio-cancel">✕</button></div>';
-    h += '<div style="display:flex">';
-    h += '<div style="flex:1 1 55%;padding:20px;border-right:1px solid rgba(255,255,255,.06)"><div style="font-size:10px;font-weight:600;color:var(--muted);margin-bottom:10px">Screenshots (' + p.screenshots.length + ")</div>";
-    if (p.screenshots.length) {
-      h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">';
-      p.screenshots.forEach(function (s) {
-        var label = s.name.replace(".png", "").replace(/^\d+-/, "").replace(/-/g, " ");
-        h += '<div><img src="' + esc(s.path) + '" alt="' + esc(label) + '" loading="lazy" style="width:100%;aspect-ratio:' + (s.type === "mobile-framed" ? "9/16" : "16/9") + ';object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:#000">' +
-          '<div style="font-size:8px;color:var(--muted);margin-top:3px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (s.type === "mobile-framed" ? "M" : "D") + " - " + esc(label) + "</div></div>";
-      });
-      h += "</div>";
-    } else h += '<div style="color:var(--muted);font-size:11px;text-align:center;padding:30px 0">No framed screenshots</div>';
-    h += "</div>";
-    h += '<div style="flex:1 1 45%;padding:20px;display:flex;flex-direction:column;gap:14px">';
-    h += '<div><div style="font-size:10px;font-weight:600;color:var(--muted);margin-bottom:6px">Tags</div><div style="display:flex;flex-wrap:wrap;gap:4px">';
-    if (p.tags.length) p.tags.forEach(function (tag) {
-      var c = TAG_COLORS[tag] || "#a78bfa";
-      h += '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:' + c + '20;color:' + c + ';border:1px solid ' + c + '30">' + esc(tag) + "</span>";
-    }); else h += '<span style="font-size:10px;color:var(--muted)">No tags detected</span>';
-    h += "</div></div>";
-    h += '<div><div style="font-size:10px;font-weight:600;color:var(--muted);margin-bottom:6px">Description</div><div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:10px 12px;font-size:11px;color:rgba(255,255,255,.7);line-height:1.5">' +
-      p.description.map(function (line, i) { return '<div style="margin-bottom:' + (i === 0 ? 8 : 2) + 'px">' + (i === 0 ? esc(line) : "• " + esc(line)) + "</div>"; }).join("") + "</div></div>";
-    if (p.url) h += '<div><div style="font-size:10px;font-weight:600;color:var(--muted);margin-bottom:6px">Production URL</div><a href="' + esc(p.url) + '" target="_blank" rel="noopener" data-stop style="font-size:11px;color:var(--accent)">' + esc(p.url) + "</a></div>";
-    h += '<div><div style="font-size:10px;font-weight:600;color:var(--muted);margin-bottom:6px">Slug</div><span style="font-size:11px;color:rgba(255,255,255,.5)">' + esc(p.slug) + "</span></div>";
-    h += "</div></div>";
-    h += '<div style="padding:16px 24px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:flex-end;gap:10px">' +
-      '<button class="mini-btn" style="border:1px solid rgba(255,255,255,.15);color:var(--muted);font-size:12px;font-weight:600;padding:8px 20px;border-radius:6px;margin:0" data-act="portfolio-cancel">Cancel</button>' +
-      '<button style="background:rgba(59,130,246,.9);border:none;color:#fff;font-size:12px;font-weight:600;padding:8px 20px;border-radius:6px;cursor:pointer' + (S.portfolioLoading ? ";opacity:.6" : "") + '" data-act="portfolio-confirm"' + (S.portfolioLoading ? " disabled" : "") + ">" + (S.portfolioLoading ? "Uploading..." : "Confirm & Post") + "</button></div>";
-    return h + "</div></div>";
-  }
-
-  function lightboxHTML() {
-    if (!S.lightboxSrc) return "";
-    return '<div class="lightbox" data-act="lightbox-close"><img src="' + esc(S.lightboxSrc) + '" alt=""></div>';
-  }
   function toastHTML() { return '<div class="toast' + (S.toast ? " show" : "") + '">' + esc(S.toast || "Copied") + "</div>"; }
 
   function render() {
     var access = detectAccessMode();
     var root = document.getElementById("root");
     root.innerHTML = headerHTML(access) + machineTabsHTML() + tableHTML(access) +
-      modalHTML() + helpHTML() + portfolioHTML() + lightboxHTML() + toastHTML();
+      modalHTML() + helpHTML() + toastHTML();
     fixIconImgs(root);
   }
   // A broken app-icon <img> turns its span back into the letter avatar.
@@ -673,16 +575,10 @@
       case "stop": stopApp(id); break;
       case "toggle": toggleApp(id, name); break;
       case "delete": deleteApp(id, name); break;
-      case "capture": capture(id); break;
-      case "portfolio": addToPortfolio(id); break;
-      case "portfolio-confirm": confirmPortfolio(); break;
-      case "portfolio-cancel": case "overlay-portfolio": if (act === "portfolio-cancel" || e.target === el) { S.portfolioPreview = null; render(); } break;
       case "copy": copy(el.getAttribute("data-copy")); break;
       case "help": S.helpOpen = true; render(); break;
       case "help-close": case "overlay-help": if (act === "help-close" || e.target === el) { S.helpOpen = false; render(); } break;
       case "qr": e.stopPropagation(); toggleQR(); break;
-      case "lightbox": e.stopPropagation(); S.lightboxSrc = el.getAttribute("data-src"); render(); break;
-      case "lightbox-close": S.lightboxSrc = null; render(); break;
     }
   });
   document.addEventListener("keydown", function (e) {
@@ -698,9 +594,7 @@
       return; // palette owns the keyboard while open
     }
     if (e.key === "Escape") {
-      if (S.lightboxSrc) { S.lightboxSrc = null; render(); }
-      else if (S.portfolioPreview) { S.portfolioPreview = null; render(); }
-      else if (S.helpOpen) { S.helpOpen = false; render(); }
+      if (S.helpOpen) { S.helpOpen = false; render(); }
       else if (S.modalApp) closeModal();
     }
     if ((e.key === "Enter" || e.key === " ") && document.activeElement && document.activeElement.matches("tr[data-act=open]")) {

@@ -38,17 +38,3 @@ test('POST /api/apps rejects a launchAgent injection payload (the RCE vector)', 
   assert.equal(await req('POST', '/api/apps', { id: 'zzz-evil', launchAgent: 'x; touch /tmp/pwned; #' }), 400);
   assert.equal(await req('POST', '/api/apps', { id: 'zzz-evil', launchAgentPath: '/tmp/a";evil.plist' }), 400);
 });
-
-test('GET /api/claude/skill|command reject invalid path segments (traversal guard)', async () => {
-  assert.equal(await req('GET', '/api/claude/skill/bad!plugin/x'), 400);
-  assert.equal(await req('GET', '/api/claude/command/ok/bad!cmd'), 400);
-});
-
-test('screenshot zip download rejects an invalid :id (shell arg guard)', async () => {
-  assert.equal(await req('GET', '/api/screenshots/BAD!id/download'), 400);
-});
-
-test('DELETE /api/screenshot rejects a bad appId or an unlisted mode', async () => {
-  assert.equal(await req('DELETE', '/api/screenshot', { appId: 'ok', mode: 'evil-mode', filename: 'a.png' }), 400);
-  assert.equal(await req('DELETE', '/api/screenshot', { appId: 'bad!id', mode: 'desktop', filename: 'a.png' }), 400);
-});

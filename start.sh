@@ -1,7 +1,9 @@
 #!/bin/bash
 cd "$(dirname "$0")"
-# Load nvm's node if present (falls back to whatever node is on PATH otherwise)
+# Load nvm and select Node 22 - matches CI and the better-sqlite3 prebuilt ABI (running an
+# older node here breaks the native module: ERR_DLOPEN_FAILED). Falls back to PATH node.
 [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh" >/dev/null 2>&1
+nvm use 22 >/dev/null 2>&1 || true
 
 # Single service: Express serves the dashboard UI (public/) AND the control API on :9875.
 # No Next.js, no build step. launchd KeepAlive is the watchdog - if node exits, it respawns.

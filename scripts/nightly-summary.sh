@@ -38,17 +38,6 @@ if [ -f /tmp/nightly-tests-summary.json ]; then
   REPORT="$REPORT## Tests\n$TESTS\n\n"
 fi
 
-# Screenshots
-if [ -f /tmp/nightly-screenshots.log ]; then
-  SS_LINE=$(grep "All done" /tmp/nightly-screenshots.log | tail -1)
-  REPORT="$REPORT## Screenshots\n${SS_LINE:-Completed}\n\n"
-fi
-
-# GIFs
-if [ -f /tmp/nightly-gifs.log ]; then
-  GIF_COUNT=$(grep -c "\.gif" /tmp/nightly-gifs.log 2>/dev/null || echo 0)
-  REPORT="$REPORT## GIFs\n$GIF_COUNT recordings\n\n"
-fi
 
 # Deep Audit
 if [ -f /tmp/deep-audit-summary.json ]; then

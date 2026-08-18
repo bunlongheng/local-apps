@@ -12,7 +12,6 @@
 #   7. Scaffold vercel.json with ignoreCommand
 #   8. Disable Dependabot
 #   9. Run npm audit
-#  10. Take first screenshot
 
 set -e
 
@@ -165,11 +164,6 @@ if [ -f package.json ]; then
 else
   skip "No package.json"
 fi
-
-# --- 10. First screenshot ---
-curl -s -X POST "$MONITOR/api/screenshots/$APP_ID" > /dev/null 2>&1 \
-  && pass "First screenshot triggered" \
-  || skip "Screenshot capture failed"
 
 # --- Summary ---
 echo ""

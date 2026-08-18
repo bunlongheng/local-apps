@@ -71,7 +71,7 @@ done
 echo "" >> "$LOG"
 echo "CHECK 3: Local-Apps API" >> "$LOG"
 
-LA_ENDPOINTS=("/api/apps" "/api/status" "/api/screenshots")
+LA_ENDPOINTS=("/api/apps" "/api/status")
 for ep in "${LA_ENDPOINTS[@]}"; do
   CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://localhost:9875$ep" 2>/dev/null)
   if [ "$CODE" = "200" ]; then
