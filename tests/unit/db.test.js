@@ -1,83 +1,66 @@
-// Unit: db.js. IMPORTANT - db.js hardcodes:
-//   const DB_PATH = path.join(__dirname, 'local.db');
-//   const db = new Database(DB_PATH);
-// with no env var or parameter override, and simply requiring the module runs
-// schema creation, ALTER TABLE migrations, and (if the apps table is empty)
-// config seeding against that path at import time. `local.db` is the real,
-// live database backing the running dashboard (verified present and recently
-// modified on this machine) - there is no ':memory:' or temp-path override to
-// hook into, and no pure mapping helper (e.g. rowToApp) is exported for
-// side-effect-free testing. Per the task spec's fallback for this exact case,
-// we do NOT require('../../db') here - that would open and migrate the real
-// database. Instead we statically verify the hardcoded-path shape (so this
-// test breaks loudly if someone adds an override, prompting a rewrite of this
-// file to exercise a real in-memory DB) and the pure, static column-mapping
-// table that upsertApp uses, read directly from source text.
-const { test } = require('node:test');
+// Unit: db.js - real behavioral tests against an isolated temp database.
+// db.js now honours LOCAL_APPS_DB, so we point it at a throwaway file, require the module
+// (schema + migrations run against the temp DB, never the live local.db), and exercise the
+// real query layer end to end.
+const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
-const SRC = fs.readFileSync(path.join(__dirname, '../../db.js'), 'utf8');
+const TMP_DB = path.join(os.tmpdir(), `local-apps-test-${process.pid}.db`);
+process.env.LOCAL_APPS_DB = TMP_DB;
+const db = require('../../db');
 
-test('db.js hardcodes DB_PATH to local.db with no env/argument override', () => {
-  assert.match(SRC, /const DB_PATH = path\.join\(__dirname, 'local\.db'\)/,
-    'expected the known hardcoded path - if this changed, rewrite db.test.js to open a real in-memory DB');
-  assert.doesNotMatch(SRC, /process\.env\.[A-Z_]*DB[A-Z_]*/,
-    'no DB path env override exists - do not require(db.js) directly in tests');
-  assert.match(SRC, /new Database\(DB_PATH\)/);
-});
-
-test('db.js exports the expected app CRUD surface (by name, without invoking it)', () => {
-  const exportsBlock = SRC.slice(SRC.indexOf('module.exports'));
-  for (const fn of ['getApps', 'getApp', 'upsertApp', 'deleteApp', 'toggleApp', 'setAppDisabled']) {
-    assert.ok(exportsBlock.includes(fn), `expected ${fn} to be exported`);
+after(() => {
+  for (const suffix of ['', '-shm', '-wal']) {
+    try { fs.unlinkSync(TMP_DB + suffix); } catch {}
   }
 });
 
-test('db.js does not export the internal rowToApp mapper (no pure helper to unit test directly)', () => {
-  const exportsBlock = SRC.slice(SRC.indexOf('module.exports'));
-  assert.ok(!exportsBlock.includes('rowToApp'), 'rowToApp is internal only');
-  assert.match(SRC, /function rowToApp\(row\)/, 'rowToApp must still exist internally');
+test('upsertApp inserts, getApp reads back with camelCase mapping', () => {
+  db.upsertApp({ id: 'zzz-test-app', name: 'ZZZ', localUrl: 'http://localhost:4321', repo: 'x/y' });
+  const a = db.getApp('zzz-test-app');
+  assert.equal(a.id, 'zzz-test-app');
+  assert.equal(a.name, 'ZZZ');
+  assert.equal(a.localUrl, 'http://localhost:4321'); // snake_case local_url -> camelCase
+  assert.equal(a.repo, 'x/y');
 });
 
-test('upsertApp camelCase -> column mapping covers the core app fields', () => {
-  const mapMatch = SRC.match(/const map = \{([\s\S]*?)\};/);
-  assert.ok(mapMatch, 'expected the camelCase->column map object in upsertApp');
-  const mapBody = mapMatch[1];
-  const expected = {
-    healthUrl: 'health_url',
-    localUrl: 'local_url',
-    localPath: 'local_path',
-    logPath: 'log_path',
-    launchAgent: 'launch_agent',
-    launchAgentPath: 'launch_agent_path',
-    startCommand: 'start_command',
-    noScreenshot: 'no_screenshot',
-  };
-  for (const [camel, column] of Object.entries(expected)) {
-    assert.match(mapBody, new RegExp(`${camel}:\\s*'${column}'`), `${camel} must map to ${column}`);
-  }
+test('upsertApp updates an existing row without duplicating it', () => {
+  const before = db.getApps().length;
+  db.upsertApp({ id: 'zzz-test-app', name: 'ZZZ-renamed' });
+  assert.equal(db.getApps().length, before);
+  assert.equal(db.getApp('zzz-test-app').name, 'ZZZ-renamed');
 });
 
-test('apps table schema declares id as the primary key and disabled/no_screenshot as integer flags', () => {
-  assert.match(SRC, /CREATE TABLE IF NOT EXISTS apps \(\s*id TEXT PRIMARY KEY/);
-  assert.match(SRC, /no_screenshot INTEGER DEFAULT 0/);
+test('setAppDisabled toggles the disabled flag', () => {
+  db.setAppDisabled('zzz-test-app', true);
+  assert.equal(db.getApp('zzz-test-app').disabled, true);
+  db.setAppDisabled('zzz-test-app', false);
+  assert.equal(db.getApp('zzz-test-app').disabled, false);
 });
 
-test('schema/migration statements are written as idempotent CREATE-IF-NOT-EXISTS / try-catch ALTERs', () => {
-  // Every CREATE TABLE in the file must guard with IF NOT EXISTS, so re-running
-  // db.js (e.g. across worker restarts) never throws on an existing schema.
-  const createStatements = SRC.match(/CREATE TABLE[^(]*/g) || [];
-  assert.ok(createStatements.length > 0, 'expected at least one CREATE TABLE statement');
-  for (const stmt of createStatements) {
-    assert.match(stmt, /CREATE TABLE IF NOT EXISTS/, `non-idempotent create: ${stmt}`);
-  }
-  // Column-add migrations rely on ALTER TABLE failing silently when the column
-  // already exists, rather than checking pragma first - confirm the try/catch guard.
-  const alterLines = SRC.split('\n').filter(l => l.includes('ALTER TABLE'));
-  assert.ok(alterLines.length > 0, 'expected ALTER TABLE migration lines');
-  for (const line of alterLines) {
-    assert.ok(line.includes('try {') && line.includes('catch'), `ALTER TABLE line must be try/catch guarded: ${line}`);
-  }
+test('upsertApp REJECTS a launchAgent with shell metacharacters (RCE backstop)', () => {
+  assert.throws(() => db.upsertApp({ id: 'zzz-evil', launchAgent: 'x; touch /tmp/pwned; #' }), /unsafe launchAgent/);
+  assert.throws(() => db.upsertApp({ id: 'zzz-evil', launchAgentPath: '/tmp/a";evil' }), /unsafe launchAgentPath/);
+  // a legitimate derived label + plist path is accepted
+  assert.doesNotThrow(() => db.upsertApp({ id: 'zzz-ok', launchAgent: 'com.bheng.zzz-ok', launchAgentPath: '/Users/bheng/Library/LaunchAgents/com.bheng.zzz-ok.plist' }));
+  db.deleteApp('zzz-ok');
+});
+
+test('syncRemoteApps stores then getRemoteApps reads a machine\'s apps', () => {
+  db.upsertMachine({ id: 'peer1', hostname: 'peer1', ip: '10.0.0.50', port: 9875, model: 'Mac' });
+  db.syncRemoteApps('peer1', [{ id: 'r1', name: 'Remote One', localUrl: 'http://localhost:3001' }]);
+  const remote = db.getRemoteApps().filter(r => r.machine_id === 'peer1');
+  assert.equal(remote.length, 1);
+  assert.equal(remote[0].id, 'r1');
+  // re-sync replaces cleanly (no duplicates)
+  db.syncRemoteApps('peer1', [{ id: 'r1', name: 'Remote One', localUrl: 'http://localhost:3001' }]);
+  assert.equal(db.getRemoteApps().filter(r => r.machine_id === 'peer1').length, 1);
+});
+
+test('deleteApp removes the row', () => {
+  db.deleteApp('zzz-test-app');
+  assert.equal(db.getApp('zzz-test-app'), undefined);
 });

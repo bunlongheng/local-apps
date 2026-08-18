@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-const DB_PATH = path.join(__dirname, 'local.db');
+const DB_PATH = process.env.LOCAL_APPS_DB || path.join(__dirname, 'local.db');
 // Personal registry (gitignored) if present, else the checked-in example so a
 // fresh clone still seeds a working demo dashboard.
 const CONFIG_FILE = fs.existsSync(path.join(__dirname, 'apps.config.json'))
@@ -373,6 +373,16 @@ function getApp(id) {
 }
 
 function upsertApp(data) {
+  // Security backstop (defense in depth): launch_agent + launch_agent_path flow into
+  // `launchctl ... gui/<uid>/<label>` / `bootstrap ... "<path>"` shell strings at start/stop.
+  // Reject any value with shell metacharacters here so NO write path (even ones that skip the
+  // API validateAppFields guard) can persist an injection payload into the exec source.
+  if (data.launchAgent && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(data.launchAgent)) {
+    throw new Error('unsafe launchAgent label rejected');
+  }
+  if (data.launchAgentPath && !(/^\/[^\0"'`;|&$<>\n\r]+\.plist$/.test(data.launchAgentPath))) {
+    throw new Error('unsafe launchAgentPath rejected');
+  }
   const existing = db.prepare('SELECT * FROM apps WHERE id = ?').get(data.id);
   if (existing) {
     const fields = [];

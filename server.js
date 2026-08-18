@@ -6,13 +6,16 @@ const { execSync, spawn } = require('child_process');
 const QRCode = require('qrcode');
 const db = require('./db');
 const { startCmd } = require('./launchctl-cmds');
-const { isValidId, validateAppFields, xmlEscape } = require('./lib/validate');
+const { isValidId, isSafeSegment, validateAppFields, xmlEscape } = require('./lib/validate');
 const makeCaddy = require('./lib/caddy');
 const makeLaunchd = require('./lib/launchd');
 const makeHealth = require('./lib/health');
 
 const compression = require('compression');
 const app = express();
+// True only when run directly (node server.js), false when require()d by a test - lets the
+// test import the configured Express app without starting the health loops, peer probes, or listener.
+const IS_MAIN = require.main === module;
 app.use(compression());
 // Baseline security headers, ported from the former next.config so collapsing to a
 // single Express service (UI + API on :9875) keeps the same posture. HSTS is omitted:
@@ -75,20 +78,19 @@ app.use(express.json());
 // and any log reader (/api/log/*, /api/*/log). NOTE: enabling the token currently requires
 // the caller to send the header; wiring the dashboard fetches to forward it from
 // localStorage is a tracked follow-up, so today the gate is meant for API/CLI clients.
-const crypto = require('crypto');
+// Trust-loopback auth policy lives in lib/auth-gate.js (pure + unit-tested). See it for the rule.
+const { decide: authDecide } = require('./lib/auth-gate');
 const AUTH_TOKEN = process.env.LOCAL_APPS_TOKEN || '';
-const SENSITIVE_GET = /^\/api\/(shell|claude\/)|\/log(\/|$)/;
-function tokenOk(given) {
-  if (!given || given.length !== AUTH_TOKEN.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(given), Buffer.from(AUTH_TOKEN));
-}
 app.use((req, res, next) => {
-  if (!AUTH_TOKEN) return next();
-  const mutating = req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE';
-  const sensitive = req.method === 'GET' && SENSITIVE_GET.test(req.path);
-  if (!mutating && !sensitive) return next();
-  if (tokenOk(req.get('x-local-apps-token'))) return next();
-  return res.status(401).json({ error: 'unauthorized' });
+  const d = authDecide({
+    remoteAddress: req.socket.remoteAddress || '',
+    method: req.method,
+    path: req.path,
+    token: req.get('x-local-apps-token'),
+    configuredToken: AUTH_TOKEN,
+  });
+  if (d.allow) return next();
+  return res.status(d.status).json({ error: 'unauthorized - control actions and sensitive reads require LOCAL_APPS_TOKEN off localhost' });
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -225,7 +227,7 @@ function getLanIp() {
 let LAN_IP = getLanIp();
 // Boot can happen (via launchd KeepAlive) before the LAN interface is up, freezing
 // LAN_IP at 'N/A'. Refresh on an interval like TAILSCALE_IP so it self-heals.
-setInterval(() => { LAN_IP = getLanIp(); }, 60000);
+setInterval(() => { LAN_IP = getLanIp(); }, 60000).unref();
 
 // --- Tailscale IP detection (cached; refreshed on an interval, not per request) ---
 function getTailscaleIp() {
@@ -235,7 +237,7 @@ function getTailscaleIp() {
 let TAILSCALE_IP = getTailscaleIp();
 // Refresh out-of-band so the hot /api/status path never shells out (execSync would
 // block the single-threaded event loop on every poll from every open tab).
-setInterval(() => { TAILSCALE_IP = getTailscaleIp(); }, 60000);
+setInterval(() => { TAILSCALE_IP = getTailscaleIp(); }, 60000).unref();
 
 // --- Machine model detection ---
 const MACHINE_MODEL = (() => {
@@ -410,7 +412,7 @@ function refreshScreenshotCache() {
   }
 }
 refreshScreenshotCache();
-setInterval(refreshScreenshotCache, 60000);
+setInterval(refreshScreenshotCache, 60000).unref();
 
 app.get('/api/status', (req, res) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -818,10 +820,15 @@ app.post('/api/stop/:id', (req, res) => {
 
 // --- Screenshot management ---
 
+// appId + mode are joined into a filesystem path below; constrain both so a crafted body
+// cannot traverse out of the screenshots dir.
+const SCREENSHOT_MODES = new Set(['desktop', 'desktop-framed', 'mobile', 'mobile-framed', 'gifs']);
+
 // Delete a screenshot file and remove it from index.json
 app.delete('/api/screenshot', express.json(), (req, res) => {
   const { appId, mode, filename } = req.body || {}
   if (!appId || !mode || !filename) return res.status(400).json({ error: 'missing fields' })
+  if (!isValidId(appId) || !SCREENSHOT_MODES.has(mode)) return res.status(400).json({ error: 'invalid appId or mode' })
   // Safety: only allow filenames, no path traversal
   if (!/^[\w.-]+\.(png|jpg|jpeg|gif|webp)$/i.test(filename)) return res.status(400).json({ error: 'invalid filename' })
   const filePath = path.join(__dirname, 'public', 'screenshots', appId, mode, filename)
@@ -844,6 +851,7 @@ app.delete('/api/screenshot', express.json(), (req, res) => {
 app.post('/api/retake', express.json(), (req, res) => {
   const { appId, mode, filename } = req.body || {}
   if (!appId || !mode || !filename) return res.status(400).json({ error: 'missing fields' })
+  if (!isValidId(appId) || !SCREENSHOT_MODES.has(mode)) return res.status(400).json({ error: 'invalid appId or mode' })
   const retakePath = path.join(__dirname, 'public', 'screenshots', appId, 'retake.json')
   let retake = {}
   try { if (fs.existsSync(retakePath)) retake = JSON.parse(fs.readFileSync(retakePath, 'utf8')) } catch {}
@@ -855,6 +863,7 @@ app.post('/api/retake', express.json(), (req, res) => {
 
 // Get retake list for an app
 app.get('/api/retake/:appId', (req, res) => {
+  if (!isValidId(req.params.appId)) return res.status(400).json({ error: 'invalid appId' })
   const retakePath = path.join(__dirname, 'public', 'screenshots', req.params.appId, 'retake.json')
   try {
     const data = fs.existsSync(retakePath) ? JSON.parse(fs.readFileSync(retakePath, 'utf8')) : {}
@@ -922,8 +931,10 @@ async function discoverPeers() {
 }
 
 // Discover on boot + every 30s
-discoverPeers();
-setInterval(discoverPeers, 30000);
+if (IS_MAIN) {
+  discoverPeers();
+  setInterval(discoverPeers, 30000);
+}
 
 app.get('/api/machines', (req, res) => {
   res.json(db.getMachines());
@@ -975,9 +986,9 @@ app.get('/api/machines/:id/status', async (req, res) => {
 // --- Machine Sync API ---
 // Each machine exposes its app list + identity. Machines can pull from each other.
 
-// Identity: who is this machine?
+// Identity: who is this machine? Peers read this server-side (http.get, no CORS needed), so
+// no wildcard Access-Control-Allow-Origin here - it only let a LAN browser snoop machine identity.
 app.get('/api/machine', (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
   res.json({
     hostname: os.hostname(),
     model: MACHINE_MODEL,
@@ -1100,6 +1111,7 @@ app.get('/api/generate-icons/status', (req, res) => {
 // --- Screenshot ZIP download ---
 app.get('/api/screenshots/:id/download', (req, res) => {
   const id = req.params.id;
+  if (!isValidId(id)) return res.status(400).json({ error: 'invalid app id' }); // id flows into a shell `zip` command + /tmp path
   const baseDir = path.join(__dirname, 'public', 'screenshots', id);
   if (!fs.existsSync(baseDir)) return res.status(404).json({ error: 'no screenshots' });
 
@@ -1127,7 +1139,7 @@ app.get('/api/screenshots/:id/download', (req, res) => {
 
 // --- File watcher (public dir only) ---
 let reloadTimer = null;
-fs.watch(path.join(__dirname, 'public'), { recursive: true }, () => {
+if (IS_MAIN) fs.watch(path.join(__dirname, 'public'), { recursive: true }, () => {
   clearTimeout(reloadTimer);
   reloadTimer = setTimeout(() => broadcast({ type: 'reload' }), 200);
 });
@@ -1153,8 +1165,10 @@ async function startupSync() {
 }
 
 // --- Boot ---
-checkAll();
-setInterval(checkAll, CHECK_INTERVAL);
+if (IS_MAIN) {
+  checkAll();
+  setInterval(checkAll, CHECK_INTERVAL);
+}
 
 // ─── Claude Sessions API (used by Claude dashboard on LAN) ──────────────────
 const CLAUDE_DIR = path.join(os.homedir(), '.claude', 'projects');
@@ -1348,6 +1362,7 @@ app.get('/api/claude/config', (req, res) => {
 // GET /api/claude/skill/:plugin/:skill — read full skill directory
 app.get('/api/claude/skill/:plugin/:skill', (req, res) => {
   const { plugin, skill } = req.params;
+  if (!isSafeSegment(plugin) || !isSafeSegment(skill)) return res.status(400).json({ error: 'invalid plugin/skill name' });
   // Search both builtin and external
   for (const base of [PLG_DIR, EXT_DIR]) {
     const skillDir = path.join(base, plugin, 'skills', skill);
@@ -1365,6 +1380,7 @@ app.get('/api/claude/skill/:plugin/:skill', (req, res) => {
 // POST /api/claude/skill/:plugin/:skill — write skill files
 app.post('/api/claude/skill/:plugin/:skill', (req, res) => {
   const { plugin, skill } = req.params;
+  if (!isSafeSegment(plugin) || !isSafeSegment(skill)) return res.status(400).json({ error: 'invalid plugin/skill name' });
   const { files } = req.body;
   if (!files || typeof files !== 'object') return res.status(400).json({ error: 'files object required' });
 
@@ -1386,6 +1402,7 @@ app.post('/api/claude/skill/:plugin/:skill', (req, res) => {
 // GET /api/claude/command/:plugin/:command — read command .md
 app.get('/api/claude/command/:plugin/:command', (req, res) => {
   const { plugin, command } = req.params;
+  if (!isSafeSegment(plugin) || !isSafeSegment(command)) return res.status(400).json({ error: 'invalid plugin/command name' });
   for (const base of [PLG_DIR, EXT_DIR]) {
     const fp = path.join(base, plugin, 'commands', command + '.md');
     if (isFile(fp)) return res.json({ plugin, command, content: safeReadFile(fp), path: fp });
@@ -1396,6 +1413,7 @@ app.get('/api/claude/command/:plugin/:command', (req, res) => {
 // POST /api/claude/command/:plugin/:command — write command .md
 app.post('/api/claude/command/:plugin/:command', (req, res) => {
   const { plugin, command } = req.params;
+  if (!isSafeSegment(plugin) || !isSafeSegment(command)) return res.status(400).json({ error: 'invalid plugin/command name' });
   const { content } = req.body;
   if (typeof content !== 'string') return res.status(400).json({ error: 'content string required' });
 
@@ -1614,7 +1632,7 @@ app.get('/api/mcp/stats', (req, res) => {
 
 // Purge old MCP activity on startup + daily
 db.purgeMcpActivity(30);
-setInterval(() => db.purgeMcpActivity(30), 24 * 60 * 60 * 1000);
+setInterval(() => db.purgeMcpActivity(30), 24 * 60 * 60 * 1000).unref();
 
 // Shell config download - allows other machines to pull zsh setup
 app.get('/api/shell/:file', (req, res) => {
@@ -1752,9 +1770,15 @@ app.use((err, req, res, _next) => {
 // localhost-only (and front it with Caddy). The mutating API was already LAN-reachable
 // via the old Next proxy, so this is the same surface. Gate it with LOCAL_APPS_TOKEN.
 const API_BIND = process.env.API_BIND || '0.0.0.0';
-app.listen(PORT, API_BIND, () => {
+if (IS_MAIN) app.listen(PORT, API_BIND, () => {
   console.log(`\n  Local Apps (UI + control plane) running at:`);
   console.log(`  http://${API_BIND}:${PORT}`);
+  if (API_BIND !== '127.0.0.1' && API_BIND !== 'localhost' && !AUTH_TOKEN) {
+    console.log(`  ⚠  Bound to ${API_BIND} without LOCAL_APPS_TOKEN - off-box callers can VIEW status but`);
+    console.log(`     all control actions + sensitive reads are DENIED. Set LOCAL_APPS_TOKEN for LAN control.`);
+  }
   console.log(`  Role:   ${MACHINE_ROLE.toUpperCase()}${IS_HUB ? ' (bots + auto-fix enabled)' : ' (status reporting only)'}\n`);
   startupSync();
 });
+
+module.exports = app;
