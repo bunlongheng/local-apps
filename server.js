@@ -13,6 +13,9 @@ const makeHealth = require('./lib/health');
 
 const compression = require('compression');
 const app = express();
+// True only when run directly (node server.js), false when require()d by a test - lets the
+// test import the configured Express app without starting the health loops, peer probes, or listener.
+const IS_MAIN = require.main === module;
 app.use(compression());
 // Baseline security headers, ported from the former next.config so collapsing to a
 // single Express service (UI + API on :9875) keeps the same posture. HSTS is omitted:
@@ -75,28 +78,19 @@ app.use(express.json());
 // and any log reader (/api/log/*, /api/*/log). NOTE: enabling the token currently requires
 // the caller to send the header; wiring the dashboard fetches to forward it from
 // localStorage is a tracked follow-up, so today the gate is meant for API/CLI clients.
-const crypto = require('crypto');
+// Trust-loopback auth policy lives in lib/auth-gate.js (pure + unit-tested). See it for the rule.
+const { decide: authDecide } = require('./lib/auth-gate');
 const AUTH_TOKEN = process.env.LOCAL_APPS_TOKEN || '';
-const SENSITIVE_GET = /^\/api\/(shell|claude\/)|\/log(\/|$)/;
-function tokenOk(given) {
-  if (!given || given.length !== AUTH_TOKEN.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(given), Buffer.from(AUTH_TOKEN));
-}
 app.use((req, res, next) => {
-  // Trust-loopback model (fail closed off-box): the localhost dashboard (direct or via the
-  // Caddy loopback proxy) has full access with no token. Any OFF-BOX caller may read only
-  // non-sensitive GETs (status view for the iPad/LAN); every mutating request and every
-  // sensitive GET (shell/claude config, logs) requires LOCAL_APPS_TOKEN and is DENIED when no
-  // token is configured. This closes unauthenticated LAN command-injection and secret reads
-  // even in the default (no-token) setup.
-  const ra = req.socket.remoteAddress || '';
-  const isLoopback = ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1';
-  if (isLoopback) return next();
-  const mutating = req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE';
-  const sensitive = req.method === 'GET' && SENSITIVE_GET.test(req.path);
-  if (!mutating && !sensitive) return next();
-  if (AUTH_TOKEN && tokenOk(req.get('x-local-apps-token'))) return next();
-  return res.status(401).json({ error: 'unauthorized - control actions and sensitive reads require LOCAL_APPS_TOKEN off localhost' });
+  const d = authDecide({
+    remoteAddress: req.socket.remoteAddress || '',
+    method: req.method,
+    path: req.path,
+    token: req.get('x-local-apps-token'),
+    configuredToken: AUTH_TOKEN,
+  });
+  if (d.allow) return next();
+  return res.status(d.status).json({ error: 'unauthorized - control actions and sensitive reads require LOCAL_APPS_TOKEN off localhost' });
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -233,7 +227,7 @@ function getLanIp() {
 let LAN_IP = getLanIp();
 // Boot can happen (via launchd KeepAlive) before the LAN interface is up, freezing
 // LAN_IP at 'N/A'. Refresh on an interval like TAILSCALE_IP so it self-heals.
-setInterval(() => { LAN_IP = getLanIp(); }, 60000);
+setInterval(() => { LAN_IP = getLanIp(); }, 60000).unref();
 
 // --- Tailscale IP detection (cached; refreshed on an interval, not per request) ---
 function getTailscaleIp() {
@@ -243,7 +237,7 @@ function getTailscaleIp() {
 let TAILSCALE_IP = getTailscaleIp();
 // Refresh out-of-band so the hot /api/status path never shells out (execSync would
 // block the single-threaded event loop on every poll from every open tab).
-setInterval(() => { TAILSCALE_IP = getTailscaleIp(); }, 60000);
+setInterval(() => { TAILSCALE_IP = getTailscaleIp(); }, 60000).unref();
 
 // --- Machine model detection ---
 const MACHINE_MODEL = (() => {
@@ -418,7 +412,7 @@ function refreshScreenshotCache() {
   }
 }
 refreshScreenshotCache();
-setInterval(refreshScreenshotCache, 60000);
+setInterval(refreshScreenshotCache, 60000).unref();
 
 app.get('/api/status', (req, res) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -937,8 +931,10 @@ async function discoverPeers() {
 }
 
 // Discover on boot + every 30s
-discoverPeers();
-setInterval(discoverPeers, 30000);
+if (IS_MAIN) {
+  discoverPeers();
+  setInterval(discoverPeers, 30000);
+}
 
 app.get('/api/machines', (req, res) => {
   res.json(db.getMachines());
@@ -1143,7 +1139,7 @@ app.get('/api/screenshots/:id/download', (req, res) => {
 
 // --- File watcher (public dir only) ---
 let reloadTimer = null;
-fs.watch(path.join(__dirname, 'public'), { recursive: true }, () => {
+if (IS_MAIN) fs.watch(path.join(__dirname, 'public'), { recursive: true }, () => {
   clearTimeout(reloadTimer);
   reloadTimer = setTimeout(() => broadcast({ type: 'reload' }), 200);
 });
@@ -1169,8 +1165,10 @@ async function startupSync() {
 }
 
 // --- Boot ---
-checkAll();
-setInterval(checkAll, CHECK_INTERVAL);
+if (IS_MAIN) {
+  checkAll();
+  setInterval(checkAll, CHECK_INTERVAL);
+}
 
 // ─── Claude Sessions API (used by Claude dashboard on LAN) ──────────────────
 const CLAUDE_DIR = path.join(os.homedir(), '.claude', 'projects');
@@ -1634,7 +1632,7 @@ app.get('/api/mcp/stats', (req, res) => {
 
 // Purge old MCP activity on startup + daily
 db.purgeMcpActivity(30);
-setInterval(() => db.purgeMcpActivity(30), 24 * 60 * 60 * 1000);
+setInterval(() => db.purgeMcpActivity(30), 24 * 60 * 60 * 1000).unref();
 
 // Shell config download - allows other machines to pull zsh setup
 app.get('/api/shell/:file', (req, res) => {
@@ -1772,7 +1770,7 @@ app.use((err, req, res, _next) => {
 // localhost-only (and front it with Caddy). The mutating API was already LAN-reachable
 // via the old Next proxy, so this is the same surface. Gate it with LOCAL_APPS_TOKEN.
 const API_BIND = process.env.API_BIND || '0.0.0.0';
-app.listen(PORT, API_BIND, () => {
+if (IS_MAIN) app.listen(PORT, API_BIND, () => {
   console.log(`\n  Local Apps (UI + control plane) running at:`);
   console.log(`  http://${API_BIND}:${PORT}`);
   if (API_BIND !== '127.0.0.1' && API_BIND !== 'localhost' && !AUTH_TOKEN) {
@@ -1782,3 +1780,5 @@ app.listen(PORT, API_BIND, () => {
   console.log(`  Role:   ${MACHINE_ROLE.toUpperCase()}${IS_HUB ? ' (bots + auto-fix enabled)' : ' (status reporting only)'}\n`);
   startupSync();
 });
+
+module.exports = app;

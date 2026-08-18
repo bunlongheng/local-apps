@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-const DB_PATH = path.join(__dirname, 'local.db');
+const DB_PATH = process.env.LOCAL_APPS_DB || path.join(__dirname, 'local.db');
 // Personal registry (gitignored) if present, else the checked-in example so a
 // fresh clone still seeds a working demo dashboard.
 const CONFIG_FILE = fs.existsSync(path.join(__dirname, 'apps.config.json'))

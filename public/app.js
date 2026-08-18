@@ -111,6 +111,14 @@
   var startPolls = {}, toastTimer = null, sse = null;
 
   function api(path, opts) {
+    // Forward the control token (if the user set one for LAN/off-box access) so mutating
+    // actions and sensitive reads work from the iPad/LAN. Localhost needs no token.
+    opts = opts || {};
+    var token = null;
+    try { token = localStorage.getItem("localAppsToken"); } catch (e) {}
+    if (token) {
+      opts.headers = Object.assign({}, opts.headers, { "x-local-apps-token": token });
+    }
     return fetch(path, opts).then(function (r) {
       if (!r.ok) throw new Error(String(r.status));
       var ct = r.headers.get("content-type") || "";
