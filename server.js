@@ -6,7 +6,7 @@ const { execSync, spawn } = require('child_process');
 const QRCode = require('qrcode');
 const db = require('./db');
 const { startCmd } = require('./launchctl-cmds');
-const { isValidId, validateAppFields, xmlEscape } = require('./lib/validate');
+const { isValidId, isSafeSegment, validateAppFields, xmlEscape } = require('./lib/validate');
 const makeCaddy = require('./lib/caddy');
 const makeLaunchd = require('./lib/launchd');
 const makeHealth = require('./lib/health');
@@ -83,12 +83,20 @@ function tokenOk(given) {
   return crypto.timingSafeEqual(Buffer.from(given), Buffer.from(AUTH_TOKEN));
 }
 app.use((req, res, next) => {
-  if (!AUTH_TOKEN) return next();
+  // Trust-loopback model (fail closed off-box): the localhost dashboard (direct or via the
+  // Caddy loopback proxy) has full access with no token. Any OFF-BOX caller may read only
+  // non-sensitive GETs (status view for the iPad/LAN); every mutating request and every
+  // sensitive GET (shell/claude config, logs) requires LOCAL_APPS_TOKEN and is DENIED when no
+  // token is configured. This closes unauthenticated LAN command-injection and secret reads
+  // even in the default (no-token) setup.
+  const ra = req.socket.remoteAddress || '';
+  const isLoopback = ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1';
+  if (isLoopback) return next();
   const mutating = req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE';
   const sensitive = req.method === 'GET' && SENSITIVE_GET.test(req.path);
   if (!mutating && !sensitive) return next();
-  if (tokenOk(req.get('x-local-apps-token'))) return next();
-  return res.status(401).json({ error: 'unauthorized' });
+  if (AUTH_TOKEN && tokenOk(req.get('x-local-apps-token'))) return next();
+  return res.status(401).json({ error: 'unauthorized - control actions and sensitive reads require LOCAL_APPS_TOKEN off localhost' });
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -818,10 +826,15 @@ app.post('/api/stop/:id', (req, res) => {
 
 // --- Screenshot management ---
 
+// appId + mode are joined into a filesystem path below; constrain both so a crafted body
+// cannot traverse out of the screenshots dir.
+const SCREENSHOT_MODES = new Set(['desktop', 'desktop-framed', 'mobile', 'mobile-framed', 'gifs']);
+
 // Delete a screenshot file and remove it from index.json
 app.delete('/api/screenshot', express.json(), (req, res) => {
   const { appId, mode, filename } = req.body || {}
   if (!appId || !mode || !filename) return res.status(400).json({ error: 'missing fields' })
+  if (!isValidId(appId) || !SCREENSHOT_MODES.has(mode)) return res.status(400).json({ error: 'invalid appId or mode' })
   // Safety: only allow filenames, no path traversal
   if (!/^[\w.-]+\.(png|jpg|jpeg|gif|webp)$/i.test(filename)) return res.status(400).json({ error: 'invalid filename' })
   const filePath = path.join(__dirname, 'public', 'screenshots', appId, mode, filename)
@@ -844,6 +857,7 @@ app.delete('/api/screenshot', express.json(), (req, res) => {
 app.post('/api/retake', express.json(), (req, res) => {
   const { appId, mode, filename } = req.body || {}
   if (!appId || !mode || !filename) return res.status(400).json({ error: 'missing fields' })
+  if (!isValidId(appId) || !SCREENSHOT_MODES.has(mode)) return res.status(400).json({ error: 'invalid appId or mode' })
   const retakePath = path.join(__dirname, 'public', 'screenshots', appId, 'retake.json')
   let retake = {}
   try { if (fs.existsSync(retakePath)) retake = JSON.parse(fs.readFileSync(retakePath, 'utf8')) } catch {}
@@ -855,6 +869,7 @@ app.post('/api/retake', express.json(), (req, res) => {
 
 // Get retake list for an app
 app.get('/api/retake/:appId', (req, res) => {
+  if (!isValidId(req.params.appId)) return res.status(400).json({ error: 'invalid appId' })
   const retakePath = path.join(__dirname, 'public', 'screenshots', req.params.appId, 'retake.json')
   try {
     const data = fs.existsSync(retakePath) ? JSON.parse(fs.readFileSync(retakePath, 'utf8')) : {}
@@ -975,9 +990,9 @@ app.get('/api/machines/:id/status', async (req, res) => {
 // --- Machine Sync API ---
 // Each machine exposes its app list + identity. Machines can pull from each other.
 
-// Identity: who is this machine?
+// Identity: who is this machine? Peers read this server-side (http.get, no CORS needed), so
+// no wildcard Access-Control-Allow-Origin here - it only let a LAN browser snoop machine identity.
 app.get('/api/machine', (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
   res.json({
     hostname: os.hostname(),
     model: MACHINE_MODEL,
@@ -1100,6 +1115,7 @@ app.get('/api/generate-icons/status', (req, res) => {
 // --- Screenshot ZIP download ---
 app.get('/api/screenshots/:id/download', (req, res) => {
   const id = req.params.id;
+  if (!isValidId(id)) return res.status(400).json({ error: 'invalid app id' }); // id flows into a shell `zip` command + /tmp path
   const baseDir = path.join(__dirname, 'public', 'screenshots', id);
   if (!fs.existsSync(baseDir)) return res.status(404).json({ error: 'no screenshots' });
 
@@ -1348,6 +1364,7 @@ app.get('/api/claude/config', (req, res) => {
 // GET /api/claude/skill/:plugin/:skill — read full skill directory
 app.get('/api/claude/skill/:plugin/:skill', (req, res) => {
   const { plugin, skill } = req.params;
+  if (!isSafeSegment(plugin) || !isSafeSegment(skill)) return res.status(400).json({ error: 'invalid plugin/skill name' });
   // Search both builtin and external
   for (const base of [PLG_DIR, EXT_DIR]) {
     const skillDir = path.join(base, plugin, 'skills', skill);
@@ -1365,6 +1382,7 @@ app.get('/api/claude/skill/:plugin/:skill', (req, res) => {
 // POST /api/claude/skill/:plugin/:skill — write skill files
 app.post('/api/claude/skill/:plugin/:skill', (req, res) => {
   const { plugin, skill } = req.params;
+  if (!isSafeSegment(plugin) || !isSafeSegment(skill)) return res.status(400).json({ error: 'invalid plugin/skill name' });
   const { files } = req.body;
   if (!files || typeof files !== 'object') return res.status(400).json({ error: 'files object required' });
 
@@ -1386,6 +1404,7 @@ app.post('/api/claude/skill/:plugin/:skill', (req, res) => {
 // GET /api/claude/command/:plugin/:command — read command .md
 app.get('/api/claude/command/:plugin/:command', (req, res) => {
   const { plugin, command } = req.params;
+  if (!isSafeSegment(plugin) || !isSafeSegment(command)) return res.status(400).json({ error: 'invalid plugin/command name' });
   for (const base of [PLG_DIR, EXT_DIR]) {
     const fp = path.join(base, plugin, 'commands', command + '.md');
     if (isFile(fp)) return res.json({ plugin, command, content: safeReadFile(fp), path: fp });
@@ -1396,6 +1415,7 @@ app.get('/api/claude/command/:plugin/:command', (req, res) => {
 // POST /api/claude/command/:plugin/:command — write command .md
 app.post('/api/claude/command/:plugin/:command', (req, res) => {
   const { plugin, command } = req.params;
+  if (!isSafeSegment(plugin) || !isSafeSegment(command)) return res.status(400).json({ error: 'invalid plugin/command name' });
   const { content } = req.body;
   if (typeof content !== 'string') return res.status(400).json({ error: 'content string required' });
 
@@ -1755,6 +1775,10 @@ const API_BIND = process.env.API_BIND || '0.0.0.0';
 app.listen(PORT, API_BIND, () => {
   console.log(`\n  Local Apps (UI + control plane) running at:`);
   console.log(`  http://${API_BIND}:${PORT}`);
+  if (API_BIND !== '127.0.0.1' && API_BIND !== 'localhost' && !AUTH_TOKEN) {
+    console.log(`  ⚠  Bound to ${API_BIND} without LOCAL_APPS_TOKEN - off-box callers can VIEW status but`);
+    console.log(`     all control actions + sensitive reads are DENIED. Set LOCAL_APPS_TOKEN for LAN control.`);
+  }
   console.log(`  Role:   ${MACHINE_ROLE.toUpperCase()}${IS_HUB ? ' (bots + auto-fix enabled)' : ' (status reporting only)'}\n`);
   startupSync();
 });
