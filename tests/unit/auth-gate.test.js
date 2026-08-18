@@ -33,8 +33,8 @@ test('off-box mutations are DENIED when no token is configured (fail closed)', (
   }
 });
 
-test('off-box sensitive GETs (shell/claude config/logs) are DENIED without a token', () => {
-  for (const path of ['/api/shell/zshrc', '/api/claude/config', '/api/log/bheng']) {
+test('off-box sensitive GETs (logs) are DENIED without a token', () => {
+  for (const path of ['/api/log/bheng', '/api/log/x']) {
     const d = decide({ remoteAddress: '10.0.0.9', method: 'GET', path, token: null, configuredToken: '' });
     assert.equal(d.allow, false);
     assert.equal(d.status, 401);
@@ -45,7 +45,7 @@ test('off-box with the correct token is allowed; wrong/absent token is denied', 
   const cfg = 'sekret-token-123';
   assert.deepEqual(decide({ remoteAddress: '10.0.0.9', method: 'POST', path: '/api/start/x', token: cfg, configuredToken: cfg }), { allow: true });
   assert.equal(decide({ remoteAddress: '10.0.0.9', method: 'POST', path: '/api/start/x', token: 'wrong', configuredToken: cfg }).allow, false);
-  assert.equal(decide({ remoteAddress: '10.0.0.9', method: 'GET', path: '/api/shell/zshrc', token: null, configuredToken: cfg }).allow, false);
+  assert.equal(decide({ remoteAddress: '10.0.0.9', method: 'GET', path: '/api/log/x', token: null, configuredToken: cfg }).allow, false);
 });
 
 test('tokenOk is false unless both are set and equal', () => {

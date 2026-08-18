@@ -15,18 +15,41 @@
     }
   ],
   "tags": [
-    { "name": "Apps", "description": "CRUD operations for registered apps" },
-    { "name": "Status", "description": "Health monitoring and live updates" },
-    { "name": "Machines", "description": "Manage peer machines for multi-machine dashboard" },
-    { "name": "Machine Sync", "description": "Cross-machine app list synchronization" },
-    { "name": "Screenshots", "description": "Automated screenshot capture and management" },
-    { "name": "Icons", "description": "Favicon generation and management" },
-    { "name": "Utilities", "description": "QR codes, logs, and other helpers" }
+    {
+      "name": "Apps",
+      "description": "CRUD operations for registered apps"
+    },
+    {
+      "name": "Status",
+      "description": "Health monitoring and live updates"
+    },
+    {
+      "name": "Machines",
+      "description": "Manage peer machines for multi-machine dashboard"
+    },
+    {
+      "name": "Machine Sync",
+      "description": "Cross-machine app list synchronization"
+    },
+    {
+      "name": "Screenshots",
+      "description": "Automated screenshot capture and management"
+    },
+    {
+      "name": "Icons",
+      "description": "Favicon generation and management"
+    },
+    {
+      "name": "Utilities",
+      "description": "QR codes, logs, and other helpers"
+    }
   ],
   "paths": {
     "/api/apps": {
       "get": {
-        "tags": ["Apps"],
+        "tags": [
+          "Apps"
+        ],
         "summary": "List all apps",
         "description": "Returns the full list of registered apps from the database.",
         "responses": {
@@ -36,7 +59,9 @@
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": { "$ref": "#/components/schemas/App" }
+                  "items": {
+                    "$ref": "#/components/schemas/App"
+                  }
                 }
               }
             }
@@ -44,14 +69,18 @@
         }
       },
       "post": {
-        "tags": ["Apps"],
+        "tags": [
+          "Apps"
+        ],
         "summary": "Register a new app",
         "description": "Registers a new app and auto-provisions infrastructure: port assignment, Caddy reverse proxy entry, macOS LaunchAgent plist, and health check enrollment.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/AppCreate" },
+              "schema": {
+                "$ref": "#/components/schemas/AppCreate"
+              },
               "example": {
                 "id": "my-app",
                 "name": "My App",
@@ -66,7 +95,9 @@
             "description": "App created with auto-provisioned infra",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/App" }
+                "schema": {
+                  "$ref": "#/components/schemas/App"
+                }
               }
             }
           },
@@ -74,7 +105,9 @@
             "description": "Missing required field (id)",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
@@ -83,17 +116,23 @@
     },
     "/api/apps/{id}": {
       "get": {
-        "tags": ["Apps"],
+        "tags": [
+          "Apps"
+        ],
         "summary": "Get a single app",
         "parameters": [
-          { "$ref": "#/components/parameters/AppId" }
+          {
+            "$ref": "#/components/parameters/AppId"
+          }
         ],
         "responses": {
           "200": {
             "description": "App details",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/App" }
+                "schema": {
+                  "$ref": "#/components/schemas/App"
+                }
               }
             }
           },
@@ -101,24 +140,32 @@
             "description": "App not found",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
         }
       },
       "put": {
-        "tags": ["Apps"],
+        "tags": [
+          "Apps"
+        ],
         "summary": "Update an app",
-        "description": "Partial update — only provided fields are changed. Re-provisions Caddy and LaunchAgent if localUrl or localPath changes.",
+        "description": "Partial update \u2014 only provided fields are changed. Re-provisions Caddy and LaunchAgent if localUrl or localPath changes.",
         "parameters": [
-          { "$ref": "#/components/parameters/AppId" }
+          {
+            "$ref": "#/components/parameters/AppId"
+          }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/AppUpdate" },
+              "schema": {
+                "$ref": "#/components/schemas/AppUpdate"
+              },
               "example": {
                 "localUrl": "http://localhost:4000",
                 "icon": "/favicons/my-app.svg"
@@ -131,7 +178,9 @@
             "description": "Updated app",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/App" }
+                "schema": {
+                  "$ref": "#/components/schemas/App"
+                }
               }
             }
           },
@@ -139,18 +188,24 @@
             "description": "App not found",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
         }
       },
       "delete": {
-        "tags": ["Apps"],
+        "tags": [
+          "Apps"
+        ],
         "summary": "Delete an app",
         "description": "Removes the app from the database, deletes its Caddy reverse proxy entry, and unloads its LaunchAgent.",
         "parameters": [
-          { "$ref": "#/components/parameters/AppId" }
+          {
+            "$ref": "#/components/parameters/AppId"
+          }
         ],
         "responses": {
           "200": {
@@ -160,7 +215,10 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": { "type": "boolean", "example": true }
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    }
                   }
                 }
               }
@@ -170,7 +228,9 @@
             "description": "App not found",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
@@ -179,7 +239,9 @@
     },
     "/api/status": {
       "get": {
-        "tags": ["Status"],
+        "tags": [
+          "Status"
+        ],
         "summary": "Dashboard status",
         "description": "Returns all apps with live health status, LAN URLs, screenshot availability, machine hostname, model, and IP address.",
         "responses": {
@@ -192,11 +254,23 @@
                   "properties": {
                     "apps": {
                       "type": "array",
-                      "items": { "$ref": "#/components/schemas/AppStatus" }
+                      "items": {
+                        "$ref": "#/components/schemas/AppStatus"
+                      }
                     },
-                    "lanIp": { "type": "string", "example": "192.168.1.50" },
-                    "machineModel": { "type": "string", "example": "Mac mini", "nullable": true },
-                    "monitorUrl": { "type": "string", "example": "http://192.168.1.50:9875" }
+                    "lanIp": {
+                      "type": "string",
+                      "example": "192.168.1.50"
+                    },
+                    "machineModel": {
+                      "type": "string",
+                      "example": "Mac mini",
+                      "nullable": true
+                    },
+                    "monitorUrl": {
+                      "type": "string",
+                      "example": "http://192.168.1.50:9875"
+                    }
                   }
                 }
               }
@@ -207,7 +281,9 @@
     },
     "/api/events": {
       "get": {
-        "tags": ["Status"],
+        "tags": [
+          "Status"
+        ],
         "summary": "SSE event stream",
         "description": "Server-Sent Events stream for real-time updates. Event types: `update` (app status change), `alert` (app went down), `reload` (config changed), `screenshots_done` (capture completed).",
         "responses": {
@@ -215,7 +291,9 @@
             "description": "SSE stream",
             "content": {
               "text/event-stream": {
-                "schema": { "type": "string" }
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -224,11 +302,15 @@
     },
     "/api/log/{id}": {
       "get": {
-        "tags": ["Utilities"],
+        "tags": [
+          "Utilities"
+        ],
         "summary": "Get app log tail",
         "description": "Returns the last 30 lines from the app's log file.",
         "parameters": [
-          { "$ref": "#/components/parameters/AppId" }
+          {
+            "$ref": "#/components/parameters/AppId"
+          }
         ],
         "responses": {
           "200": {
@@ -240,7 +322,9 @@
                   "properties": {
                     "lines": {
                       "type": "array",
-                      "items": { "type": "string" }
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   }
                 }
@@ -252,11 +336,15 @@
     },
     "/api/start/{id}": {
       "post": {
-        "tags": ["Status"],
+        "tags": [
+          "Status"
+        ],
         "summary": "Start an app",
         "description": "Loads and starts the app's macOS LaunchAgent plist.",
         "parameters": [
-          { "$ref": "#/components/parameters/AppId" }
+          {
+            "$ref": "#/components/parameters/AppId"
+          }
         ],
         "responses": {
           "200": {
@@ -266,7 +354,10 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": { "type": "boolean", "example": true }
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    }
                   }
                 }
               }
@@ -276,7 +367,9 @@
             "description": "No LaunchAgent configured",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           },
@@ -284,7 +377,9 @@
             "description": "App not found",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
@@ -293,7 +388,9 @@
     },
     "/api/qr": {
       "get": {
-        "tags": ["Utilities"],
+        "tags": [
+          "Utilities"
+        ],
         "summary": "QR code for LAN access",
         "description": "Returns a QR code image (base64 data URL) pointing to the LAN dashboard URL.",
         "responses": {
@@ -304,8 +401,14 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "url": { "type": "string", "example": "http://192.168.1.50:9875" },
-                    "dataUrl": { "type": "string", "description": "Base64 PNG data URL" }
+                    "url": {
+                      "type": "string",
+                      "example": "http://192.168.1.50:9875"
+                    },
+                    "dataUrl": {
+                      "type": "string",
+                      "description": "Base64 PNG data URL"
+                    }
                   }
                 }
               }
@@ -316,7 +419,9 @@
     },
     "/api/machines": {
       "get": {
-        "tags": ["Machines"],
+        "tags": [
+          "Machines"
+        ],
         "summary": "List peer machines",
         "description": "Returns all saved peer machines from the database.",
         "responses": {
@@ -326,7 +431,9 @@
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": { "$ref": "#/components/schemas/Machine" }
+                  "items": {
+                    "$ref": "#/components/schemas/Machine"
+                  }
                 }
               }
             }
@@ -336,7 +443,9 @@
     },
     "/api/machine": {
       "get": {
-        "tags": ["Machine Sync"],
+        "tags": [
+          "Machine Sync"
+        ],
         "summary": "Machine identity",
         "description": "Returns this machine's hostname, hardware model, LAN IP, monitor port, and number of registered apps.",
         "responses": {
@@ -344,170 +453,9 @@
             "description": "Machine info",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/MachineInfo" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/screenshots": {
-      "get": {
-        "tags": ["Screenshots"],
-        "summary": "Global screenshot index",
-        "description": "Returns the global screenshots index.json if it exists.",
-        "responses": {
-          "200": {
-            "description": "Screenshot index",
-            "content": {
-              "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": { "type": "object" }
+                  "$ref": "#/components/schemas/MachineInfo"
                 }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/screenshots/{id}": {
-      "get": {
-        "tags": ["Screenshots"],
-        "summary": "Get screenshots for an app",
-        "description": "Returns the screenshot index (desktop/mobile lists) for a specific app.",
-        "parameters": [
-          { "$ref": "#/components/parameters/AppId" }
-        ],
-        "responses": {
-          "200": {
-            "description": "Screenshot data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": { "type": "string" },
-                    "desktop": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    },
-                    "mobile": {
-                      "type": "array",
-                      "items": { "type": "string" }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": ["Screenshots"],
-        "summary": "Capture screenshots",
-        "description": "Triggers the Playwright screenshot bot for the specified app. Runs asynchronously in the background. Broadcasts `screenshots_done` SSE event on completion.",
-        "parameters": [
-          { "$ref": "#/components/parameters/AppId" }
-        ],
-        "responses": {
-          "200": {
-            "description": "Capture started or already running",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": ["started", "already_running"]
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "App not found",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/screenshots-status": {
-      "get": {
-        "tags": ["Screenshots"],
-        "summary": "Running screenshot jobs",
-        "description": "Returns currently active screenshot capture jobs with their start times.",
-        "responses": {
-          "200": {
-            "description": "Active jobs map",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "object",
-                    "properties": {
-                      "startedAt": { "type": "string", "format": "date-time" }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/screenshot": {
-      "delete": {
-        "tags": ["Screenshots"],
-        "summary": "Delete a screenshot",
-        "description": "Deletes a specific screenshot file and removes it from the app's index.json.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["appId", "mode", "filename"],
-                "properties": {
-                  "appId": { "type": "string", "description": "App ID" },
-                  "mode": { "type": "string", "enum": ["desktop", "mobile"], "description": "Screenshot mode" },
-                  "filename": { "type": "string", "description": "Screenshot filename (no path)" }
-                }
-              },
-              "example": {
-                "appId": "my-app",
-                "mode": "desktop",
-                "filename": "home.png"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Screenshot deleted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": { "type": "boolean", "example": true }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Missing fields or invalid filename",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
               }
             }
           }
@@ -516,7 +464,9 @@
     },
     "/api/retake": {
       "post": {
-        "tags": ["Screenshots"],
+        "tags": [
+          "Screenshots"
+        ],
         "summary": "Toggle retake flag",
         "description": "Marks or unmarks a screenshot for retake. Stored in the app's retake.json.",
         "requestBody": {
@@ -525,11 +475,25 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["appId", "mode", "filename"],
+                "required": [
+                  "appId",
+                  "mode",
+                  "filename"
+                ],
                 "properties": {
-                  "appId": { "type": "string" },
-                  "mode": { "type": "string", "enum": ["desktop", "mobile"] },
-                  "filename": { "type": "string" }
+                  "appId": {
+                    "type": "string"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "desktop",
+                      "mobile"
+                    ]
+                  },
+                  "filename": {
+                    "type": "string"
+                  }
                 }
               }
             }
@@ -543,7 +507,9 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "marked": { "type": "boolean" }
+                    "marked": {
+                      "type": "boolean"
+                    }
                   }
                 }
               }
@@ -553,7 +519,9 @@
             "description": "Missing fields",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
@@ -562,15 +530,19 @@
     },
     "/api/retake/{appId}": {
       "get": {
-        "tags": ["Screenshots"],
+        "tags": [
+          "Screenshots"
+        ],
         "summary": "Get retake list",
-        "description": "Returns the retake.json for an app — a map of screenshots flagged for retake.",
+        "description": "Returns the retake.json for an app \u2014 a map of screenshots flagged for retake.",
         "parameters": [
           {
             "name": "appId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "description": "App identifier"
           }
         ],
@@ -581,7 +553,9 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": { "type": "boolean" }
+                  "additionalProperties": {
+                    "type": "boolean"
+                  }
                 }
               }
             }
@@ -591,11 +565,15 @@
     },
     "/api/generate-icons/{id}": {
       "post": {
-        "tags": ["Icons"],
+        "tags": [
+          "Icons"
+        ],
         "summary": "Generate favicons for one app",
         "description": "Finds the best source icon (SVG/PNG) and generates favicon.ico (16+32), apple-touch-icon.png (180), and icon.png (512). Runs asynchronously.",
         "parameters": [
-          { "$ref": "#/components/parameters/AppId" }
+          {
+            "$ref": "#/components/parameters/AppId"
+          }
         ],
         "responses": {
           "200": {
@@ -605,7 +583,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "enum": ["started", "already_running"] }
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "started",
+                        "already_running"
+                      ]
+                    }
                   }
                 }
               }
@@ -615,7 +599,9 @@
             "description": "App not found",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
@@ -624,7 +610,9 @@
     },
     "/api/generate-icons": {
       "post": {
-        "tags": ["Icons"],
+        "tags": [
+          "Icons"
+        ],
         "summary": "Generate favicons for all apps",
         "description": "Runs the favicon generator for every registered app. Skips apps that are already complete (e.g. mindmaps). Runs asynchronously.",
         "responses": {
@@ -635,7 +623,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": { "type": "string", "enum": ["started", "already_running"] }
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "started",
+                        "already_running"
+                      ]
+                    }
                   }
                 }
               }
@@ -646,7 +640,9 @@
     },
     "/api/generate-icons/status": {
       "get": {
-        "tags": ["Icons"],
+        "tags": [
+          "Icons"
+        ],
         "summary": "Icon generation job status",
         "description": "Returns currently running icon generation jobs.",
         "responses": {
@@ -659,7 +655,10 @@
                   "additionalProperties": {
                     "type": "object",
                     "properties": {
-                      "startedAt": { "type": "string", "format": "date-time" }
+                      "startedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
                     }
                   }
                 }
@@ -676,7 +675,9 @@
         "name": "id",
         "in": "path",
         "required": true,
-        "schema": { "type": "string" },
+        "schema": {
+          "type": "string"
+        },
         "description": "App identifier (kebab-case)",
         "example": "my-app"
       }
@@ -685,93 +686,262 @@
       "App": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "example": "my-app" },
-          "name": { "type": "string", "example": "my-app" },
-          "healthUrl": { "type": "string", "example": "http://localhost:3000" },
-          "localUrl": { "type": "string", "example": "http://localhost:3000" },
-          "repo": { "type": "string", "example": "https://github.com/me/my-app", "nullable": true },
-          "localPath": { "type": "string", "example": "/Users/me/Sites/my-app", "nullable": true },
-          "logPath": { "type": "string", "example": "/tmp/my-app.log", "nullable": true },
-          "startCommand": { "type": "string", "example": "npm run dev", "nullable": true },
-          "icon": { "type": "string", "nullable": true },
-          "caddyUrl": { "type": "string", "example": "http://my-app.localhost", "nullable": true },
-          "launchAgent": { "type": "string", "nullable": true },
-          "launchAgentPath": { "type": "string", "nullable": true }
+          "id": {
+            "type": "string",
+            "example": "my-app"
+          },
+          "name": {
+            "type": "string",
+            "example": "my-app"
+          },
+          "healthUrl": {
+            "type": "string",
+            "example": "http://localhost:3000"
+          },
+          "localUrl": {
+            "type": "string",
+            "example": "http://localhost:3000"
+          },
+          "repo": {
+            "type": "string",
+            "example": "https://github.com/me/my-app",
+            "nullable": true
+          },
+          "localPath": {
+            "type": "string",
+            "example": "/Users/me/Sites/my-app",
+            "nullable": true
+          },
+          "logPath": {
+            "type": "string",
+            "example": "/tmp/my-app.log",
+            "nullable": true
+          },
+          "startCommand": {
+            "type": "string",
+            "example": "npm run dev",
+            "nullable": true
+          },
+          "icon": {
+            "type": "string",
+            "nullable": true
+          },
+          "caddyUrl": {
+            "type": "string",
+            "example": "http://my-app.localhost",
+            "nullable": true
+          },
+          "launchAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "launchAgentPath": {
+            "type": "string",
+            "nullable": true
+          }
         }
       },
       "AppCreate": {
         "type": "object",
-        "required": ["id"],
+        "required": [
+          "id"
+        ],
         "properties": {
-          "id": { "type": "string", "description": "Unique identifier (kebab-case)" },
-          "name": { "type": "string", "description": "Display name (defaults to id)" },
-          "localPath": { "type": "string", "description": "Absolute path to project root" },
-          "localUrl": { "type": "string", "description": "Local URL (auto-assigned if omitted)" },
-          "healthUrl": { "type": "string", "description": "Health check URL (defaults to localUrl)" },
-          "repo": { "type": "string", "description": "GitHub repo URL" },
-          "startCommand": { "type": "string", "description": "Start command (defaults to 'npm run dev')" },
-          "icon": { "type": "string", "description": "URL or path to app icon" },
-          "logPath": { "type": "string", "description": "Log file path (defaults to /tmp/{id}.log)" }
+          "id": {
+            "type": "string",
+            "description": "Unique identifier (kebab-case)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name (defaults to id)"
+          },
+          "localPath": {
+            "type": "string",
+            "description": "Absolute path to project root"
+          },
+          "localUrl": {
+            "type": "string",
+            "description": "Local URL (auto-assigned if omitted)"
+          },
+          "healthUrl": {
+            "type": "string",
+            "description": "Health check URL (defaults to localUrl)"
+          },
+          "repo": {
+            "type": "string",
+            "description": "GitHub repo URL"
+          },
+          "startCommand": {
+            "type": "string",
+            "description": "Start command (defaults to 'npm run dev')"
+          },
+          "icon": {
+            "type": "string",
+            "description": "URL or path to app icon"
+          },
+          "logPath": {
+            "type": "string",
+            "description": "Log file path (defaults to /tmp/{id}.log)"
+          }
         }
       },
       "AppUpdate": {
         "type": "object",
         "properties": {
-          "name": { "type": "string" },
-          "localPath": { "type": "string" },
-          "localUrl": { "type": "string" },
-          "healthUrl": { "type": "string" },
-          "repo": { "type": "string" },
-          "startCommand": { "type": "string" },
-          "icon": { "type": "string" },
-          "logPath": { "type": "string" }
+          "name": {
+            "type": "string"
+          },
+          "localPath": {
+            "type": "string"
+          },
+          "localUrl": {
+            "type": "string"
+          },
+          "healthUrl": {
+            "type": "string"
+          },
+          "repo": {
+            "type": "string"
+          },
+          "startCommand": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "logPath": {
+            "type": "string"
+          }
         }
       },
       "AppStatus": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "name": { "type": "string" },
-          "localUrl": { "type": "string" },
-          "lanUrl": { "type": "string", "nullable": true },
-          "status": { "type": "string", "enum": ["up", "down", "unknown"] },
-          "lastChecked": { "type": "string", "format": "date-time", "nullable": true },
-          "caddyUrl": { "type": "string", "nullable": true },
-          "launchAgent": { "type": "string", "nullable": true },
-          "launchAgentPath": { "type": "string", "nullable": true },
-          "icon": { "type": "string", "nullable": true },
-          "repo": { "type": "string", "nullable": true },
-          "localPath": { "type": "string", "nullable": true },
-          "logPath": { "type": "string", "nullable": true },
-          "hostname": { "type": "string" },
-          "hasScreenshots": { "type": "boolean" }
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "localUrl": {
+            "type": "string"
+          },
+          "lanUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "unknown"
+            ]
+          },
+          "lastChecked": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "caddyUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "launchAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "launchAgentPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "icon": {
+            "type": "string",
+            "nullable": true
+          },
+          "repo": {
+            "type": "string",
+            "nullable": true
+          },
+          "localPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "logPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "hasScreenshots": {
+            "type": "boolean"
+          }
         }
       },
       "Machine": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "example": "Bunlongs-Mac-mini.local" },
-          "hostname": { "type": "string", "example": "Bunlongs-Mac-mini.local", "nullable": true },
-          "ip": { "type": "string", "example": "192.168.1.50" },
-          "port": { "type": "integer", "example": 9875 },
-          "model": { "type": "string", "example": "Mac mini", "nullable": true },
-          "last_seen": { "type": "string", "format": "date-time" }
+          "id": {
+            "type": "string",
+            "example": "Bunlongs-Mac-mini.local"
+          },
+          "hostname": {
+            "type": "string",
+            "example": "Bunlongs-Mac-mini.local",
+            "nullable": true
+          },
+          "ip": {
+            "type": "string",
+            "example": "192.168.1.50"
+          },
+          "port": {
+            "type": "integer",
+            "example": 9875
+          },
+          "model": {
+            "type": "string",
+            "example": "Mac mini",
+            "nullable": true
+          },
+          "last_seen": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "MachineInfo": {
         "type": "object",
         "properties": {
-          "hostname": { "type": "string", "example": "Bunlongs-Mac-mini.local" },
-          "model": { "type": "string", "example": "Mac mini", "nullable": true },
-          "lanIp": { "type": "string", "example": "192.168.1.50" },
-          "port": { "type": "integer", "example": 9875 },
-          "appCount": { "type": "integer", "example": 10 }
+          "hostname": {
+            "type": "string",
+            "example": "Bunlongs-Mac-mini.local"
+          },
+          "model": {
+            "type": "string",
+            "example": "Mac mini",
+            "nullable": true
+          },
+          "lanIp": {
+            "type": "string",
+            "example": "192.168.1.50"
+          },
+          "port": {
+            "type": "integer",
+            "example": 9875
+          },
+          "appCount": {
+            "type": "integer",
+            "example": 10
+          }
         }
       },
       "Error": {
         "type": "object",
         "properties": {
-          "error": { "type": "string" }
+          "error": {
+            "type": "string"
+          }
         }
       }
     }

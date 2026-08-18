@@ -209,71 +209,6 @@ db.exec(`
   )
 `);
 
-// --- MCP Activity ---
-db.exec(`
-  CREATE TABLE IF NOT EXISTS mcp_activity (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    server TEXT NOT NULL,
-    tool TEXT NOT NULL,
-    args TEXT,
-    result_length INTEGER DEFAULT 0,
-    is_error INTEGER DEFAULT 0,
-    duration_ms INTEGER,
-    cwd TEXT,
-    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-  )
-`);
-db.exec(`CREATE INDEX IF NOT EXISTS idx_mcp_server ON mcp_activity(server)`);
-db.exec(`CREATE INDEX IF NOT EXISTS idx_mcp_tool ON mcp_activity(tool)`);
-db.exec(`CREATE INDEX IF NOT EXISTS idx_mcp_created ON mcp_activity(created_at)`);
-
-const insertMcpStmt = db.prepare(`
-  INSERT INTO mcp_activity (server, tool, args, result_length, is_error, duration_ms, cwd)
-  VALUES (@server, @tool, @args, @resultLength, @isError, @durationMs, @cwd)
-`);
-
-function insertMcpActivity(data) {
-  insertMcpStmt.run({
-    server: data.server,
-    tool: data.tool,
-    args: data.args || null,
-    resultLength: data.resultLength || 0,
-    isError: data.isError ? 1 : 0,
-    durationMs: data.durationMs || null,
-    cwd: data.cwd || null,
-  });
-}
-
-function getMcpActivity({ server, tool, from, to, limit = 100, offset = 0 } = {}) {
-  let where = [];
-  const params = {};
-  if (server) { where.push('server = @server'); params.server = server; }
-  if (tool) { where.push('tool = @tool'); params.tool = tool; }
-  if (from) { where.push('created_at >= @from'); params.from = from; }
-  if (to) { where.push('created_at <= @to'); params.to = to; }
-  const clause = where.length ? 'WHERE ' + where.join(' AND ') : '';
-  const rows = db.prepare(`SELECT * FROM mcp_activity ${clause} ORDER BY created_at DESC LIMIT @limit OFFSET @offset`).all({ ...params, limit, offset });
-  const total = db.prepare(`SELECT COUNT(*) as count FROM mcp_activity ${clause}`).get(params).count;
-  return { rows, total };
-}
-
-function getMcpStats({ server, from, to } = {}) {
-  let where = [];
-  const params = {};
-  if (server) { where.push('server = @server'); params.server = server; }
-  if (from) { where.push('created_at >= @from'); params.from = from; }
-  if (to) { where.push('created_at <= @to'); params.to = to; }
-  const clause = where.length ? 'WHERE ' + where.join(' AND ') : '';
-  const summary = db.prepare(`SELECT COUNT(*) as total, SUM(is_error) as errors, AVG(duration_ms) as avgMs FROM mcp_activity ${clause}`).get(params);
-  const byServer = db.prepare(`SELECT server, COUNT(*) as calls, SUM(is_error) as errors FROM mcp_activity ${clause} GROUP BY server ORDER BY calls DESC`).all(params);
-  const byTool = db.prepare(`SELECT server, tool, COUNT(*) as calls, AVG(duration_ms) as avgMs FROM mcp_activity ${clause} GROUP BY server, tool ORDER BY calls DESC LIMIT 30`).all(params);
-  return { total: summary.total, errors: summary.errors || 0, avgMs: Math.round(summary.avgMs || 0), byServer, byTool };
-}
-
-function purgeMcpActivity(days = 30) {
-  return db.prepare(`DELETE FROM mcp_activity WHERE created_at < datetime('now', '-' || @days || ' days')`).run({ days }).changes;
-}
-
 // --- Remote apps helpers ---
 function upsertRemoteApp(machineId, app) {
   db.prepare(`
@@ -488,5 +423,4 @@ module.exports = {
   getApps, getApp, upsertApp, deleteApp, toggleApp, setAppDisabled, getTabColors,
   getMachines, upsertMachine, deleteMachine,
   getRemoteApps, syncRemoteApps, deleteRemoteApps,
-  insertMcpActivity, getMcpActivity, getMcpStats, purgeMcpActivity,
 };
