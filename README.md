@@ -1,3 +1,13 @@
+<div align="center">
+  <img src="docs/icon.png" alt="Local Apps" width="96" height="96" />
+  <h1>Local Apps</h1>
+  <p><em>Bot that deploys a cost-capped Claude agent to fix down local apps</em></p>
+  <p><a href="https://github.com/bunlongheng/local-apps">Repo</a> &middot; <a href="https://bunlongheng.com/projects?name=local-apps">Portfolio</a></p>
+  <img src="docs/social-preview.png" alt="Local Apps - preview" width="820" />
+</div>
+
+---
+
 # Local Apps
 
 A self-healing dashboard for a fleet of local dev apps. Register an app and it auto-assigns a port, wires a Caddy reverse proxy and a macOS LaunchAgent, then health-checks it, restarts it when it crashes, and exposes it over LAN and Tailscale - all from one page.
