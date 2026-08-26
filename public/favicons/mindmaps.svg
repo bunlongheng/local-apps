@@ -1,0 +1,71 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'>
+  <defs>
+    <radialGradient id='gR' cx='38%' cy='28%' r='72%'>
+      <stop offset='0%' stop-color='#ff7048'/>
+      <stop offset='60%' stop-color='#e83820'/>
+      <stop offset='100%' stop-color='#b81800'/>
+    </radialGradient>
+    <radialGradient id='gP' cx='35%' cy='28%' r='70%'>
+      <stop offset='0%' stop-color='#c884ff'/>
+      <stop offset='60%' stop-color='#8b3cf7'/>
+      <stop offset='100%' stop-color='#5410bc'/>
+    </radialGradient>
+    <radialGradient id='gB' cx='64%' cy='28%' r='70%'>
+      <stop offset='0%' stop-color='#90dcff'/>
+      <stop offset='60%' stop-color='#38b0f0'/>
+      <stop offset='100%' stop-color='#0868c0'/>
+    </radialGradient>
+    <radialGradient id='gG' cx='35%' cy='28%' r='70%'>
+      <stop offset='0%' stop-color='#78ee90'/>
+      <stop offset='60%' stop-color='#20c838'/>
+      <stop offset='100%' stop-color='#087018'/>
+    </radialGradient>
+    <linearGradient id='gM' x1='0%' y1='0%' x2='0%' y2='100%'>
+      <stop offset='0%' stop-color='#d8e2ea'/>
+      <stop offset='50%' stop-color='#a8b8c4'/>
+      <stop offset='100%' stop-color='#6c7e8e'/>
+    </linearGradient>
+    <filter id='sh' x='-30%' y='-30%' width='160%' height='160%'>
+      <feDropShadow dx='0' dy='7' stdDeviation='12' flood-color='rgba(0,0,0,0.20)'/>
+    </filter>
+  </defs>
+
+  <!-- White rounded background -->
+  <rect width='512' height='512' rx='112' fill='#ffffff'/>
+
+  <!-- Top pill: red-orange, full width -->
+  <rect x='96' y='76' width='320' height='126' rx='63' fill='url(#gR)' filter='url(#sh)'/>
+
+  <!-- Middle-left: purple rounded square -->
+  <rect x='96' y='214' width='160' height='160' rx='64' fill='url(#gP)' filter='url(#sh)'/>
+
+  <!-- Middle-right: blue circle -->
+  <circle cx='336' cy='294' r='80' fill='url(#gB)' filter='url(#sh)'/>
+
+  <!-- Bottom: green teardrop (narrows toward neck) -->
+  <path d='M 144 382 C 96 382 96 434 96 454 C 96 504 130 528 196 528 C 256 528 256 502 256 454 C 256 434 256 382 208 382 Z'
+        fill='url(#gG)' filter='url(#sh)'/>
+
+  <!-- Base cap: metallic gray -->
+  <rect x='188' y='520' width='136' height='38' rx='19' fill='url(#gM)'/>
+  <!-- Lower dome shadow -->
+  <ellipse cx='256' cy='558' rx='46' ry='11' fill='#8898a8' opacity='0.45'/>
+
+  <!-- Sparkles -->
+  <!-- Cyan star, top-left -->
+  <g transform='translate(68,196)'>
+    <path d='M0,-18 L4.5,-4.5 L18,0 L4.5,4.5 L0,18 L-4.5,4.5 L-18,0 L-4.5,-4.5 Z' fill='#48c8f0'/>
+  </g>
+  <!-- Yellow star, top-right -->
+  <g transform='translate(322,68)'>
+    <path d='M0,-13 L3,-3 L13,0 L3,3 L0,13 L-3,3 L-13,0 L-3,-3 Z' fill='#f0c030'/>
+  </g>
+  <!-- Purple star, right -->
+  <g transform='translate(442,336)'>
+    <path d='M0,-16 L4,-4 L16,0 L4,4 L0,16 L-4,4 L-16,0 L-4,-4 Z' fill='#a060f8'/>
+  </g>
+  <!-- Small yellow star, lower-right -->
+  <g transform='translate(408,430)'>
+    <path d='M0,-9 L2,-2 L9,0 L2,2 L0,9 L-2,2 L-9,0 L-2,-2 Z' fill='#f0c030'/>
+  </g>
+</svg>

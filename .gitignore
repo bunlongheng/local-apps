@@ -1,0 +1,22 @@
+node_modules/
+.DS_Store
+*.pem
+npm-debug.log*
+.env*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+/data/
+
+# Personal app registry - each user keeps their own; seed from apps.config.example.json
+apps.config.json
+
+# Runtime logs and local state
+*.log
+*-state.json
+machine-role.json
+
+# Local backups (DB + config snapshots - never publish)
+*.bak
+*.bak.*
