@@ -18,5 +18,6 @@
     <div id="root"></div>
   </div>
   <script src="/app.js?v=9"></script>
+  <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js").catch(function(){});});}</script>
 </body>
 </html>
