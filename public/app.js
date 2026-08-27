@@ -278,7 +278,9 @@
     h += '<div class="counters"><div class="counter up">' + upCount + "</div>";
     if (downCount > 0) h += '<div class="counter down">' + downCount + "</div>";
     h += "</div>";
-    h += '<div class="header-right"><button class="icon-btn" data-act="help" title="Quick Reference">?</button>';
+    h += '<div class="header-right">';
+    h += '<button class="icon-btn" data-act="search" title="Search apps" aria-label="Search apps"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></button>';
+    h += '<button class="icon-btn" data-act="help" title="Quick Reference">?</button>';
     h += '<div class="qr-wrap"><button class="qr-toggle' + (S.qrOpen ? " open" : "") + '" data-act="qr" title="Show LAN QR code">' + qrSvg() + "</button>";
     if (S.qrOpen && S.qrData) h += '<div class="qr-pop" data-keep="qr"><img src="' + esc(S.qrData.dataUrl) + '" alt="QR"><div class="url">' + esc(S.qrData.url) + "</div></div>";
     h += "</div></div></div></header>";
@@ -574,6 +576,7 @@
       case "toggle": toggleApp(id, name); break;
       case "delete": deleteApp(id, name); break;
       case "copy": copy(el.getAttribute("data-copy")); break;
+      case "search": e.stopPropagation(); openCmdK(); break;
       case "help": S.helpOpen = true; render(); break;
       case "help-close": case "overlay-help": if (act === "help-close" || e.target === el) { S.helpOpen = false; render(); } break;
       case "qr": e.stopPropagation(); toggleQR(); break;
