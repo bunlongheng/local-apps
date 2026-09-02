@@ -172,8 +172,9 @@
         if (msg.type === "update") {
           if (msg.status === "removed") { S.apps = S.apps.filter(function (a) { return a.id !== msg.id; }); }
           else {
-            S.apps = S.apps.map(function (a) { return a.id === msg.id ? Object.assign({}, a, { status: msg.status }) : a; });
-            if (S.modalApp && S.modalApp.id === msg.id) S.modalApp = Object.assign({}, S.modalApp, { status: msg.status });
+            var patch = msg.disabled !== undefined ? { status: msg.status, disabled: msg.disabled } : { status: msg.status };
+            S.apps = S.apps.map(function (a) { return a.id === msg.id ? Object.assign({}, a, patch) : a; });
+            if (S.modalApp && S.modalApp.id === msg.id) S.modalApp = Object.assign({}, S.modalApp, patch);
             if (msg.status === "up") {
               S.startupState[msg.id] = { phase: "serving", label: "Ready", percent: 100 };
               if (startPolls[msg.id]) { clearInterval(startPolls[msg.id]); delete startPolls[msg.id]; }
