@@ -272,6 +272,13 @@ async function checkAll() {
 
     const newStatus = up ? 'up' : 'down';
     if (s.status !== newStatus) {
+      // Flap detection: going down shortly after a restart means it crashed on us.
+      // Tracked in a rolling 2-min window that survives the 'up' counter reset below,
+      // so a start-then-crash app can't loop the escalation chain forever (L5 trips it).
+      if (newStatus === 'down' && s.status === 'up' && s.lastRestart && Date.now() - s.lastRestart < 120000) {
+        s.flapWindow = (s.flapWindow || []).filter(t => Date.now() - t < 120000);
+        s.flapWindow.push(Date.now());
+      }
       s.status = newStatus;
       broadcast({ type: 'update', id: appCfg.id, status: newStatus });
       if (newStatus === 'down') broadcast({ type: 'alert', id: appCfg.id, name: appCfg.name });
@@ -292,6 +299,25 @@ async function checkAll() {
       const attempts = s.restartAttempts || 0;
       const lastRestart = s.lastRestart || 0;
       const port = appCfg.localUrl ? (() => { try { return new URL(appCfg.localUrl).port; } catch { return null; } })() : null;
+
+      // Level 5: Circuit breaker. The chain is churning - stop trying and land the app
+      // cleanly OFF (disabled) instead of blinking yellow forever / flapping CPU in a loop.
+      // Trips on 3 flaps in 2 min, or 2 failed restart attempts still down. Runs before
+      // L1 so it intercepts; once disabled, the outer !disabled guard skips future ticks.
+      const flaps = (s.flapWindow = (s.flapWindow || []).filter(t => Date.now() - t < 120000)).length;
+      if (flaps >= 3 || (attempts >= 2 && Date.now() - lastRestart > 60000)) {
+        try {
+          if (port) execSync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
+          if (label) execSync(`launchctl bootout gui/${uid}/${label} 2>/dev/null`, { timeout: 10000 });
+        } catch {}
+        db.setAppDisabled(appCfg.id, true);
+        appCfg.disabled = true;
+        s.downSince = null; s.restartAttempts = 0; s.flapWindow = [];
+        console.log(`  [L5] circuit breaker -> disabled ${appCfg.id} (${flaps} flaps, ${attempts} attempts)`);
+        broadcast({ type: 'update', id: appCfg.id, status: 'down', disabled: true });
+        broadcast({ type: 'alert', id: appCfg.id, name: appCfg.name });
+        continue;
+      }
 
       // Level 1: Quick kickstart (first attempt, or 60s since last try)
       // kickstart fails if the service was booted out (LaunchAgent purge) - bootstrap the plist as fallback
