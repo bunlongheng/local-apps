@@ -6,6 +6,7 @@ const { execSync, spawn } = require('child_process');
 const QRCode = require('qrcode');
 const db = require('./db');
 const { startCmd } = require('./launchctl-cmds');
+const { shouldTrip, rearmReason } = require('./lib/breaker');
 const { isValidId, validateAppFields, xmlEscape } = require('./lib/validate');
 const makeCaddy = require('./lib/caddy');
 const makeLaunchd = require('./lib/launchd');
@@ -290,6 +291,16 @@ async function checkAll() {
     // Level 3 (180s): still down? read logs, try common fixes (npm install, port kill)
     // Level 4 (300s): still down? deploy Claude Code agent to debug and fix
     const autoRestartEnabled = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'auto-restart.json'), 'utf8')).enabled; } catch { return false; } })();
+    // Level 5 recovery: a breaker OFF (never a user OFF) re-arms when the port is
+    // observed up or after the cooldown, so a healthy app can't sit grey forever.
+    const rearm = IS_HUB && autoRestartEnabled ? rearmReason(appCfg, up, Date.now()) : null;
+    if (rearm) {
+      db.setAppDisabled(appCfg.id, false);
+      appCfg.disabled = false;
+      s.downSince = null; s.restartAttempts = 0; s.flapWindow = [];
+      console.log(`  [L5] re-armed ${appCfg.id} (${rearm})`);
+      broadcast({ type: 'update', id: appCfg.id, status: newStatus, disabled: false });
+    }
     if (IS_HUB && autoRestartEnabled && newStatus === 'down' && !appCfg.disabled && (appCfg.launchAgentPath || appCfg.launchAgent)) {
       const uid = process.getuid();
       const label = appCfg.launchAgent;
@@ -302,18 +313,18 @@ async function checkAll() {
 
       // Level 5: Circuit breaker. The chain is churning - stop trying and land the app
       // cleanly OFF (disabled) instead of blinking yellow forever / flapping CPU in a loop.
-      // Trips on 3 flaps in 2 min, or 2 failed restart attempts still down. Runs before
-      // L1 so it intercepts; once disabled, the outer !disabled guard skips future ticks.
-      const flaps = (s.flapWindow = (s.flapWindow || []).filter(t => Date.now() - t < 120000)).length;
-      if (flaps >= 3 || (attempts >= 2 && Date.now() - lastRestart > 60000)) {
+      // Trips on 3 flaps in 2 min, or the whole L1-L4 chain exhausted and still down
+      // (policy in lib/breaker.js). Runs before L1 so it intercepts; once disabled, the
+      // outer !disabled guard skips future ticks until the re-arm above fires.
+      if (shouldTrip(s, Date.now())) {
         try {
           if (port) execSync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
           if (label) execSync(`launchctl bootout gui/${uid}/${label} 2>/dev/null`, { timeout: 10000 });
         } catch {}
-        db.setAppDisabled(appCfg.id, true);
+        db.setAppDisabled(appCfg.id, true, 'breaker');
         appCfg.disabled = true;
+        console.log(`  [L5] circuit breaker -> disabled ${appCfg.id} (${s.flapWindow.length} flaps, ${attempts} attempts)`);
         s.downSince = null; s.restartAttempts = 0; s.flapWindow = [];
-        console.log(`  [L5] circuit breaker -> disabled ${appCfg.id} (${flaps} flaps, ${attempts} attempts)`);
         broadcast({ type: 'update', id: appCfg.id, status: 'down', disabled: true });
         broadcast({ type: 'alert', id: appCfg.id, name: appCfg.name });
         continue;

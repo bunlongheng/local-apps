@@ -44,6 +44,9 @@ try { db.exec(`ALTER TABLE apps ADD COLUMN icon TEXT`); } catch { /* already exi
 
 // Migration: add disabled toggle
 try { db.exec(`ALTER TABLE apps ADD COLUMN disabled INTEGER DEFAULT 0`); } catch { /* already exists */ }
+// Migration: who turned it off (user | breaker) and when, so a breaker OFF can re-arm
+try { db.exec(`ALTER TABLE apps ADD COLUMN disabled_reason TEXT`); } catch { /* already exists */ }
+try { db.exec(`ALTER TABLE apps ADD COLUMN disabled_at TEXT`); } catch { /* already exists */ }
 
 // Migration: add tab color columns
 try { db.exec(`ALTER TABLE apps ADD COLUMN tab_color TEXT`); } catch { /* already exists */ }
@@ -281,6 +284,8 @@ function rowToApp(row) {
     icon: row.icon,
     login: !!row.login,
     disabled: !!row.disabled,
+    disabledReason: row.disabled_reason || null,
+    disabledAt: row.disabled_at || null,
     about: row.about,
     features: safeParse(row.features),
     architect: row.architect,
@@ -377,8 +382,9 @@ function toggleApp(id) {
   return { id, disabled: !!newState };
 }
 
-function setAppDisabled(id, disabled) {
-  db.prepare('UPDATE apps SET disabled = ? WHERE id = ?').run(disabled ? 1 : 0, id);
+function setAppDisabled(id, disabled, reason = 'user') {
+  db.prepare('UPDATE apps SET disabled = ?, disabled_reason = ?, disabled_at = ? WHERE id = ?')
+    .run(disabled ? 1 : 0, disabled ? reason : null, disabled ? new Date().toISOString() : null, id);
 }
 
 // --- Machines ---
