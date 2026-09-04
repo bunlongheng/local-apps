@@ -64,3 +64,20 @@ test('deleteApp removes the row', () => {
   db.deleteApp('zzz-test-app');
   assert.equal(db.getApp('zzz-test-app'), undefined);
 });
+
+test('setAppDisabled records who turned it off and when; enabling clears both', () => {
+  db.upsertApp({ id: 'zzz-breaker', name: 'B' });
+  db.setAppDisabled('zzz-breaker', true, 'breaker');
+  let a = db.getApp('zzz-breaker');
+  assert.equal(a.disabled, true);
+  assert.equal(a.disabledReason, 'breaker');
+  assert.ok(!Number.isNaN(Date.parse(a.disabledAt)), 'disabledAt is an ISO timestamp');
+  db.setAppDisabled('zzz-breaker', true);
+  assert.equal(db.getApp('zzz-breaker').disabledReason, 'user', 'default reason is user');
+  db.setAppDisabled('zzz-breaker', false);
+  a = db.getApp('zzz-breaker');
+  assert.equal(a.disabled, false);
+  assert.equal(a.disabledReason, null);
+  assert.equal(a.disabledAt, null);
+  db.deleteApp('zzz-breaker');
+});

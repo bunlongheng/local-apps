@@ -262,7 +262,7 @@
   }
   function copySvg() { return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'; }
 
-  function dotClass(app) { return app.disabled ? "disabled" : app.status === "up" ? "up" : "starting-up"; }
+  function dotClass(app) { return app.status === "up" ? "up" : app.disabled ? "disabled" : "starting-up"; }
 
   function headerHTML(access) {
     var isTail = access.mode === "tailscale";
@@ -321,7 +321,7 @@
       var lanU = isTail ? (app.tailscaleUrl || "#") : (app.lanUrl || app.localUrl || "#");
       h += '<tr data-act="open" data-id="' + esc(app.id) + '" tabindex="0">';
       h += '<td class="col-app"><div class="app-cell"><span class="dot ' + dotClass(app) + '"></span>' +
-        appIcon(app.id, app.name, app.icon, 32, app.disabled || app.status !== "up") +
+        appIcon(app.id, app.name, app.icon, 32, app.status !== "up") +
         '<div class="app-meta"><a class="app-name' + (app.disabled ? " disabled" : "") + '" href="' + esc(best) + '" target="_blank" rel="noopener" data-stop>' + esc(app.name) + "</a>";
       if (S.startingApps[app.id]) {
         var s = S.startupState[app.id] || { phase: "wait", label: "Starting...", percent: 5 };
@@ -423,7 +423,7 @@
     }
     var h = '<div class="overlay" data-act="overlay-modal"><div class="modal">';
     h += '<button class="modal-close" data-act="close">✕</button>';
-    h += '<div class="modal-head"><div class="modal-head-inner"><span class="dot ' + dotClass(app) + '"></span>' + appIcon(app.id, app.name, app.icon, 32, app.disabled || app.status !== "up") +
+    h += '<div class="modal-head"><div class="modal-head-inner"><span class="dot ' + dotClass(app) + '"></span>' + appIcon(app.id, app.name, app.icon, 32, app.status !== "up") +
       '<span class="modal-title">' + esc(app.name) + "</span>";
     h += '<div class="badges">' + badges.map(function (b) {
       var span = '<span class="badge' + (b.active ? " active" : "") + '" title="' + esc(b.title) + '">' + b.label + "</span>";
