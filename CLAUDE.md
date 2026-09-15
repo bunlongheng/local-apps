@@ -11,6 +11,7 @@ Self-healing, multi-machine orchestrator that monitors and auto-fixes local web 
 ## Architecture rules
 - Apps register via POST /api/apps - auto-assigns a port, a Caddy reverse proxy, and a macOS LaunchAgent.
 - Machine role set via machine-role.json or the MACHINE_ROLE env var (hub or agent).
+- Chrome extensions are never onboarded. POST/PUT /api/apps hard-rejects any localPath whose repo root holds a Chrome manifest (`lib/chrome-ext.js`). Extensions have no port to health-check; they are verified unpacked in Chrome by their own extension tests.
 - SQLite (better-sqlite3) stores apps, machines, and remote_apps tables.
 
 ## Auth model

@@ -8,6 +8,7 @@ const db = require('./db');
 const { startCmd } = require('./launchctl-cmds');
 const { shouldTrip, rearmReason } = require('./lib/breaker');
 const { isValidId, validateAppFields, xmlEscape } = require('./lib/validate');
+const { isChromeExtensionRepo, CHROME_EXT_ERROR } = require('./lib/chrome-ext');
 const makeCaddy = require('./lib/caddy');
 const makeLaunchd = require('./lib/launchd');
 const makeHealth = require('./lib/health');
@@ -581,6 +582,7 @@ app.post('/api/apps', (req, res) => {
   if (req.body.name && typeof req.body.name !== 'string') return res.status(400).json({ error: 'name must be a string' });
   const vErr = validateAppFields(req.body);
   if (vErr) return res.status(400).json({ error: vErr });
+  if (isChromeExtensionRepo(req.body.localPath)) return res.status(400).json({ error: CHROME_EXT_ERROR });
 
   // Check for port conflict if a port is specified
   const requestedUrl = req.body.localUrl || req.body.healthUrl;
@@ -620,6 +622,7 @@ app.put('/api/apps/:id', (req, res) => {
   if (!existing) return res.status(404).json({ error: 'not found' });
   const vErr = validateAppFields(req.body);
   if (vErr) return res.status(400).json({ error: vErr });
+  if (isChromeExtensionRepo(req.body.localPath)) return res.status(400).json({ error: CHROME_EXT_ERROR });
 
   // Check for port conflict on update
   const requestedUrl = req.body.localUrl || req.body.healthUrl;
@@ -1041,7 +1044,10 @@ app.get('/api/icon-sync', (req, res) => {
     let hasAppIcon = false;
     let synced = false;
     if (a.localPath) {
-      for (const p of ['public/favicon.png', 'public/apple-touch-icon.png', 'public/icon.png']) {
+      // app/icon.png first: generate-favicons.js writes the 512px PNG to app/ when
+      // an app/ dir exists (Next App Router), so checking public/favicon.png first
+      // compared a 512 icon against a 64px favicon and always read out of sync.
+      for (const p of ['app/icon.png', 'public/favicon.png', 'public/apple-touch-icon.png', 'public/icon.png']) {
         const full = path.join(a.localPath, p);
         if (fs.existsSync(full)) {
           hasAppIcon = true;
