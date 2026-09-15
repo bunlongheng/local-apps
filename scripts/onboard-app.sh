@@ -119,19 +119,33 @@ curl -s -X POST "$MONITOR/api/generate-icons/$APP_ID" > /dev/null 2>&1 \
   && pass "Favicon generation triggered" \
   || skip "Favicon generation failed"
 
-# --- 6. Shell alias ---
-ALIAS_NAME="_${APP_ID//-/}"
+# --- 6. Tab registry (NOT a shell append) ---
+# ~/.claude/tab-colors.json is the single source of truth. The _<name> shell
+# function is generated from it on every new shell, so registering here is the
+# only step. Appending a function to ~/.claude-tabs.sh by hand is what let the
+# two drift apart.
 ALIAS_LABEL=$(echo "$APP_NAME" | tr '[:lower:]' '[:upper:]')
 DIR_NAME=$(basename "$LOCAL_PATH")
 
-if grep -q "\"$DIR_NAME\"" "$TABS_FILE" 2>/dev/null; then
-  skip "Shell alias already exists in .claude-tabs.sh"
+if python3 - "$DIR_NAME" <<'PYEOF' 2>/dev/null
+import json, os, sys
+reg = os.path.expanduser("~/.claude/tab-colors.json")
+sys.exit(0 if sys.argv[1] in json.load(open(reg)) else 1)
+PYEOF
+then
+  skip "Tab registry already has $DIR_NAME"
 else
-  # Pad to align with existing entries
-  printf '%-16s{ _tab %-22s %-17s %-5s %-5s %s; }\n' \
-    "${ALIAS_NAME}()" "\"$DIR_NAME\"" "\"$ALIAS_LABEL\"" "$CR" "$CG" "$CB" >> "$TABS_FILE"
-  pass "Added alias ${ALIAS_NAME} to .claude-tabs.sh"
+  python3 - "$DIR_NAME" "$ALIAS_LABEL" "$CR" "$CG" "$CB" <<'PYEOF'
+import json, os, sys
+d, label, r, g, b = sys.argv[1], sys.argv[2], *map(int, sys.argv[3:6])
+reg = os.path.expanduser("~/.claude/tab-colors.json")
+cfg = json.load(open(reg))
+cfg[d] = {"label": label, "r": r, "g": g, "b": b, "icon": ""}
+json.dump(cfg, open(reg, "w"), indent=2, ensure_ascii=False)
+PYEOF
+  pass "Registered $DIR_NAME in tab-colors.json (alias _$DIR_NAME generates on next shell)"
 fi
+
 
 # --- 7. GitHub repo polish ---
 cd "$LOCAL_PATH"
