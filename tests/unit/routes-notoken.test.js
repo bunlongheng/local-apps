@@ -7,6 +7,9 @@ const os = require('node:os');
 const path = require('node:path');
 
 const TMP_DB = path.join(os.tmpdir(), `local-apps-notoken-${process.pid}.db`);
+// node:test runs each file in its own process by default; should that ever change (an isolation flag,
+// a shared runner), the cached server module from routes-security would carry its token, so fail loudly.
+assert.equal(require.cache[require.resolve('../../server')], undefined, 'server must not be preloaded: this file needs its own process');
 delete process.env.LOCAL_APPS_TOKEN;
 process.env.LOCAL_APPS_DB = TMP_DB;
 process.env.MACHINE_ROLE = 'hub';
