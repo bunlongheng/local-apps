@@ -10,7 +10,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { startCmd } = require('../../launchctl-cmds');
+const { startCmd, bootoutCmd } = require('../../launchctl-cmds');
 
 const UID = 501;
 const LABEL = 'com.example.claude';
@@ -96,4 +96,9 @@ test('killPort actually kills a child holding the port', async () => {
   assert.equal(await killPort(port), 1, '1 pid killed');
   await exited;
   assert.equal(child.exitCode === null ? child.signalCode : child.exitCode, 'SIGKILL');
+});
+
+test('bootoutCmd unloads exactly the labelled service for the uid, stderr silenced, no other shell tokens', () => {
+  assert.equal(bootoutCmd(501, 'com.example.x'), 'launchctl bootout gui/501/com.example.x 2>/dev/null');
+  assert.ok(!/[;&|`$]/.test(bootoutCmd(501, 'com.example.x').replace('2>/dev/null', '')), 'no chaining operators');
 });
