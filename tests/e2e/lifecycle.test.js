@@ -71,3 +71,12 @@ test('GET /api/machine and /api/machines answer with their shapes', async () => 
   assert.equal(list.status, 200); assert.ok(Array.isArray(list.json));
   assert.equal((await api('GET', '/api/machines/zzz-no-such-machine/status')).status, 404);
 });
+
+test('hub-only routes answer when the instance is a hub (skipped on an agent)', async (t) => {
+  const role = (await api('GET', '/api/status')).json.machineRole;
+  if (role !== 'hub') return t.skip('instance is not a hub');
+  const tc = await api('GET', '/api/tab-colors'); assert.equal(tc.status, 200); assert.equal(typeof tc.json, 'object');
+  const c = await api('GET', '/api/consistency?id=zzz-not-real'); assert.equal(c.status, 200); assert.ok(Array.isArray(c.json) && c.json.length === 1 && c.json[0].id === 'zzz-not-real');
+  const prof = await api('GET', '/api/app-profiles'); assert.equal(prof.status, 200);
+  assert.equal((await api('GET', '/api/machines')).status, 200);
+});
