@@ -13,6 +13,8 @@ assert.equal(require.cache[require.resolve('../../server')], undefined, 'server 
 delete process.env.LOCAL_APPS_TOKEN;
 process.env.LOCAL_APPS_DB = TMP_DB;
 process.env.MACHINE_ROLE = 'hub';
+const SCRATCH_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'home-'));
+process.env.LOCAL_APPS_HOME = SCRATCH_HOME; process.env.LOCAL_APPS_LOG_DIR = path.join(SCRATCH_HOME, 'logs');
 const app = require('../../server');
 
 let server, base;
@@ -21,7 +23,7 @@ before(async () => {
   base = `http://127.0.0.1:${server.address().port}`;
   require('../../db').upsertApp({ id: 'zzz-nt', localPath: '/tmp/zzz-nt' });
 });
-after(() => { if (server) server.close(); for (const s of ['', '-shm', '-wal']) { try { fs.unlinkSync(TMP_DB + s); } catch { /* not created */ } } });
+after(() => { if (server) server.close(); for (const s of ['', '-shm', '-wal']) { try { fs.unlinkSync(TMP_DB + s); } catch { /* not created */ } } fs.rmSync(SCRATCH_HOME, { recursive: true, force: true }); });
 
 test('with no LOCAL_APPS_TOKEN, off-box control and sensitive reads are denied, with or without a header; loopback still works', async () => {
   const off = (p, method, token) => fetch(base + p, { method, headers: { 'x-forwarded-for': '1.2.3.4', ...(token ? { 'x-local-apps-token': token } : {}) } });
