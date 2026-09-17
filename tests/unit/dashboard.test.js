@@ -1,5 +1,7 @@
-// Unit: public/app.js in jsdom - the 3 behaviours round 9 changed: off-box viewers see no controls,
-// a silent SSE stream reconnects after 60s, and keyboardControls promotes rows but never overlays.
+// Unit: public/app.js in jsdom - the dashboard's behaviour: off-box viewers see no controls, a silent
+// SSE stream reconnects after 60s, keyboardControls promotes rows but never overlays, clicks send the
+// matching requests, SSE frames re-render, the palette and modal tabs work, peers are read-only.
+// public/app.js is evaluated inside the jsdom window, so it is outside the coverage gate by design.
 // Timers and the clock are the window's own, replaced with a fake before app.js is evaluated, so
 // the test drives every interval deterministically.
 const { test } = require('node:test');
@@ -35,17 +37,24 @@ function fakeClock(w) {
   };
 }
 
-function boot({ status }) {
+function boot({ status, machines = [], peerStatus = null }) {
   const dom = new JSDOM(INDEX, { url: 'http://localhost:9875/', runScripts: 'outside-only', pretendToBeVisual: true });
   const w = dom.window;
   const clock = fakeClock(w);
   const sources = [];
   w.EventSource = class { constructor(url) { this.url = url; this.closed = false; sources.push(this); } close() { this.closed = true; } };
-  const routes = { '/api/status': status, '/api/favicons': {}, '/api/machines': [] };
-  w.fetch = (p) => Promise.resolve({ ok: p in routes, status: p in routes ? 200 : 404, headers: { get: () => 'application/json' }, json: () => Promise.resolve(routes[p]) });
+  const routes = { '/api/status': status, '/api/favicons': {}, '/api/machines': machines, '/api/log/alpha': { lines: ['ready on 4000'] } };
+  if (peerStatus) for (const m of machines) routes[`/api/machines/${m.id}/status`] = peerStatus;
+  const requests = [];   // every non-GET call the dashboard makes: { method, path }
+  w.fetch = (p, opts) => {
+    const method = (opts && opts.method) || 'GET';
+    if (method !== 'GET') { requests.push({ method, path: p }); return Promise.resolve({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: () => Promise.resolve(p.endsWith('/toggle') ? { id: 'alpha', disabled: true } : { ok: true }) }); }
+    return Promise.resolve({ ok: p in routes, status: p in routes ? 200 : 404, headers: { get: () => 'application/json' }, json: () => Promise.resolve(routes[p]) });
+  };
+  w.confirm = () => true;
   w.eval(APP_JS);
   const settle = () => new Promise((r) => setTimeout(r, 10));   // real timer: let the fetch promises resolve
-  return { w, clock, sources, settle, root: () => w.document.getElementById('root'), close: () => w.close() };
+  return { w, clock, sources, requests, settle, root: () => w.document.getElementById('root'), close: () => w.close() };
 }
 
 test('an off-box viewer gets no toggle, start/stop or delete controls; on the box they render', async () => {
@@ -94,5 +103,71 @@ test('keyboardControls promotes rows and chips to role=button, never the overlay
   const overlay = t.root().querySelector('[data-act="overlay-modal"]');
   assert.ok(overlay); assert.equal(overlay.getAttribute('role'), null, 'backdrop is not a button'); assert.equal(overlay.hasAttribute('tabindex'), false);
   assert.equal(t.root().querySelector('[role="dialog"]').getAttribute('tabindex'), null);
+  t.close();
+});
+
+const ON = { apps: APPS, viewer: 'loopback', machineRole: 'agent', lanIp: '10.0.0.5' };
+const key = (w, k, extra) => w.document.dispatchEvent(new w.KeyboardEvent('keydown', Object.assign({ key: k, bubbles: true, cancelable: true }, extra || {})));
+
+test('clicking stop, toggle and delete sends the matching request and the row follows the answer', async () => {
+  const t = boot({ status: ON });
+  await t.settle();
+  t.root().querySelector('tr[data-act="open"]').click(); await t.settle();
+  t.root().querySelector('[data-act="stop"]').click(); await t.settle();
+  assert.deepEqual(t.requests.at(-1), { method: 'POST', path: '/api/stop/alpha' });
+  assert.equal(t.root().querySelector('tr[data-act="open"] .dot').classList.contains('down'), true, 'row dot flips to down after stop');
+  t.root().querySelector('[data-act="toggle"]').click(); await t.settle();
+  assert.deepEqual(t.requests.at(-1), { method: 'POST', path: '/api/apps/alpha/toggle' });
+  assert.equal(t.root().querySelector('[data-act="toggle"]').getAttribute('aria-checked'), 'false', 'switch reflects disabled=true from the answer');
+  t.root().querySelector('[data-act="delete"]').click(); await t.settle();
+  assert.deepEqual(t.requests.at(-1), { method: 'DELETE', path: '/api/apps/alpha' });
+  t.close();
+});
+
+test('an SSE update frame re-renders the row; a removed frame drops it; an alert frame toasts', async () => {
+  const t = boot({ status: ON });
+  await t.settle(); t.clock.tick(3000); const es = t.sources[0]; es.onopen();
+  assert.equal(t.root().querySelector('tr[data-act="open"] .dot').classList.contains('up'), true);
+  es.onmessage({ data: JSON.stringify({ type: 'update', id: 'alpha', status: 'down' }) });
+  assert.equal(t.root().querySelector('tr[data-act="open"] .dot').classList.contains('down'), true);
+  es.onmessage({ data: JSON.stringify({ type: 'alert', id: 'alpha', name: 'Alpha' }) });
+  assert.match(t.root().textContent, /Alpha went down/);
+  es.onmessage({ data: JSON.stringify({ type: 'update', id: 'alpha', status: 'removed' }) });
+  assert.equal(t.root().querySelector('tr[data-act="open"]'), null, 'row gone');
+  t.close();
+});
+
+test('the palette opens on Cmd+K, filters as you type, arrows move the active option and Enter opens the modal', async () => {
+  const t = boot({ status: { ...ON, apps: [...APPS, { id: 'beta', name: 'Beta', status: 'down', localUrl: 'http://localhost:4001', hostname: 'm4' }] } });
+  await t.settle();
+  key(t.w, 'k', { metaKey: true });
+  const input = t.w.document.getElementById('cmdk-input'); assert.ok(input, 'palette mounted'); assert.equal(input.getAttribute('role'), 'combobox');
+  assert.equal(t.w.document.querySelectorAll('[role="option"]').length, 2);
+  input.value = 'bet'; input.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+  const opts = t.w.document.querySelectorAll('[role="option"]');
+  assert.equal(opts.length, 1); assert.match(opts[0].textContent, /Beta/); assert.equal(input.getAttribute('aria-activedescendant'), 'cmdk-opt-0');
+  input.value = ''; input.dispatchEvent(new t.w.Event('input', { bubbles: true }));
+  key(t.w, 'ArrowDown'); assert.equal(input.getAttribute('aria-activedescendant'), 'cmdk-opt-1');
+  key(t.w, 'Enter'); await t.settle();
+  assert.equal(t.w.document.getElementById('cmdk-input'), null, 'palette closed');
+  assert.equal(t.root().querySelector('[role="dialog"]').getAttribute('aria-label'), 'Beta', 'modal opened on the highlighted app');
+  key(t.w, 'Escape'); assert.equal(t.root().querySelector('[role="dialog"]'), null, 'Escape closes the modal');
+  t.close();
+});
+
+test('modal tabs switch the active pane; a discovered peer renders a machine tab whose apps are read-only', async () => {
+  const t = boot({ status: ON, machines: [{ id: 'peer-1', hostname: 'peer-1', ip: '10.0.0.7', model: 'MacBook' }], peerStatus: { apps: [{ id: 'remote-a', name: 'Remote A', status: 'up', localUrl: 'http://localhost:5000' }], machineModel: 'MacBook', lanIp: '10.0.0.7' } });
+  await t.settle();
+  t.root().querySelector('tr[data-act="open"]').click(); await t.settle();
+  assert.equal(t.root().querySelector('[data-act="tab"].active').getAttribute('data-tab'), 'info');
+  t.root().querySelector('[data-act="tab"][data-tab="about"]').click(); await t.settle();
+  assert.equal(t.root().querySelector('[data-act="tab"].active').getAttribute('data-tab'), 'about');
+  key(t.w, 'Escape');
+  const tabs = t.root().querySelectorAll('[data-act="machine"]');
+  assert.equal(tabs.length, 2, 'local + 1 peer');
+  tabs[1].click(); await t.settle();
+  assert.match(t.root().querySelector('tr[data-act="open"]').textContent, /Remote A/);
+  t.root().querySelector('tr[data-act="open"]').click(); await t.settle();
+  assert.equal(t.root().querySelector('[data-act="toggle"]'), null); assert.match(t.root().textContent, /read-only on a peer/);
   t.close();
 });
