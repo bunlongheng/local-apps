@@ -30,6 +30,8 @@ jobs:
       # ci: commit after a test-adding PR, never loosen them inside a feature PR.
       - name: Unit tests + coverage gate
         run: npm run test:coverage
+      - name: Dashboard per-file coverage floor (public/app.js)
+        run: npm run test:coverage:dashboard
       - name: E2E against a booted instance (agent role, loopback only)
         run: |
           MACHINE_ROLE=agent API_BIND=127.0.0.1 LOCAL_APPS_DB=/tmp/ci-local.db node server.js > /tmp/ci-server.log 2>&1 &
