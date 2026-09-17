@@ -83,3 +83,14 @@ test('killPort frees a real listener without a shell and resolves 0 on a free po
   assert.equal(String(execFileSync('lsof', ['-ti', `:${port}`])).trim(), String(process.pid));
   srv.close();
 });
+
+test('killPort actually kills a child holding the port', async () => {
+  const { killPort } = require('../../launchctl-cmds');
+  const { spawn } = require('node:child_process');
+  const child = spawn(process.execPath, ['-e', "require('net').createServer().listen(0,'127.0.0.1',function(){process.stdout.write(String(this.address().port))});setInterval(()=>{},1000)"]);
+  const port = await new Promise(r => child.stdout.once('data', d => r(Number(String(d)))));
+  const exited = new Promise(r => child.once('exit', r));
+  assert.equal(await killPort(port), 1, '1 pid killed');
+  await exited;
+  assert.equal(child.exitCode === null ? child.signalCode : child.exitCode, 'SIGKILL');
+});
