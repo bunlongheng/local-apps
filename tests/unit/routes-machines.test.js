@@ -28,12 +28,12 @@ function call(fn, params = {}) {
     fn({ params, query: {}, headers: {} }, res);
   });
 }
-function boot({ peers = [], statusByIp = {} } = {}) {
-  const db = fakeDb(); const { app, routes } = fakeApp();
+function boot({ peers = [], statusByIp = {}, hub = true, lanIp = '10.0.0.5' } = {}) {
+  const db = fakeDb(); const { app, routes } = fakeApp(); let sweeps = 0;
   const ctx = {
-    appRecord, peerRecord, db, dbg: () => {}, IS_HUB: true, IS_MAIN: false, MACHINE_ROLE: 'hub', PORT: 9875,
-    LAN_IP: () => '10.0.0.5', MACHINE_MODEL: () => 'Mac mini',
-    sweepSubnet: async (lanIp, probe) => (await Promise.all(peers.map(ip => probe(ip)))).filter(Boolean),
+    appRecord, peerRecord, db, dbg: () => {}, IS_HUB: hub, IS_MAIN: false, MACHINE_ROLE: hub ? 'hub' : 'agent', PORT: 9875,
+    LAN_IP: () => lanIp, MACHINE_MODEL: () => 'Mac mini',
+    sweepSubnet: async (lanIp, probe) => { sweeps++; return (await Promise.all(peers.map(ip => probe(ip)))).filter(Boolean); },
     fetchJson: async (url) => {
       const ip = new URL(url).hostname;
       if (url.endsWith('/api/machine')) { if (!peers.includes(ip)) throw new Error('refused'); return { hostname: `host-${ip}`, model: 'MacBook', appCount: 1 }; }
@@ -42,7 +42,7 @@ function boot({ peers = [], statusByIp = {} } = {}) {
     },
   };
   const { discoverPeers, startupSync } = require('../../routes/machines')(app, ctx);
-  return { db, routes, discoverPeers, startupSync, ctx, peers };
+  return { db, routes, discoverPeers, startupSync, ctx, peers, sweeps: () => sweeps };
 }
 
 test('a discovered peer lands in the db with its sanitised apps', async () => {
@@ -114,4 +114,12 @@ test('startupSync refreshes a reachable known machine and leaves an unreachable 
   t.ctx.fetchJson = async (url) => (url.endsWith('/api/machine') ? { hostname: 'bad name!', model: 'MacBook', appCount: 1 } : {});
   await t.startupSync();
   assert.equal(t.db.machines.get('host-10.0.0.7').hostname, 'host-10.0.0.7', 'invalid hostname falls back to the stored one');
+});
+
+test('an agent machine, or a hub with no LAN interface, never sweeps the subnet', async () => {
+  const agent = boot({ peers: ['10.0.0.7'], hub: false }); await agent.discoverPeers();
+  assert.equal(agent.sweeps(), 0); assert.equal(agent.db.getMachines().length, 0);
+  const noLan = boot({ peers: ['10.0.0.7'], lanIp: 'N/A' }); await noLan.discoverPeers();
+  assert.equal(noLan.sweeps(), 0); assert.equal(noLan.db.getMachines().length, 0);
+  const hub = boot({ peers: ['10.0.0.7'] }); await hub.discoverPeers(); assert.equal(hub.sweeps(), 1);
 });
