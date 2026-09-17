@@ -39,3 +39,10 @@ test('peerRecord keeps only a plain hostname, sane model and count; anything els
   assert.equal(bad.hostname, '1.2.3.4'); assert.equal(bad.model, 'bxb'); assert.equal(bad.appCount, 0);
   assert.equal(peerRecord('1.2.3.4', 9875, null).hostname, '1.2.3.4');
 });
+
+test('appRecord keeps http(s) urls only and bounded plain text', () => {
+  const { appRecord } = require('../../lib/peers');
+  const r = appRecord({ id: 'x', name: '<b>X</b>', localUrl: 'javascript:alert(1)', prodUrl: 'https://x.example', repo: 'data:text/html,hi', status: 'weird' });
+  assert.deepEqual(r, { id: 'x', name: 'bX/b', healthUrl: null, localUrl: null, caddyUrl: null, prodUrl: 'https://x.example', repo: null, icon: null, status: 'down' });
+  assert.equal(appRecord({ id: '../etc' }), null);
+});

@@ -122,6 +122,8 @@
       return ct.indexOf("application/json") !== -1 ? r.json() : r.text();
     });
   }
+  // Links come from this hub and from peers; only http(s) may become an href.
+  function safeUrl(u) { return typeof u === "string" && /^https?:\/\//i.test(u) ? u : "#"; }
   function toast(msg, ms, kind) {
     S.toastKind = kind || "";
     S.toast = msg; render();
@@ -327,7 +329,7 @@
       h += '<tr data-act="open" data-id="' + esc(app.id) + '" tabindex="0">';
       h += '<td class="col-app"><div class="app-cell"><span class="dot ' + dotClass(app) + '"></span>' +
         appIcon(app.id, app.name, app.icon, 32, app.status !== "up") +
-        '<div class="app-meta"><a class="app-name' + (app.disabled ? " disabled" : "") + '" href="' + esc(best) + '" target="_blank" rel="noopener" data-stop>' + esc(app.name) + "</a>";
+        '<div class="app-meta"><a class="app-name' + (app.disabled ? " disabled" : "") + '" href="' + esc(safeUrl(best)) + '" target="_blank" rel="noopener" data-stop>' + esc(app.name) + "</a>";
       if (S.startingApps[app.id]) {
         var s = S.startupState[app.id] || { phase: "wait", label: "Starting...", percent: 5 };
         var tone = s.phase === "error" ? "error" : s.stalled ? "stalled" : s.percent >= 100 ? "done" : "active";
@@ -336,11 +338,11 @@
           '<span class="progress-bar ' + tone + '"><span class="progress-fill" style="width:' + s.percent + '%"></span></span></div>';
       }
       h += "</div></div></td>";
-      h += '<td class="col-hostname"><a class="link-sm' + (app.disabled ? " disabled" : "") + '" href="' + esc(hostU) + '" target="_blank" rel="noopener" data-stop>' + esc(stripProto(hostU)) + "</a></td>";
-      h += '<td class="col-lan"><a class="link-sm' + (app.disabled ? " disabled" : "") + '" href="' + esc(lanU) + '" target="_blank" rel="noopener" data-stop>' + esc(stripProto(lanU)) + "</a></td>";
+      h += '<td class="col-hostname"><a class="link-sm' + (app.disabled ? " disabled" : "") + '" href="' + esc(safeUrl(hostU)) + '" target="_blank" rel="noopener" data-stop>' + esc(stripProto(hostU)) + "</a></td>";
+      h += '<td class="col-lan"><a class="link-sm' + (app.disabled ? " disabled" : "") + '" href="' + esc(safeUrl(lanU)) + '" target="_blank" rel="noopener" data-stop>' + esc(stripProto(lanU)) + "</a></td>";
       h += '<td class="col-actions"><div class="actions">';
-      if (isTail) h += '<a class="action-icon' + (app.tailscaleUrl ? "" : " dim") + '" href="' + esc(app.tailscaleUrl || "#") + '" target="_blank" rel="noopener" data-stop title="Tailscale"><img src="/devices/tailscale.svg" width="16" height="16" alt="Tailscale" style="opacity:.85"></a>';
-      h += '<a class="action-icon' + (app.prodUrl ? "" : " dim") + '" href="' + esc(app.prodUrl || "#") + '" target="_blank" rel="noopener" data-stop title="Vercel">' + vercelSvg() + "</a>";
+      if (isTail) h += '<a class="action-icon' + (app.tailscaleUrl ? "" : " dim") + '" href="' + esc(safeUrl(app.tailscaleUrl || "#")) + '" target="_blank" rel="noopener" data-stop title="Tailscale"><img src="/devices/tailscale.svg" width="16" height="16" alt="Tailscale" style="opacity:.85"></a>';
+      h += '<a class="action-icon' + (app.prodUrl ? "" : " dim") + '" href="' + esc(safeUrl(app.prodUrl || "#")) + '" target="_blank" rel="noopener" data-stop title="Vercel">' + vercelSvg() + "</a>";
       h += "</div></td></tr>";
     });
     return h + "</tbody></table></main>";
@@ -390,7 +392,7 @@
       var emoji = ROW_EMOJI[r.label] || "";
       h += '<div class="info-row"><span class="info-label">' + (emoji ? emoji + " " : "") + esc(r.label) + "</span>";
       h += '<span class="info-value">';
-      if (r.url) h += '<a href="' + esc(r.url) + '" target="_blank" rel="noopener" data-stop>' + esc(r.value) + "</a>" + (r.extra || "");
+      if (r.url) h += '<a href="' + esc(safeUrl(r.url)) + '" target="_blank" rel="noopener" data-stop>' + esc(r.value) + "</a>" + (r.extra || "");
       else h += "<span>" + esc(r.value) + (r.extra || "") + "</span>";
       if (r.lock) h += ' <span class="lock-badge" title="This deployment requires login">\u{1F512}</span>';
       h += "</span>";
@@ -432,7 +434,7 @@
       '<span class="modal-title">' + esc(app.name) + "</span>";
     h += '<div class="badges">' + badges.map(function (b) {
       var span = '<span class="badge' + (b.active ? " active" : "") + '" title="' + esc(b.title) + '">' + b.label + "</span>";
-      return b.href ? '<a class="badge-link" href="' + esc(b.href) + '" target="_blank" rel="noopener" data-stop>' + span + "</a>" : span;
+      return b.href ? '<a class="badge-link" href="' + esc(safeUrl(b.href)) + '" target="_blank" rel="noopener" data-stop>' + span + "</a>" : span;
     }).join("") + "</div>";
     h += "</div>"; // close modal-head-inner
     // claude-tab chip (top-right): the app's _alias, its color, click-to-copy the full launch command
