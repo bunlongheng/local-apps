@@ -28,3 +28,15 @@ test('tcpCheck probes with HEAD and falls back to GET only on 405/501', async ()
   assert.deepEqual(seen, ['HEAD', 'GET']);
   srv.closeAllConnections?.(); srv.close();
 });
+
+test('processCheck finds a running process by its command line and not after it exits', async () => {
+  const { spawn } = require('node:child_process');
+  const marker = `zzz-marker-${process.pid}`;
+  // The marker rides in the script text so it is part of the command line pgrep -f sees.
+  const child = spawn(process.execPath, ['-e', `setInterval(() => {}, 1000) // ${marker}`], { stdio: 'ignore' });
+  await new Promise(r => setTimeout(r, 300));
+  const h = makeHealth({ broadcast: () => {} });
+  assert.equal(await h.processCheck(marker), true);
+  child.kill('SIGKILL'); await new Promise(r => child.on('exit', r)); await new Promise(r => setTimeout(r, 200));
+  assert.equal(await h.processCheck(marker), false);
+});
