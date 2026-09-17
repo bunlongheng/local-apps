@@ -949,58 +949,6 @@ app.get('/api/machine', (req, res) => {
   });
 });
 
-// --- Icon Generation API ---
-const iconJobs = new Map();
-
-app.post('/api/generate-icons/:id', (req, res) => {
-  const id = req.params.id;
-  const appCfg = db.getApp(id);
-  if (!appCfg) return res.status(404).json({ error: 'not found' });
-  if (iconJobs.has(id)) return res.json({ status: 'already_running' });
-
-  broadcast({ type: 'icons_start', ids: [id] });
-
-  const proc = spawn('node', [path.join(__dirname, 'scripts', 'generate-favicons.js'), id], {
-    cwd: __dirname, stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  let output = '';
-  proc.stdout.on('data', d => output += d.toString());
-  proc.stderr.on('data', d => output += d.toString());
-  iconJobs.set(id, { proc, startedAt: new Date().toISOString() });
-  proc.on('close', (code) => {
-    iconJobs.delete(id);
-    broadcast({ type: 'icons_done', id, code });
-  });
-  res.json({ status: 'started', ids: [id] });
-});
-
-app.post('/api/generate-icons', (req, res) => {
-  if (iconJobs.has('__all__')) return res.json({ status: 'already_running' });
-
-  // Figure out which app IDs will be generated
-  const allApps = db.getApps().map(a => a.id);
-  broadcast({ type: 'icons_start', ids: allApps });
-
-  const proc = spawn('node', [path.join(__dirname, 'scripts', 'generate-favicons.js')], {
-    cwd: __dirname, stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  let output = '';
-  proc.stdout.on('data', d => output += d.toString());
-  proc.stderr.on('data', d => output += d.toString());
-  iconJobs.set('__all__', { proc, startedAt: new Date().toISOString() });
-  proc.on('close', (code) => {
-    iconJobs.delete('__all__');
-    broadcast({ type: 'icons_done', id: '__all__', code });
-  });
-  res.json({ status: 'started', ids: allApps });
-});
-
-app.get('/api/generate-icons/status', (req, res) => {
-  const jobs = {};
-  for (const [id, job] of iconJobs) jobs[id] = { startedAt: job.startedAt };
-  res.json(jobs);
-});
-
 // --- File watcher (public dir only) ---
 let reloadTimer = null;
 if (IS_MAIN) fs.watch(path.join(__dirname, 'public'), { recursive: true }, () => {

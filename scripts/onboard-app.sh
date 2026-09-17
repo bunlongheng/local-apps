@@ -22,6 +22,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 MONITOR="http://localhost:9875"
+MONITOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TABS_FILE="$HOME/.claude-tabs.sh"
 
 # --- Args ---
@@ -115,8 +116,8 @@ else
 fi
 
 # --- 5. Generate favicon ---
-curl -s -X POST "$MONITOR/api/generate-icons/$APP_ID" > /dev/null 2>&1 \
-  && pass "Favicon generation triggered" \
+(cd "$MONITOR_DIR" && node scripts/generate-favicons.js "$APP_ID") > /dev/null 2>&1 \
+  && pass "Favicon generated" \
   || skip "Favicon generation failed"
 
 # --- 6. Tab registry (NOT a shell append) ---
