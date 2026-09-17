@@ -20,9 +20,11 @@ before(async () => {
   await new Promise((resolve) => { server = app.listen(0, '127.0.0.1', resolve); });
   base = `http://127.0.0.1:${server.address().port}`;
 });
+const TMP_PATHS = [];   // fixture files and dirs, removed even when an assertion fails
 after(() => {
   if (server) server.close();
   for (const s of ['', '-shm', '-wal']) { try { fs.unlinkSync(TMP_DB + s); } catch { /* not created */ } }
+  for (const p of TMP_PATHS) fs.rmSync(p, { recursive: true, force: true });
 });
 
 async function req(method, p, body) {
@@ -124,7 +126,7 @@ test('/api/status says whether the viewer is on the box; the SSE stream pings ev
 
 test('/api/log/:id returns exactly the last 30 lines of a log larger than the 64KB tail, and [] for a missing file', async () => {
   const db = require('../../db');
-  const logPath = path.join(os.tmpdir(), `zzz-log-${process.pid}.log`);
+  const logPath = path.join(os.tmpdir(), `zzz-log-${process.pid}.log`); TMP_PATHS.push(logPath);
   const lines = []; for (let i = 1; i <= 200; i++) lines.push(`line ${String(i).padStart(4, '0')} ` + 'x'.repeat(1000));
   fs.writeFileSync(logPath, lines.join('\n') + '\n');
   db.upsertApp({ id: 'zzz-log', localPath: '/tmp/zzz-log', logPath });
@@ -162,7 +164,7 @@ test('every response carries the security headers: frame denial, nosniff, a CSP 
 
 test('POST and PUT /api/apps refuse a localPath whose repo root holds a Chrome extension manifest', async () => {
   const { CHROME_EXT_ERROR } = require('../../lib/chrome-ext');
-  const ext = fs.mkdtempSync(path.join(os.tmpdir(), 'zzz-ext-'));
+  const ext = fs.mkdtempSync(path.join(os.tmpdir(), 'zzz-ext-')); TMP_PATHS.push(ext);
   fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify({ manifest_version: 3, name: 'x' }));
   const post = await fetch(base + '/api/apps', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: 'zzz-ext', localPath: ext }) });
   assert.equal(post.status, 400); assert.equal((await post.json()).error, CHROME_EXT_ERROR);
@@ -170,5 +172,4 @@ test('POST and PUT /api/apps refuse a localPath whose repo root holds a Chrome e
   const put = await fetch(base + '/api/apps/zzz-prof', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ localPath: ext }) });
   assert.equal(put.status, 400); assert.equal((await put.json()).error, CHROME_EXT_ERROR);
   assert.equal((await (await fetch(base + '/api/apps/zzz-prof')).json()).localPath, '/tmp/zzz-prof', 'row unchanged');
-  fs.rmSync(ext, { recursive: true, force: true });
 });
