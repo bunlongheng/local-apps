@@ -408,7 +408,6 @@
       h += '<span class="info-value">';
       if (r.url) h += '<a ' + linkAttrs(r.url) + '>' + esc(r.value) + "</a>" + (r.extra || "");
       else h += "<span>" + esc(r.value) + (r.extra || "") + "</span>";
-      if (r.lock) h += ' <span class="lock-badge" title="This deployment requires login">\u{1F512}</span>';
       h += "</span>";
       h += '<button class="copy-btn" data-act="copy" data-copy="' + esc(r.url || r.value) + '" title="Copy">' + copySvg() + "</button></div>";
     });
