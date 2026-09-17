@@ -57,7 +57,7 @@ test('startCmd silences stderr on both branches (callers rely on exit codes)', (
 
 test('server.js has no bare app restart (kickstart -k) - all start paths use startCmd', () => {
   // Routes live in routes/*.js since the split; the rule covers every file that can start an app.
-  const files = ['server.js', 'routes/apps.js', 'routes/meta.js', 'routes/machines.js'];
+  const files = ['server.js', 'lib/chain.js', 'routes/apps.js', 'routes/meta.js', 'routes/machines.js'];
   const src = files.map(f => fs.readFileSync(path.join(__dirname, '../..', f), 'utf8')).join('\n');
   // `kickstart` without -k (cron run-now) is fine; `kickstart -k` is the app
   // restart pattern and must always carry the bootstrap fallback via startCmd.

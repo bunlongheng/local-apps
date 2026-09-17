@@ -11,7 +11,8 @@ const QRCode = require('qrcode');
 const db = require('./db');
 const { startCmd, bootoutCmd, killPort } = require('./launchctl-cmds');
 const { shouldTrip, rearmReason } = require('./lib/breaker');
-const { nextLevel, recordAttempt, l3Fixes } = require('./lib/escalation');
+const { nextLevel, recordAttempt } = require('./lib/escalation');
+const { runLevel } = require('./lib/chain');
 const { isValidId, validateAppFields, xmlEscape } = require('./lib/validate');
 const { isChromeExtensionRepo, CHROME_EXT_ERROR } = require('./lib/chrome-ext');
 const makeCaddy = require('./lib/caddy');
@@ -383,45 +384,12 @@ async function checkAll() {
       // Which level fires is decided by lib/escalation.js (pure, unit-tested); this loop
       // only executes it. Every level records the attempt before running its command.
       const level = nextLevel(s, Date.now());
-      if (level === 1) {
+      if (level >= 1 && level <= 3) {
         recordAttempt(s, Date.now());
         try {
-          await execAsync(startCmd(uid, label, plistPath), { timeout: 15000 });
-          console.log(`  [L1] kickstart: ${appCfg.id}`);
-        } catch (e) { dbg('L1', e); }
-      }
-      else if (level === 2) {
-        recordAttempt(s, Date.now());
-        try {
-          if (port) await killPort(port);
-          await execAsync(`${bootoutCmd(uid, label)}; sleep 1; launchctl bootstrap gui/${uid} "${plistPath}" 2>/dev/null`, { timeout: 15000 });
-          console.log(`  [L2] port-kill + reload: ${appCfg.id}`);
-        } catch (e) { dbg('L2', e); }
-      }
-      else if (level === 3) {
-        recordAttempt(s, Date.now());
-        try {
-          const dir = appCfg.localPath;
-          if (dir && fs.existsSync(dir)) {
-            const logPath = appCfg.logPath || `/tmp/${appCfg.id}.log`;
-            let logTail = '';
-            try { logTail = (await execAsync(`tail -30 "${logPath}" 2>/dev/null`, { timeout: 5000 })).stdout; } catch (e) { dbg('checkAll', e); }
-            const fixes = l3Fixes(logTail);
-            if (fixes.npmInstall) {
-              console.log(`  [L3] npm install: ${appCfg.id}`);
-              // --ignore-scripts: a registered app dir is attacker-influencable, so never
-              // run its package lifecycle scripts (preinstall/postinstall) during auto-heal.
-              try { await execAsync(`cd "${dir}" && npm install --ignore-scripts 2>/dev/null`, { timeout: 60000 }); } catch (e) { console.warn(`  [L3] npm install failed: ${appCfg.id}: ${e.message}`); }
-            }
-            if (fixes.clearNext) {
-              console.log(`  [L3] clear .next cache: ${appCfg.id}`);
-              try { await execAsync(`rm -rf "${dir}/.next" 2>/dev/null`, { timeout: 5000 }); } catch (e) { dbg('L3', e); }
-            }
-            if (port) await killPort(port);
-          }
-          await execAsync(startCmd(uid, label, plistPath), { timeout: 15000 });
-          console.log(`  [L3] fix + restart: ${appCfg.id}`);
-        } catch (e) { dbg('L3', e); }
+          await runLevel(level, { id: appCfg.id, uid, label, plistPath, port, dir: appCfg.localPath, logPath: appCfg.logPath || `/tmp/${appCfg.id}.log` },
+            { exec: execAsync, killPort, exists: fs.existsSync, log: console.log, warn: console.warn, startCmd, bootoutCmd });
+        } catch (e) { dbg(`L${level}`, e); }
       }
       // Level 4: hand the failure to the local agent (last resort, opt-in)
       else if (level === 4) {
