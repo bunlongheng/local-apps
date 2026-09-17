@@ -31,7 +31,7 @@ function boot(apps) {
     bootoutCmd: (u, l) => `bootout ${l}`, startCmd: (u, l) => `start ${l}`, PORT: 9875, MACHINE_ROLE: 'hub',
     getNextAvailablePort: () => 3999, isPortTaken: () => null, killPort: async (p) => calls.push(`killPort:${p}`), db, dbg: () => {},
     broadcast: (e) => calls.push(`sse:${e.type}:${e.id || ''}:${e.status || ''}`), sseClients: new Set(),
-    getState: (id) => (states[id] ||= { status: 'up' }), clearState: (id) => calls.push(`clearState:${id}`), checkSingle: () => {},
+    getState: (id) => (states[id] ||= { status: 'up' }), clearState: (id) => calls.push(`clearState:${id}`), checkSingle: (a) => calls.push(`recheck:${a.id}`),
     setupInfra: (id, data) => { calls.push(`setupInfra:${id}:${data.localUrl || ''}`); return { caddyUrl: `http://${id}.localhost`, launchAgent: `com.t.${id}` }; },
     teardownInfra: async (a) => calls.push(`teardown:${a.id}:${db.getApp(a.id) ? 'row-present' : 'row-gone'}`),
     updateTabColors: (id, name) => calls.push(`tabs:${id}:${name}`), forViewer: (req, a) => a, execAsync: async (cmd) => calls.push(`exec:${cmd}`), spawn: (bin, args) => { calls.push(`spawn:${args[1]}`); return { unref() {} }; },
@@ -52,6 +52,7 @@ test('toggle OFF boots out, then frees the port, marks down and broadcasts; togg
   calls.length = 0;
   const on = await call(routes['POST /api/apps/:id/toggle'], { params: { id: 'a' } });
   assert.deepEqual(on.body, { id: 'a', disabled: false }); assert.deepEqual(calls, ['exec:start com.t.a']);
+  mock.timers.tick(15000); assert.equal(calls.filter(c => c === 'recheck:a').length, 3, 'toggle ON rechecks like start');
   assert.equal((await call(routes['POST /api/apps/:id/toggle'], { params: { id: 'zzz' } })).status, 404);
   mock.timers.reset();
 });
@@ -94,6 +95,8 @@ test('stop kills the port, boots out in the background and marks down; start kic
   assert.deepEqual(calls, ['killPort:4000', 'spawn:bootout com.t.a', 'sse:update:a:down']); assert.equal(states.a.status, 'down');
   calls.length = 0;
   assert.deepEqual((await call(routes['POST /api/start/:id'], { params: { id: 'a' } })).body, { ok: true }); assert.deepEqual(calls, ['spawn:start com.t.a']);
+  mock.timers.tick(15000);
+  assert.equal(calls.filter(c => c === 'recheck:a').length, 3, 'health is rechecked at 3s, 8s and 15s after a start');
   assert.equal((await call(routes['POST /api/start/:id'], { params: { id: 'c' } })).status, 400);
   assert.equal((await call(routes['POST /api/stop/:id'], { params: { id: 'c' } })).status, 400);
   mock.timers.reset();
