@@ -20,3 +20,4 @@ machine-role.json
 # Local backups (DB + config snapshots - never publish)
 *.bak
 *.bak.*
+scripts/favicon-sources.json
