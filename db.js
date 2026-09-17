@@ -114,7 +114,6 @@ if (profiles) {
   txProfiles(profiles);
 }
 
-
 // Sync tab color/icon from ~/.claude/tab-colors.json onto apps that ALREADY exist.
 // We intentionally do NOT create apps from tab-colors entries: the registry includes
 // terminal-only tabs (jira, slack, ssh sessions) that are not monitored apps, and
@@ -154,15 +153,6 @@ db.exec(`
 
 // --- Claude table (flexible document store for .md, .json, etc.) ---
 db.exec(`
-  CREATE TABLE IF NOT EXISTS claude (
-    id TEXT PRIMARY KEY,
-    category TEXT NOT NULL,
-    name TEXT NOT NULL,
-    content TEXT NOT NULL,
-    meta TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )
 `);
 
 // --- Seed from JSON if DB is empty ---
@@ -379,14 +369,6 @@ function deleteApp(id) {
   return db.prepare('DELETE FROM apps WHERE id = ?').run(id).changes > 0;
 }
 
-function toggleApp(id) {
-  const app = getApp(id);
-  if (!app) return null;
-  const newState = app.disabled ? 0 : 1;
-  db.prepare('UPDATE apps SET disabled = ? WHERE id = ?').run(newState, id);
-  return { id, disabled: !!newState };
-}
-
 function setAppDisabled(id, disabled, reason = 'user') {
   db.prepare('UPDATE apps SET disabled = ?, disabled_reason = ?, disabled_at = ? WHERE id = ?')
     .run(disabled ? 1 : 0, disabled ? reason : null, disabled ? new Date().toISOString() : null, id);
@@ -426,7 +408,7 @@ function getTabColors() {
 }
 
 module.exports = {
-  getApps, getApp, upsertApp, deleteApp, toggleApp, setAppDisabled, getTabColors,
+  getApps, getApp, upsertApp, deleteApp, setAppDisabled, getTabColors,
   getMachines, upsertMachine, deleteMachine,
   getRemoteApps, syncRemoteApps, deleteRemoteApps,
 };
