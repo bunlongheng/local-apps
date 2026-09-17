@@ -74,3 +74,12 @@ test('a throwing handler reaches the 4-arg error middleware', async () => {
   assert.equal(r.status, 500);
   assert.deepEqual(await r.json(), { error: 'kaboom' });
 });
+
+test('static: If-Modified-Since at or after the mtime gets 304, older gets 200', async () => {
+  const first = await fetch(base + '/big.js');
+  const lm = first.headers.get('last-modified');
+  const same = await fetch(base + '/big.js', { headers: { 'if-modified-since': lm } });
+  assert.equal(same.status, 304);
+  const older = await fetch(base + '/big.js', { headers: { 'if-modified-since': new Date(Date.parse(lm) - 60000).toUTCString() } });
+  assert.equal(older.status, 200);
+});
