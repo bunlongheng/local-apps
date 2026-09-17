@@ -153,6 +153,9 @@ function getNextAvailablePort() {
 }
 
 // --- Full infra setup/teardown ---
+// Caddy proxies and LaunchAgents are host features of a Homebrew macOS box. Anywhere
+// else the dashboard and API run in monitoring mode, exactly as the README promises.
+const CAN_PROVISION = process.platform === 'darwin';
 function setupInfra(id, data) {
   const result = {};
 
@@ -172,6 +175,7 @@ function setupInfra(id, data) {
     }
   }
 
+  if (!CAN_PROVISION) return result;
   // Caddy
   if (port) {
     result.caddyUrl = addCaddyEntry(id, port);
@@ -190,6 +194,7 @@ function setupInfra(id, data) {
 }
 
 function teardownInfra(id) {
+  if (!CAN_PROVISION) return;
   removeCaddyEntry(id);
   removeLaunchAgent(id);
 
