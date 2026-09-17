@@ -96,5 +96,4 @@ test('createLaunchAgent is an upsert: a changed start command rewrites the plist
   const plist = fs.readFileSync(path.join(dir, 'com.you.zzz-up.plist'), 'utf8');
   assert.match(plist, /start/); assert.doesNotMatch(plist, /run dev/);
   assert.ok(calls.some(c => /bootout/.test(c)), 'old service booted out before the rewrite');
-  fs.rmSync(dir, { recursive: true, force: true });
 });
