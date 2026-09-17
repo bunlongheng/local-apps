@@ -164,9 +164,13 @@
       function () { if (S.activeMachine) S.machineOnline[S.activeMachine] = false; S.error = true; S.loading = false; render(); });
   }
 
+  // While the SSE stream is open every change arrives as an event; the 15s poll is only the
+  // fallback for a dropped stream, not a second source of full re-renders.
+  var sseOk = false;
   function connectSSE() {
     function connect() {
       var es = new EventSource("/api/events"); sse = es;
+      es.onopen = function () { sseOk = true; };
       es.onmessage = function (e) {
         var msg; try { msg = JSON.parse(e.data); } catch (x) { return; }
         if (msg.type === "update") {
@@ -185,7 +189,7 @@
         }
         if (msg.type === "reload") load();
       };
-      es.onerror = function () { es.close(); setTimeout(connect, 3000); };
+      es.onerror = function () { sseOk = false; es.close(); setTimeout(connect, 3000); };
     }
     connect();
   }
@@ -478,9 +482,22 @@
   function render() {
     var access = detectAccessMode();
     var root = document.getElementById("root");
+    // innerHTML replaces every node: remember the log scroll and the focused control so a
+    // status tick does not yank the reader back to the top or drop keyboard focus.
+    var logEl = document.getElementById("logBody"), logTop = logEl ? logEl.scrollTop : null;
+    var ae = document.activeElement, focusKey = ae && ae.getAttribute ? (ae.getAttribute("data-act") || "") + "|" + (ae.getAttribute("data-id") || "") : null;
     root.innerHTML = headerHTML(access) + machineTabsHTML() + tableHTML(access) +
       modalHTML() + helpHTML() + toastHTML();
     fixIconImgs(root);
+    keyboardControls(root);
+    if (logTop !== null) { var l2 = document.getElementById("logBody"); if (l2) l2.scrollTop = logTop; }
+    if (focusKey && focusKey !== "|") { var parts = focusKey.split("|"); var sel = '[data-act="' + parts[0] + '"]' + (parts[1] ? '[data-id="' + parts[1] + '"]' : ""); var again = root.querySelector(sel); if (again) again.focus(); }
+    else if (S.modalApp) { var close = root.querySelector(".modal .modal-close"); if (close && !root.querySelector(".modal :focus")) close.focus(); }
+  }
+  // Rows and chips are clickable via data-act; make them reachable by keyboard too.
+  function keyboardControls(root) {
+    var els = root.querySelectorAll("[data-act]:not(button):not(a):not(input)");
+    for (var i = 0; i < els.length; i++) { els[i].tabIndex = 0; if (!els[i].getAttribute("role")) els[i].setAttribute("role", "button"); }
   }
   // A broken app-icon <img> turns its span back into the letter avatar.
   function fixIconImgs(root) {
@@ -616,7 +633,7 @@
     api("/api/icon-sync").then(function (s) { S.iconSync = s || {}; render(); }).catch(function () {});
     api("/api/tab-colors").then(function (t) { S.tabColors = t || {}; render(); }).catch(function () {});
   });
-  setInterval(load, 15000);
+  setInterval(function () { if (!sseOk) load(); }, 15000);
   setInterval(loadMachines, 30000);
   setTimeout(connectSSE, 3000);
 })();
