@@ -242,7 +242,7 @@ if (IS_MAIN) fs.watch(path.join(__dirname, 'public'), { recursive: true }, () =>
 
 // --- Routes live in routes/*.js, registered against a small ctx. LAN_IP, TAILSCALE_IP and
 // MACHINE_MODEL are getters because they refresh on timers. ---
-const ctx = { home: os.homedir(), isLoopback, clientAddress, appRecord, bootoutCmd, getNextAvailablePort, isPortTaken, killPort, CHROME_EXT_ERROR, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT, QRCode, addCaddyEntry, broadcast, checkSingle, clearState, db, dbg, execAsync, fetchJson, forViewer, getState, isChromeExtensionRepo, isValidId, peerRecord, renameCaddyEntry, setupInfra, spawn, sseClients, startCmd, sweepSubnet, teardownInfra, updateTabColors, validateAppFields,
+const ctx = { home: os.homedir(), faviconsDir: path.join(__dirname, 'public', 'favicons'), isLoopback, clientAddress, appRecord, bootoutCmd, getNextAvailablePort, isPortTaken, killPort, CHROME_EXT_ERROR, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT, QRCode, addCaddyEntry, broadcast, checkSingle, clearState, db, dbg, execAsync, fetchJson, forViewer, getState, isChromeExtensionRepo, isValidId, peerRecord, renameCaddyEntry, setupInfra, spawn, sseClients, startCmd, sweepSubnet, teardownInfra, updateTabColors, validateAppFields,
   LAN_IP: () => LAN_IP, TAILSCALE_IP: () => TAILSCALE_IP, MACHINE_MODEL: () => MACHINE_MODEL };
 require('./routes/apps')(app, ctx);
 require('./routes/meta')(app, ctx);
@@ -250,8 +250,11 @@ const { startupSync } = require('./routes/machines')(app, ctx);
 
 // --- Boot ---
 if (IS_MAIN) {
-  checkAll();
-  setInterval(checkAll, CHECK_INTERVAL);
+  // A tick that throws (SQLite busy, a probe that rejects) is logged, never an unhandled rejection
+  // that ends the process and has launchd spin it.
+  const tick = () => checkAll().catch((e) => console.warn(`  checkAll failed: ${e.message}`));
+  tick();
+  setInterval(tick, CHECK_INTERVAL);
 }
 
 // NOTE (2026-05-21): A2A (agent-to-agent) was removed from local-apps and consolidated
@@ -259,12 +262,11 @@ if (IS_MAIN) {
 // re-add an A2A endpoint here. The single A2A server lives in ~/Sites/claude.
 
 // Global error handler - no stack traces leaked, but honest status codes.
-// A thrown error with an explicit .status keeps it (400/404/...); everything else is
-// a real server fault -> 500, so clients and monitoring can tell the two apart.
+// Routes answer their own 4xx; anything that reaches here is a server fault, so the client gets a
+// fixed 500 and the detail goes to the log only.
 app.use((err, req, res, _next) => {
   console.error(err.message);
-  const status = Number.isInteger(err.status) ? err.status : 500;
-  res.status(status).json({ error: status < 500 ? err.message : 'Internal error' });
+  res.status(500).json({ error: 'Internal error' });
 });
 
 // This one process serves BOTH the dashboard UI (public/index.html) and the
