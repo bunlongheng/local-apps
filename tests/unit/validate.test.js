@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { isValidId, isSafePath, isSafeCommand, isSafeLaunchAgent, isSafeLaunchAgentPath, isSafeSegment, validateAppFields, xmlEscape } = require('../../lib/validate');
+const { manifestLabel, isValidId, isSafePath, isSafeCommand, isSafeLaunchAgent, isSafeLaunchAgentPath, isSafeSegment, validateAppFields, xmlEscape } = require('../../lib/validate');
 
 test('isValidId accepts kebab-case ids', () => {
   assert.ok(isValidId('my-app'));
@@ -80,4 +80,11 @@ test('healthUrl and localUrl must be loopback (no SSRF through the health loop)'
   assert.ok(!isLocalUrl('file:///etc/passwd'));
   assert.ok(validateAppFields({ healthUrl: 'http://1.2.3.4:80' }));
   assert.equal(validateAppFields({ healthUrl: 'http://localhost:4000', localUrl: 'http://localhost:4000' }), null);
+});
+
+test('manifestLabel names the PWA by how the dashboard was reached', () => {
+  assert.equal(manifestLabel('100.99.41.27:9875'), 'Apps (Tailscale)');
+  assert.equal(manifestLabel('192.168.1.5:9875'), 'Apps (LAN)'); assert.equal(manifestLabel('10.0.0.218'), 'Apps (LAN)');
+  assert.equal(manifestLabel('local-apps.localhost'), 'Apps (Caddy)'); assert.equal(manifestLabel('local-apps.localhost:9875'), 'Apps (Caddy)');
+  assert.equal(manifestLabel('localhost:9875'), 'Local Apps'); assert.equal(manifestLabel(''), 'Local Apps');
 });
