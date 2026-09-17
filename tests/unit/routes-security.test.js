@@ -13,6 +13,10 @@ const TMP_DB = path.join(os.tmpdir(), `local-apps-routes-${process.pid}.db`);
 process.env.LOCAL_APPS_DB = TMP_DB;
 process.env.MACHINE_ROLE = 'hub';   // the hub registers every route; do not depend on machine-role.json
 process.env.LOCAL_APPS_TOKEN = 'zzz-tok';   // exercises the header wiring; loopback callers never need it
+// Favicons come from a seeded temp dir, so the suite never depends on what public/favicons holds.
+const FAV_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'favs-'));
+fs.writeFileSync(path.join(FAV_DIR, 'zzz-fav.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+process.env.LOCAL_APPS_FAVICONS_DIR = FAV_DIR;
 // The import must be hermetic: server.js captures child_process at load, so spies installed here
 // are the functions it would call. Any top-level shell-out outside an IS_MAIN guard fails this.
 const cp = require('node:child_process');
@@ -31,6 +35,7 @@ after(() => {
   if (server) server.close();
   for (const s of ['', '-shm', '-wal']) { try { fs.unlinkSync(TMP_DB + s); } catch { /* not created */ } }
   for (const p of TMP_PATHS) fs.rmSync(p, { recursive: true, force: true });
+  fs.rmSync(FAV_DIR, { recursive: true, force: true });
 });
 
 async function req(method, p, body) {
@@ -102,8 +107,7 @@ test('meta: manifest label follows the host, favicons map is /favicons/<file>?v=
   assert.equal(foreign.status, 421, 'foreign Host is a DNS-rebinding attempt: 421'); assert.equal(foreign.name, undefined);
   assert.equal((await man('local-apps.localhost')).status, 200);
   const fav = await (await fetch(base + '/api/favicons')).json();
-  assert.ok(Object.keys(fav).length > 0);
-  for (const [id, v] of Object.entries(fav)) assert.match(v, new RegExp(`^/favicons/${id}\\.(png|svg|ico)\\?v=\\d+$`));
+  assert.deepEqual(Object.keys(fav), ['zzz-fav']); assert.match(fav['zzz-fav'], /^\/favicons\/zzz-fav\.png\?v=\d+$/);
   const qr = await (await fetch(base + '/api/qr')).json();
   assert.match(qr.dataUrl, /^data:image\/png;base64,/); assert.match(qr.url, /^http:\/\/.+:\d+$/);
   const prof = await (await fetch(base + '/api/app-profiles')).json();
