@@ -228,7 +228,10 @@ async function teardownInfra(app) {
   } catch (e) { dbg('teardown/killPort', e); }
   if (!CAN_PROVISION) return;
   if (app && app.launchAgent) { try { await execAsync(bootoutCmd(process.getuid(), app.launchAgent), { timeout: 10000 }); } catch (e) { dbg('teardown/bootout', e); } }
-  removeCaddyEntry(id);
+  // A PUT may have renamed the Caddy host; tear down the block the record actually points at.
+  const host = app && app.caddyUrl ? String(app.caddyUrl).replace(/^https?:\/\//, '').replace(/\.localhost.*$/, '') : id;
+  removeCaddyEntry(host);
+  if (host !== id) removeCaddyEntry(id);
   removeLaunchAgent(id);
   console.log(`  cleanup: ${id}`);
 }
