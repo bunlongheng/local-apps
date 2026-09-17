@@ -170,8 +170,9 @@ function isPortTaken(port, excludeId) {
 function getNextAvailablePort() {
   const usedPorts = new Set();
   for (const a of db.getApps()) {
-    if (a.localUrl) {
-      try { usedPorts.add(parseInt(new URL(a.localUrl).port)); } catch (e) { dbg('getNextAvailablePort', e); }
+    for (const u of [a.localUrl, a.healthUrl]) {   // both count, exactly as isPortTaken counts them
+      if (!u) continue;
+      try { const p = parseInt(new URL(u).port); if (p) usedPorts.add(p); } catch (e) { dbg('getNextAvailablePort', e); }
     }
   }
   for (let p = PORT_RANGE_START; p <= PORT_RANGE_END; p++) {
