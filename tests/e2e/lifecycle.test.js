@@ -19,7 +19,8 @@ function viaCaddy() {
   return new Promise((resolve) => {
     const req = http.get({ host: '127.0.0.1', port: 80, path: '/', headers: { host: `${ID}.localhost` }, timeout: 3000 }, (r) => {
       let body = ''; r.on('data', (c) => { body += c; });
-      r.on('end', () => resolve(r.statusCode === 502 || body.includes('<title>App is off</title>') ? 'offline' : `proxied ${r.statusCode} ${body.slice(0, 200)}`));
+      // 'offline' needs the page itself: a bare 502 means the block proxies but handle_errors did not serve offline.html.
+      r.on('end', () => resolve(body.includes('<title>App is off</title>') ? 'offline' : r.statusCode === 502 ? 'bare-502' : `proxied ${r.statusCode} ${body.slice(0, 200)}`));
     });
     req.on('error', () => resolve('none')); req.on('timeout', () => { req.destroy(); resolve('none'); });
   });
