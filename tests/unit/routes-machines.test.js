@@ -13,7 +13,7 @@ function fakeDb() {
     upsertMachine: (m) => machines.set(m.id, { ...(machines.get(m.id) || {}), ...m }),
     deleteMachine: (id) => machines.delete(id),
     getRemoteApps: (id) => [...remote.values()].filter(r => !id || r.machine_id === id),
-    syncRemoteApps: (id, apps) => { for (const a of apps) remote.set(`${id}/${a.id}`, { id: a.id, machine_id: id, name: a.name, status: a.status }); },
+    syncRemoteApps: (id, apps) => { for (const a of apps) remote.set(`${id}/${a.id}`, { id: a.id, machine_id: id, name: a.name, status: a.status, health_url: a.healthUrl || null, local_url: a.localUrl || null, caddy_url: a.caddyUrl || null, prod_url: a.prodUrl || null, repo: a.repo || null, icon: a.icon || null, synced_at: 'T' }); },
     deleteRemoteApps: (id) => { for (const k of [...remote.keys()]) if (k.startsWith(`${id}/`)) remote.delete(k); },
   };
 }
@@ -90,4 +90,16 @@ test('GET /api/machine describes this machine; GET /api/machines lists peers', a
   await t.discoverPeers();
   const list = await call(t.routes['GET /api/machines']);
   assert.ok(Array.isArray(list.body)); assert.equal(list.body.length, 1);
+});
+
+test('GET /api/all-apps and /api/machines/:id/apps map snake_case rows to the camelCase the dashboard reads', async () => {
+  const t = boot({ peers: ['10.0.0.7'], statusByIp: { '10.0.0.7': { apps: [{ id: 'remote-a', name: 'A', status: 'up', healthUrl: 'http://localhost:3001', localUrl: 'http://localhost:3001', caddyUrl: 'http://a.localhost', prodUrl: 'https://a.example.com', repo: 'https://github.com/x/a', icon: 'a.png' }] } } });
+  await t.discoverPeers();
+  const id = t.db.getMachines()[0].id;
+  const all = await call(t.routes['GET /api/all-apps']);
+  assert.equal(all.body.total, 2); assert.equal(all.body.local[0].machineId, 'local'); assert.equal(typeof all.body.local[0].machine, 'string');
+  assert.deepEqual(all.body.remote, [{ id: 'remote-a', name: 'A', healthUrl: 'http://localhost:3001', localUrl: 'http://localhost:3001', caddyUrl: 'http://a.localhost', prodUrl: 'https://a.example.com', repo: 'https://github.com/x/a', icon: 'a.png', status: 'up', machineId: id, syncedAt: 'T' }]);
+  const one = await call(t.routes['GET /api/machines/:id/apps'], { id });
+  assert.deepEqual(one.body, [{ id: 'remote-a', name: 'A', healthUrl: 'http://localhost:3001', localUrl: 'http://localhost:3001', caddyUrl: 'http://a.localhost', prodUrl: 'https://a.example.com', repo: 'https://github.com/x/a', icon: 'a.png', status: 'up', syncedAt: 'T' }]);
+  assert.deepEqual((await call(t.routes['GET /api/machines/:id/apps'], { id: 'nope' })).body, []);
 });
