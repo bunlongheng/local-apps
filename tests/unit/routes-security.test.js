@@ -59,3 +59,12 @@ test('log, start, stop and events routes: 404 on unknown ids, SSE headers on eve
   assert.equal(r.status, 200); assert.match(r.headers.get('content-type'), /text\/event-stream/);
   ctrl.abort();
 });
+
+test('HTTP layer: X-Forwarded-For from a loopback socket demotes the caller (the Caddy path)', async () => {
+  const r = await fetch(base + '/api/apps/zzz-prof', { headers: { 'x-forwarded-for': '1.2.3.4' } });
+  assert.equal(r.status, 200);
+  const a = await r.json();
+  assert.equal(a.localPath, undefined, 'proxied LAN viewer must not see paths');
+  const w = await fetch(base + '/api/stop/zzz-prof', { method: 'POST', headers: { 'x-forwarded-for': '1.2.3.4' } });
+  assert.equal(w.status, 401, 'proxied LAN mutation is denied');
+});

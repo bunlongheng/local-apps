@@ -79,3 +79,15 @@ test('registry and per-machine reads are sensitive off-box, plain status is not'
   for (const p of ['/api/log/x', '/api/capabilities', '/api/tab-colors', '/api/consistency', '/api/app-profiles', '/api/icon-sync', '/api/all-apps', '/api/machines/m1/apps']) assert.equal(off(p).status, 401, p);
   for (const p of ['/api/status', '/api/apps', '/api/apps/x', '/api/machines', '/api/qr', '/']) assert.deepEqual(off(p), { allow: true }, p);
 });
+
+test('a LAN caller arriving through the loopback reverse proxy is off-box, not localhost', () => {
+  const { effectiveAddress } = require('../../lib/auth-gate');
+  assert.equal(effectiveAddress('127.0.0.1', '1.2.3.4'), '1.2.3.4');
+  assert.equal(effectiveAddress('127.0.0.1', '1.2.3.4, 10.9.9.9'), '1.2.3.4', 'first hop is the client');
+  assert.equal(effectiveAddress('1.2.3.4', '127.0.0.1'), '1.2.3.4', 'a non-loopback socket ignores XFF entirely');
+  assert.equal(effectiveAddress('127.0.0.1', undefined), '127.0.0.1');
+  const viaCaddy = { remoteAddress: '127.0.0.1', forwardedFor: '1.2.3.4', method: 'POST', path: '/api/start/x', token: null, configuredToken: '', host: 'local-apps.localhost' };
+  assert.equal(decide(viaCaddy).status, 401, 'proxied LAN mutation is denied without the token');
+  assert.deepEqual(decide({ ...viaCaddy, method: 'GET', path: '/api/status' }), { allow: true });
+  assert.deepEqual(decide({ ...viaCaddy, forwardedFor: '127.0.0.1' }), { allow: true }, 'the proxy forwarding a loopback client keeps loopback trust');
+});
