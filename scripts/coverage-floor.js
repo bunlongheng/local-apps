@@ -28,7 +28,7 @@ function run(suffix, minLines, minBranches, tests) {
     // Called from inside a test file, node:test would see its own NODE_TEST_CONTEXT and refuse to
     // run the nested suite; drop it so the child is a fresh runner.
     const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
-    const r = spawnSync(process.execPath, ['--test', '--experimental-test-coverage', '--test-reporter=lcov', `--test-reporter-destination=${out}`, `--test-coverage-include=${suffix}`, ...tests], { stdio: ['ignore', 'ignore', 'inherit'], env });
+    const r = spawnSync(process.execPath, ['--test', '--test-timeout=30000', '--experimental-test-coverage', '--test-reporter=lcov', `--test-reporter-destination=${out}`, `--test-coverage-include=${suffix}`, ...tests], { stdio: ['ignore', 'ignore', 'inherit'], env });
     if (r.status !== 0) { console.error(`coverage-floor: node --test exited ${r.status}`); return r.status || 1; }
     return floor(out, suffix, minLines, minBranches);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
