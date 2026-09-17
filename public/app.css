@@ -200,7 +200,7 @@ a.badge-link { text-decoration: none; display: inline-flex; align-items: center;
 .lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 8px; box-shadow: 0 0 40px rgba(0,0,0,0.5); }
 
 /* Toast */
-.toast { position: fixed; bottom: 32px; left: 50%; background: #22c55e; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 12px; font-weight: 700; transition: all 0.2s; pointer-events: none; z-index: 10000; opacity: 0; transform: translateX(-50%) translateY(20px); }
+.toast { position: fixed; bottom: 32px; left: 50%; background: #22c55e; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 12px; font-weight: 700; transition: all 0.2s; pointer-events: none; z-index: 10000; opacity: 0; transform: translateX(-50%) translateY(20px);  bottom: calc(24px + env(safe-area-inset-bottom)); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* Icon prompt tab */
