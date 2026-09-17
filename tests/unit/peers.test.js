@@ -46,3 +46,11 @@ test('appRecord keeps http(s) urls only and bounded plain text', () => {
   assert.deepEqual(r, { id: 'x', name: 'bX/b', healthUrl: null, localUrl: null, caddyUrl: null, prodUrl: 'https://x.example', repo: null, icon: null, status: 'down' });
   assert.equal(appRecord({ id: '../etc' }), null);
 });
+
+test('fetchJson refuses a body over the cap', async () => {
+  const http = require('node:http');
+  const srv = http.createServer((q, r) => { r.write('['); r.write('"x",'.repeat(2000)); r.end('"y"]'); });
+  await new Promise(r => srv.listen(0, '127.0.0.1', r));
+  await assert.rejects(fetchJson(`http://127.0.0.1:${srv.address().port}/`, 2000, 4096), /too large/);
+  srv.closeAllConnections?.(); srv.close();
+});
