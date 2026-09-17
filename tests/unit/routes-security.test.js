@@ -72,3 +72,32 @@ test('HTTP layer: X-Forwarded-For from a loopback socket demotes the caller (the
 
 // start/stop on a registered app run launchctl and lsof; that path is covered with spies in
 // routes-apps.test.js so this file never touches the host.
+
+test('meta: manifest label follows the host, favicons map is /favicons/<file>?v=, qr is a data URL, profiles carry the 7 keys', async () => {
+  // fetch() drops a caller-set Host header, so the manifest probe goes through node:http.
+  const http = require('node:http');
+  const man = (host) => new Promise((resolve, reject) => http.get(base + '/api/manifest', { headers: { host } }, (r) => { let b = ''; r.on('data', (c) => { b += c; }); r.on('end', () => resolve(JSON.parse(b))); }).on('error', reject));
+  // Only hosts the auth gate allows (loopback, *.localhost, this machine's LAN ip) reach the handler:
+  // an arbitrary Host header is a DNS-rebinding attempt and is refused before routing.
+  assert.equal((await man('local-apps.localhost')).name, 'Apps (Caddy)');
+  assert.equal((await man('localhost:9875')).start_url, 'http://localhost:9875/');
+  assert.equal((await man('evil.example:9875')).name, undefined, 'foreign Host never reaches the manifest');
+  const lanIp = (await (await fetch(base + '/api/status')).json()).lanIp;
+  if (/^(10\.|192\.168\.)/.test(lanIp)) assert.equal((await man(lanIp + ':9875')).name, 'Apps (LAN)');
+  const fav = await (await fetch(base + '/api/favicons')).json();
+  assert.ok(Object.keys(fav).length > 0);
+  for (const [id, v] of Object.entries(fav)) assert.match(v, new RegExp(`^/favicons/${id}\\.(png|svg|ico)\\?v=\\d+$`));
+  const qr = await (await fetch(base + '/api/qr')).json();
+  assert.match(qr.dataUrl, /^data:image\/png;base64,/); assert.match(qr.url, /^http:\/\/.+:\d+$/);
+  const prof = await (await fetch(base + '/api/app-profiles')).json();
+  assert.deepEqual(Object.keys(prof['zzz-prof']).sort(), ['about', 'architect', 'deploy', 'features', 'performance', 'prompt', 'security']);
+  assert.equal(prof['zzz-prof'].about, 'x');
+});
+
+test('meta: /api/consistency?id= is sanitised to [a-z0-9-] and audits that app only', async () => {
+  const r = await fetch(base + '/api/consistency?id=zzz-prof%3B%20rm');
+  assert.equal(r.status, 200);
+  const body = await r.json();
+  assert.ok(Array.isArray(body) && body.length === 1, '1 app audited, not the whole registry');
+  assert.equal(body[0].id, 'zzz-profrm', 'shell metacharacters are stripped from the id before any file check');
+});
