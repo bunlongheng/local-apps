@@ -78,3 +78,14 @@ test('renameCaddyEntry removes the old id and adds the new id at the new port', 
   assert.ok(content.includes('new-name.localhost'), 'new id must be present');
   assert.ok(content.includes('reverse_proxy 127.0.0.1:4005'), 'new port must be used');
 });
+
+test('adding an entry installs the shipped offline.html next to the Caddyfile', () => {
+  const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'caddy-off-'));
+  const cf = path.join(dir, 'Caddyfile'); fs.writeFileSync(cf, '');
+  const caddy = require('../../lib/caddy')({ caddyfile: cf, errorRoot: dir, getLanIp: () => '1.2.3.4', exec: () => {} });
+  caddy.addCaddyEntry('zzz-off', 4010);
+  assert.ok(fs.existsSync(path.join(dir, 'offline.html')), 'offline.html copied into errorRoot');
+  assert.match(fs.readFileSync(path.join(dir, 'offline.html'), 'utf8'), /not running/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
