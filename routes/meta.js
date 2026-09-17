@@ -10,12 +10,12 @@ const path = require('path');
 // Repo root: moved handlers keep resolving files from the project, not from routes/.
 const ROOT = path.join(__dirname, '..');
 
-const REQUIRED = ['IS_HUB', 'db', 'dbg', 'validateAppFields', 'QRCode', 'PORT'];
+const REQUIRED = ['IS_HUB', 'db', 'dbg', 'QRCode', 'PORT'];
 
 module.exports = function register(app, ctx) {
   // Fail at boot, not at request time, when server.js forgets to pass a dependency.
   for (const k of REQUIRED) if (!(k in ctx)) throw new Error(`routes/meta.js: ctx is missing ${k}`);
-  const { IS_HUB, db, dbg, validateAppFields, QRCode, PORT } = ctx;
+  const { IS_HUB, db, dbg, QRCode, PORT } = ctx;
 
   // --- Tab Colors ---
   if (IS_HUB) app.get('/api/tab-colors', (req, res) => {

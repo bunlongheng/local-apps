@@ -2,7 +2,7 @@
 // db.js now honours LOCAL_APPS_DB, so we point it at a throwaway file, require the module
 // (schema + migrations run against the temp DB, never the live local.db), and exercise the
 // real query layer end to end.
-const { test, before, after } = require('node:test');
+const { test, after } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');

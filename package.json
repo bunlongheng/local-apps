@@ -9,11 +9,12 @@
     "start": "node --env-file-if-exists=.env server.js",
     "server": "node --env-file-if-exists=.env --watch server.js",
     "icons": "node scripts/generate-favicons.js",
-    "lint": "eslint .",
-    "test": "node --test 'tests/unit/**/*.test.js' 'tests/e2e/**/*.test.js'",
+    "lint": "eslint . --max-warnings 0",
+    "test": "node --test 'tests/unit/**/*.test.js'",
     "test:unit": "node --test 'tests/unit/**/*.test.js'",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=70 --test-coverage-branches=74 --test-coverage-functions=78 'tests/unit/**/*.test.js'",
-    "test:e2e": "node --test 'tests/e2e/**/*.test.js'"
+    "test:e2e": "node --test 'tests/e2e/**/*.test.js'",
+    "test:all": "node --test 'tests/unit/**/*.test.js' 'tests/e2e/**/*.test.js'"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",

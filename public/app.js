@@ -51,7 +51,7 @@
   }
 
   function stripProto(u) { return String(u || "").replace(/^https?:\/\//, ""); }
-  function getPort(url) { try { return new URL(url).port || null; } catch (e) { return null; } }
+  function getPort(url) { try { return new URL(url).port || null; } catch { return null; } }
 
   var ROW_EMOJI = { Host: "\u{1F50C}", Local: "\u{1F310}", LAN: "\u{1F4E1}", Tailscale: "\u{1F517}", Caddy: "\u{1F3E0}", Prod: "\u{1F680}", GitHub: "\u{1F419}" };
   var PROFILE_TABS = [
@@ -105,14 +105,14 @@
     modalApp: null, modalTab: "info", logLines: [], logLoading: false,
     qrData: null, qrOpen: false, helpOpen: false,
   };
-  var startPolls = {}, toastTimer = null, sse = null;
+  var startPolls = {}, toastTimer = null;
 
   function api(path, opts) {
     // Forward the control token (if the user set one for LAN/off-box access) so mutating
     // actions and sensitive reads work from the iPad/LAN. Localhost needs no token.
     opts = opts || {};
     var token = null;
-    try { token = localStorage.getItem("localAppsToken"); } catch (_e) { /* best effort: UI stays usable */ }
+    try { token = localStorage.getItem("localAppsToken"); } catch { /* best effort: UI stays usable */ }
     if (token) {
       opts.headers = Object.assign({}, opts.headers, { "x-local-apps-token": token });
     }
@@ -141,7 +141,7 @@
     var ta = document.createElement("textarea");
     ta.value = text; ta.style.cssText = "position:fixed;opacity:0";
     document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); } catch (_e) { /* best effort: UI stays usable */ }
+    try { document.execCommand("copy"); } catch { /* best effort: UI stays usable */ }
     document.body.removeChild(ta); toast("Copied", 1500);
   }
 
@@ -174,10 +174,10 @@
   var sseOk = false;
   function connectSSE() {
     function connect() {
-      var es = new EventSource("/api/events"); sse = es;
+      var es = new EventSource("/api/events");
       es.onopen = function () { sseOk = true; };
       es.onmessage = function (e) {
-        var msg; try { msg = JSON.parse(e.data); } catch (x) { return; }
+        var msg; try { msg = JSON.parse(e.data); } catch { return; }
         if (msg.type === "update") {
           if (msg.status === "removed") { S.apps = S.apps.filter(function (a) { return a.id !== msg.id; }); }
           else {
@@ -262,7 +262,7 @@
     var go = S.qrData ? Promise.resolve() : api("/api/qr").then(function (d) { S.qrData = d; });
     go.then(function () { S.qrOpen = true; render(); }, function () {});
   }
-  function switchMachine(id) { S.activeMachine = id; try { localStorage.setItem("activeMachine", id || ""); } catch (_e) { /* best effort: UI stays usable */ } S.loading = true; render(); load(); }
+  function switchMachine(id) { S.activeMachine = id; try { localStorage.setItem("activeMachine", id || ""); } catch { /* best effort: UI stays usable */ } S.loading = true; render(); load(); }
 
   // ---- render -----------------------------------------------------------
   function vercelSvg() { return '<svg width="14" height="14" viewBox="0 0 76 65" fill="white"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z"/></svg>'; }
@@ -660,7 +660,7 @@
   });
 
   // ---- boot -------------------------------------------------------------
-  try { var saved = localStorage.getItem("activeMachine"); if (saved) S.activeMachine = saved; } catch (_e) { /* best effort: UI stays usable */ }
+  try { var saved = localStorage.getItem("activeMachine"); if (saved) S.activeMachine = saved; } catch { /* best effort: UI stays usable */ }
   var um = new URLSearchParams(location.search).get("machine"); if (um) S.activeMachine = um;
 
   render();
