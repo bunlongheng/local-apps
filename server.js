@@ -737,7 +737,12 @@ app.get('/api/app-profiles', (req, res) => {
 app.put('/api/app-profiles/:id', (req, res) => {
   const existing = db.getApp(req.params.id);
   if (!existing) return res.status(404).json({ error: 'not found' });
-  db.upsertApp({ id: req.params.id, ...req.body });
+  // Profile route writes profile columns only. Spreading req.body let a caller rewrite
+  // launchAgent, launchAgentPath, startCommand or localPath here, past validateAppFields.
+  const PROFILE_FIELDS = ['about', 'features', 'architect', 'deploy', 'security', 'performance', 'prompt', 'sortOrder'];
+  const patch = { id: req.params.id };
+  for (const k of PROFILE_FIELDS) if (k in (req.body || {})) patch[k] = req.body[k];
+  db.upsertApp(patch);
   res.json({ ok: true });
 });
 
