@@ -26,6 +26,8 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      # Gate policy: thresholds sit 1 point under what CI measures. Raise them only in a dedicated
+      # ci: commit after a test-adding PR, never loosen them inside a feature PR.
       - name: Unit tests + coverage gate
         run: npm run test:coverage
       - name: E2E against a booted instance (agent role, loopback only)
