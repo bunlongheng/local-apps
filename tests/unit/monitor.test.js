@@ -52,3 +52,12 @@ test('a second tick while the first is in flight returns without probing', async
   assert.equal(probes, 1);
   assert.equal(await m.checkAll(), true, 'runs again once the first tick finished');
 });
+
+test('one app whose level throws does not abort the tick for the others', async () => {
+  const B = { ...APP, id: 'b', localUrl: 'http://localhost:4001' };
+  const { m, calls } = boot({ apps: [{ ...APP }, B], decision: { level: 1 } });
+  const orig = calls.push.bind(calls);
+  calls.push = (x) => { orig(x); if (x === 'runLevel:1:a:4000') throw new Error('boom'); return calls.length; };
+  assert.equal(await m.checkAll(), true);
+  assert.ok(calls.includes('runLevel:1:a:4000') && calls.includes('runLevel:1:b:4001'));
+});
