@@ -11,7 +11,7 @@ const MUTATE = process.env.E2E_MUTATE === '1';
 const opts = { skip: MUTATE ? false : 'set E2E_MUTATE=1 against a scratch instance' };
 function freePort() { return new Promise((r) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); }); }
 
-before(async () => { if (!MUTATE) return; if (!await serverUp()) throw new Error('local-apps server not reachable - start it first'); await api('DELETE', `/api/apps/${ID}`); });
+before(async () => { if (!await serverUp()) throw new Error('local-apps server not reachable - start it first'); await api('DELETE', `/api/apps/${ID}`); });
 after(async () => { if (MUTATE) await api('DELETE', `/api/apps/${ID}`); });
 
 test('POST -> GET -> PUT -> DELETE round-trips an app', opts, async () => {
@@ -34,7 +34,7 @@ test('POST -> GET -> PUT -> DELETE round-trips an app', opts, async () => {
   assert.equal((await api('GET', `/api/apps/${ID}`)).status, 404);
 });
 
-test('GET /api/machine and /api/machines answer with their shapes', opts, async () => {
+test('GET /api/machine and /api/machines answer with their shapes', async () => {
   const me = await api('GET', '/api/machine');
   assert.equal(me.status, 200); assert.ok(['hub', 'agent'].includes(me.json.role)); assert.equal(typeof me.json.hostname, 'string'); assert.equal(typeof me.json.appCount, 'number');
   const list = await api('GET', '/api/machines');
