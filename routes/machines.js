@@ -123,5 +123,5 @@ module.exports = function register(app, ctx) {
     }
   }
 
-  return { startupSync };
+  return { startupSync, discoverPeers };
 };
