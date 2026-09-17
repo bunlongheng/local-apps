@@ -77,7 +77,6 @@ test('GET /api/machines/:id/status: 404 unknown, 502 unreachable, sanitised apps
   assert.equal((await call(fn, { id: 'nope' })).status, 404);
   const ok = await call(fn, { id });
   assert.equal(ok.status, 200); assert.equal(ok.body.apps.length, 1); assert.equal(ok.body.apps[0].id, 'remote-a'); assert.equal(ok.body.machineModel, 'MacBook Pro');
-  delete t.ctx.fetchJson; t.ctx.fetchJson = async () => { throw new Error('timeout'); };
   const t2 = boot({ peers: ['10.0.0.8'] }); await t2.discoverPeers();
   const down = await call(t2.routes['GET /api/machines/:id/status'], { id: t2.db.getMachines()[0].id });
   assert.equal(down.status, 502);
