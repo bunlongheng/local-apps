@@ -10,13 +10,13 @@ const { manifestLabel } = require('../lib/validate');
 // Repo root: moved handlers keep resolving files from the project, not from routes/.
 const ROOT = path.join(__dirname, '..');
 
-const REQUIRED = ['LAN_IP', 'IS_HUB', 'db', 'dbg', 'QRCode', 'PORT', 'home'];
+const REQUIRED = ['LAN_IP', 'IS_HUB', 'db', 'dbg', 'QRCode', 'PORT', 'home', 'faviconsDir'];
 
 module.exports = function register(app, ctx) {
   // Fail at boot, not at request time, when server.js forgets to pass a dependency.
   for (const k of REQUIRED) if (!(k in ctx)) throw new Error(`routes/meta.js: ctx is missing ${k}`);
   // home: the owner's home dir (tab registry, MCP config, ~/.local/bin); tests point it at a fixture.
-  const { IS_HUB, db, dbg, QRCode, PORT, home } = ctx;
+  const { IS_HUB, db, dbg, QRCode, PORT, home, faviconsDir } = ctx;   // faviconsDir: tests point it at a temp dir
 
   // --- Tab Colors ---
   if (IS_HUB) app.get('/api/tab-colors', (req, res) => {
@@ -62,7 +62,7 @@ module.exports = function register(app, ctx) {
 
   // --- Auto-generated FAVICONS map from /public/favicons/ ---
   app.get('/api/favicons', (req, res) => {
-    const dir = path.join(ROOT, 'public', 'favicons');
+    const dir = faviconsDir;
     const map = {};
     const priority = { png: 3, ico: 2, svg: 1 };
     const chosen = {}; // track which ext won per id
@@ -136,7 +136,7 @@ module.exports = function register(app, ctx) {
     const apps = db.getApps();
     const result = {};
     for (const a of apps) {
-      const fav = path.join(ROOT, 'public', 'favicons', `${a.id}.png`);
+      const fav = path.join(faviconsDir, `${a.id}.png`);
       const hasFav = fs.existsSync(fav);
       let hasAppIcon = false;
       let synced = false;
