@@ -70,3 +70,14 @@ test('validateAppFields rejects unsafe launchAgent + launchAgentPath (the RCE ve
   assert.match(validateAppFields({ launchAgentPath: '/tmp/a";evil' }), /launchAgentPath/);
   assert.equal(validateAppFields({ launchAgent: 'com.bheng.ok', launchAgentPath: '/Users/YOU/Library/LaunchAgents/com.bheng.ok.plist' }), null);
 });
+
+test('healthUrl and localUrl must be loopback (no SSRF through the health loop)', () => {
+  const { isLocalUrl } = require('../../lib/validate');
+  assert.ok(isLocalUrl('http://localhost:3000'));
+  assert.ok(isLocalUrl('http://127.0.0.1:3000/health'));
+  assert.ok(!isLocalUrl('http://1.2.3.4:3000'));
+  assert.ok(!isLocalUrl('http://internal.corp/admin'));
+  assert.ok(!isLocalUrl('file:///etc/passwd'));
+  assert.ok(validateAppFields({ healthUrl: 'http://1.2.3.4:80' }));
+  assert.equal(validateAppFields({ healthUrl: 'http://localhost:4000', localUrl: 'http://localhost:4000' }), null);
+});
