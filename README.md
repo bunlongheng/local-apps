@@ -98,6 +98,7 @@ public/         vanilla-JS dashboard, service worker, offline page
 scripts/        generate-favicons, consistency, onboard-app.sh, storage-guard.sh (the owner's own tooling, kept for reference)
 tests/          unit/ (lib modules, db, consistency, launchctl-cmds, routes-apps, routes-machines, routes-security) and e2e/
                 npm test (unit), npm run test:e2e (needs the app on :9875), npm run test:all, npm run lint
+                the coverage gate measures server code only; dashboard behaviour is pinned by tests/unit/dashboard.test.js (jsdom)
 ```
 
 ## License
