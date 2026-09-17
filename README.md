@@ -58,6 +58,8 @@ On the `hub` role only, 5 routes serve the owner's own workflow rather than the 
 
 ## Configuration
 
+Self-healing is opt-in. Copy `data/auto-restart.example.json` to `data/auto-restart.json` (`{"enabled": true}`) to turn the L1-L5 chain on; add `"agent": true` to allow L4 to hand a failure to a local Claude Code CLI. Without the file the hub only monitors.
+
 No environment variables are required.
 
 | Env var | Default | Purpose |

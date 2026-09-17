@@ -1,17 +1,49 @@
 // App routes: registry CRUD, toggle, bulk-toggle, events (SSE), log, start, stop, and the port helpers they share.
+const os = require('os');
 // Registered by server.js as require('./routes/apps')(app, ctx). Everything a handler needs comes
 // from ctx, so this file has no module-level state beyond what it declares itself.
 const fs = require('fs');
 
-const REQUIRED = ['getNextAvailablePort', 'isPortTaken', 'killPort', 'db', 'dbg', 'broadcast', 'sseClients', 'getState', 'clearState', 'checkSingle', 'setupInfra', 'teardownInfra', 'updateTabColors', 'forViewer', 'startCmd', 'execAsync', 'execSync', 'spawn', 'validateAppFields', 'isValidId', 'isChromeExtensionRepo', 'CHROME_EXT_ERROR', 'addCaddyEntry', 'renameCaddyEntry'];
+const REQUIRED = ['PORT', 'MACHINE_ROLE', 'getNextAvailablePort', 'isPortTaken', 'killPort', 'db', 'dbg', 'broadcast', 'sseClients', 'getState', 'clearState', 'checkSingle', 'setupInfra', 'teardownInfra', 'updateTabColors', 'forViewer', 'startCmd', 'execAsync', 'execSync', 'spawn', 'validateAppFields', 'isValidId', 'isChromeExtensionRepo', 'CHROME_EXT_ERROR', 'addCaddyEntry', 'renameCaddyEntry'];
 
 module.exports = function register(app, ctx) {
   // Fail at boot, not at request time, when server.js forgets to pass a dependency.
   for (const k of REQUIRED) if (!(k in ctx)) throw new Error(`routes/apps.js: ctx is missing ${k}`);
-  const { getNextAvailablePort, isPortTaken, killPort, db, dbg, broadcast, sseClients, getState, clearState, checkSingle, setupInfra, teardownInfra, updateTabColors, forViewer, startCmd, execAsync, execSync, spawn, validateAppFields, isValidId, isChromeExtensionRepo, CHROME_EXT_ERROR, addCaddyEntry, renameCaddyEntry } = ctx;
+  const { PORT, MACHINE_ROLE, getNextAvailablePort, isPortTaken, killPort, db, dbg, broadcast, sseClients, getState, clearState, checkSingle, setupInfra, teardownInfra, updateTabColors, forViewer, startCmd, execAsync, execSync, spawn, validateAppFields, isValidId, isChromeExtensionRepo, CHROME_EXT_ERROR, addCaddyEntry, renameCaddyEntry } = ctx;
 
 
   // --- CRUD: Apps ---
+  // Same-origin only: the dashboard is served by this process and peers read it server-side.
+  app.get('/api/status', (req, res) => {
+    const apps = db.getApps().map(a => {
+      const s = getState(a.id);
+      return {
+        id: a.id,
+        name: a.name,
+        localUrl: a.localUrl,
+        lanUrl: a.localUrl ? a.localUrl.replace('localhost', ctx.LAN_IP()) : null,
+        tailscaleUrl: (ctx.TAILSCALE_IP() && a.localUrl) ? a.localUrl.replace('localhost', ctx.TAILSCALE_IP()) : null,
+        status: s.status,
+        mode: (a.startCommand || '').includes('start') && !(a.startCommand || '').includes('dev') ? 'prod' : 'dev',
+        lastChecked: s.lastChecked,
+        caddyUrl: a.caddyUrl || null,
+        launchAgent: a.launchAgent || null,
+        launchAgentPath: a.launchAgentPath || null,
+        icon: a.icon || null,
+        repo: a.repo || null,
+        prodUrl: a.prodUrl || null,
+        prodUrl2: a.prodUrl2 || null,
+        localPath: a.localPath || null,
+        logPath: a.logPath || null,
+        disabled: a.disabled || false,
+        hostname: os.hostname(),
+        tabColor: a.tabColor || null,
+        tabIcon: a.tabIcon || null,
+      };
+    });
+    res.json({ apps: apps.map(a => forViewer(req, a)), lanIp: ctx.LAN_IP(), tailscaleIp: ctx.TAILSCALE_IP(), machineModel: ctx.MACHINE_MODEL(), machineRole: MACHINE_ROLE, monitorUrl: `http://${ctx.LAN_IP()}:${PORT}` });
+  });
+
   app.get('/api/apps', (req, res) => {
     res.json(db.getApps().map(a => forViewer(req, a)));
   });

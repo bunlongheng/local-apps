@@ -314,6 +314,10 @@ async function checkAll() {
     return false;
   }));
 
+  // Read once per tick, not once per app: 2 booleans that cannot change mid-tick.
+  const autoRestartCfg = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'auto-restart.json'), 'utf8')); } catch { return {}; } })();
+  const autoRestartEnabled = !!autoRestartCfg.enabled;
+  const autoRestartAgent = autoRestartCfg.agent === true;
   for (const [index, appCfg] of apps.entries()) {
     const s = getState(appCfg.id);
     s.lastChecked = new Date().toISOString();
@@ -338,9 +342,6 @@ async function checkAll() {
     // Level 2 (90s):  still down? kill port, bootout+bootstrap fresh
     // Level 3 (180s): still down? read logs, try common fixes (npm install, port kill)
     // Level 4 (300s): still down? deploy Claude Code agent to debug and fix
-    const autoRestartCfg = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'auto-restart.json'), 'utf8')); } catch { return {}; } })();
-    const autoRestartEnabled = !!autoRestartCfg.enabled;
-    const autoRestartAgent = autoRestartCfg.agent === true;
     // Level 5 recovery: a breaker OFF (never a user OFF) re-arms when the port is
     // observed up or after the cooldown, so a healthy app can't sit grey forever.
     const rearm = IS_HUB && autoRestartEnabled ? rearmReason(appCfg, up, Date.now()) : null;
@@ -461,36 +462,6 @@ async function checkAll() {
 }
 
 
-app.get('/api/status', (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  const apps = db.getApps().map(a => {
-    const s = getState(a.id);
-    return {
-      id: a.id,
-      name: a.name,
-      localUrl: a.localUrl,
-      lanUrl: a.localUrl ? a.localUrl.replace('localhost', LAN_IP) : null,
-      tailscaleUrl: (TAILSCALE_IP && a.localUrl) ? a.localUrl.replace('localhost', TAILSCALE_IP) : null,
-      status: s.status,
-      mode: (a.startCommand || '').includes('start') && !(a.startCommand || '').includes('dev') ? 'prod' : 'dev',
-      lastChecked: s.lastChecked,
-      caddyUrl: a.caddyUrl || null,
-      launchAgent: a.launchAgent || null,
-      launchAgentPath: a.launchAgentPath || null,
-      icon: a.icon || null,
-      repo: a.repo || null,
-      prodUrl: a.prodUrl || null,
-      prodUrl2: a.prodUrl2 || null,
-      localPath: a.localPath || null,
-      logPath: a.logPath || null,
-      disabled: a.disabled || false,
-      hostname: os.hostname(),
-      tabColor: a.tabColor || null,
-      tabIcon: a.tabIcon || null,
-    };
-  });
-  res.json({ apps: apps.map(a => forViewer(req, a)), lanIp: LAN_IP, tailscaleIp: TAILSCALE_IP, machineModel: MACHINE_MODEL, machineRole: MACHINE_ROLE, monitorUrl: `http://${LAN_IP}:${PORT}` });
-});
 
 
 
