@@ -17,6 +17,7 @@ const { isChromeExtensionRepo, CHROME_EXT_ERROR } = require('./lib/chrome-ext');
 const makeCaddy = require('./lib/caddy');
 const makeLaunchd = require('./lib/launchd');
 const makeHealth = require('./lib/health');
+const { fetchJson, sweepSubnet } = require('./lib/peers');
 
 const app = createApp();
 // True only when run directly (node server.js), false when require()d by a test - lets the
@@ -842,32 +843,15 @@ app.post('/api/stop/:id', (req, res) => {
 let discoveredPeers = []; // live peers found on network
 
 function probeHost(ip, port = 9875) {
-  return new Promise((resolve) => {
-    const url = `http://${ip}:${port}/api/machine`;
-    http.get(url, { timeout: 2000 }, (resp) => {
-      let data = '';
-      resp.on('data', c => data += c);
-      resp.on('end', () => {
-        try {
-          const info = JSON.parse(data);
-          resolve({ id: info.hostname || ip, hostname: info.hostname, ip, port, model: info.model, appCount: info.appCount });
-        } catch { resolve(null); }
-      });
-    }).on('error', () => resolve(null)).on('timeout', function() { this.destroy(); resolve(null); });
-  });
+  return fetchJson(`http://${ip}:${port}/api/machine`, 2000)
+    .then((info) => ({ id: info.hostname || ip, hostname: info.hostname, ip, port, model: info.model, appCount: info.appCount }))
+    .catch(() => null);
 }
 
 async function discoverPeers() {
-  if (LAN_IP === 'N/A') return;
-  const subnet = LAN_IP.split('.').slice(0, 3).join('.');
-  const probes = [];
-  for (let i = 1; i <= 254; i++) {
-    const ip = `${subnet}.${i}`;
-    if (ip === LAN_IP) continue; // skip self
-    probes.push(probeHost(ip));
-  }
-  const results = await Promise.all(probes);
-  discoveredPeers = results.filter(Boolean);
+  // Hub-only: an agent machine has no business sweeping the LAN every 30s.
+  if (!IS_HUB || LAN_IP === 'N/A') return;
+  discoveredPeers = await sweepSubnet(LAN_IP, probeHost, { concurrency: 32 });
   // Sync to DB
   for (const p of discoveredPeers) {
     db.upsertMachine(p);
@@ -883,13 +867,7 @@ async function discoverPeers() {
   // Fetch and store apps from each peer
   for (const p of discoveredPeers) {
     try {
-      const data = await new Promise((resolve, reject) => {
-        http.get(`http://${p.ip}:${p.port || 9875}/api/status`, { timeout: 3000 }, (resp) => {
-          let body = '';
-          resp.on('data', c => body += c);
-          resp.on('end', () => { try { resolve(JSON.parse(body)); } catch { reject(); } });
-        }).on('error', reject);
-      });
+      const data = await fetchJson(`http://${p.ip}:${p.port || 9875}/api/status`, 3000);
       if (data.apps && Array.isArray(data.apps)) {
         db.syncRemoteApps(p.id, data.apps);
       }
@@ -934,13 +912,7 @@ app.get('/api/machines/:id/status', async (req, res) => {
   if (!m) return res.status(404).json({ error: 'machine not found' });
   const url = `http://${m.ip}:${m.port || 9875}/api/status`;
   try {
-    const data = await new Promise((resolve, reject) => {
-      http.get(url, { timeout: 5000 }, (resp) => {
-        let body = '';
-        resp.on('data', c => body += c);
-        resp.on('end', () => { try { resolve(JSON.parse(body)); } catch { reject(new Error('invalid JSON')); } });
-      }).on('error', reject).on('timeout', function() { this.destroy(); reject(new Error('timeout')); });
-    });
+    const data = await fetchJson(url, 5000);
     const hostname = data.apps?.[0]?.hostname || m.hostname;
     const model = data.machineModel || m.model;
     db.upsertMachine({ id: m.id, hostname, ip: m.ip, port: m.port, model });
@@ -978,13 +950,7 @@ async function startupSync() {
   const machines = db.getMachines();
   for (const m of machines) {
     try {
-      const info = await new Promise((resolve, reject) => {
-        http.get(`http://${m.ip}:${m.port || 9875}/api/machine`, { timeout: 3000 }, (resp) => {
-          let data = '';
-          resp.on('data', c => data += c);
-          resp.on('end', () => { try { resolve(JSON.parse(data)); } catch { reject(); } });
-        }).on('error', reject).on('timeout', function() { this.destroy(); reject(); });
-      });
+      const info = await fetchJson(`http://${m.ip}:${m.port || 9875}/api/machine`, 3000);
       db.upsertMachine({ id: m.id, hostname: info.hostname || m.hostname, ip: m.ip, port: m.port, model: info.model || m.model });
       console.log(`  Online: ${info.hostname || m.ip} (${info.appCount} apps)`);
     } catch {
