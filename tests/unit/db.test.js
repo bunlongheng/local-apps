@@ -102,3 +102,13 @@ test('upsertApp keeps prodUrl2, tabColor and tabIcon on create', () => {
   const a = db.upsertApp({ id: 'zzz-extra', localPath: '/tmp/zzz', prodUrl2: 'https://x.example', tabColor: '#123456', tabIcon: 'X' });
   assert.equal(a.prodUrl2, 'https://x.example'); assert.equal(a.tabColor, '#123456'); assert.equal(a.tabIcon, 'X');
 });
+
+test('getTabColors returns only apps with a colour, label uppercased, icon defaulting to empty', () => {
+  db.upsertApp({ id: 'zzz-tc', name: 'tc app', tabColor: '#0a0b0c', tabIcon: 'T' });
+  db.upsertApp({ id: 'zzz-tc2', name: 'no icon', tabColor: '#111111' });
+  db.upsertApp({ id: 'zzz-notc', name: 'no colour' });
+  const tc = db.getTabColors();
+  assert.deepEqual(tc['zzz-tc'], { label: 'TC APP', color: '#0a0b0c', icon: 'T' });
+  assert.deepEqual(tc['zzz-tc2'], { label: 'NO ICON', color: '#111111', icon: '' });
+  assert.equal(tc['zzz-notc'], undefined);
+});
