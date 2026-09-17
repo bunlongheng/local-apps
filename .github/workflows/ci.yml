@@ -26,8 +26,9 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
-      # Gate policy: thresholds sit 1 point under what CI measures. Raise them only in a dedicated
-      # ci: commit after a test-adding PR, never loosen them inside a feature PR.
+      # Gate policy: thresholds sit about 1 point under what the ubuntu runner measures (it reads a
+      # little lower than a Mac). Raise them only in a dedicated ci: commit after a test-adding PR,
+      # never loosen them inside a feature PR.
       - name: Unit tests + coverage gate
         run: npm run test:coverage
       - name: Dashboard per-file coverage floor (public/app.js)
