@@ -34,8 +34,8 @@ function boot(apps) {
     getState: (id) => (states[id] ||= { status: 'up' }), clearState: (id) => calls.push(`clearState:${id}`), checkSingle: () => {},
     setupInfra: (id, data) => { calls.push(`setupInfra:${id}:${data.localUrl || ''}`); return { caddyUrl: `http://${id}.localhost`, launchAgent: `com.t.${id}` }; },
     teardownInfra: async (a) => calls.push(`teardown:${a.id}:${db.getApp(a.id) ? 'row-present' : 'row-gone'}`),
-    updateTabColors: () => {}, forViewer: (req, a) => a, execAsync: async (cmd) => calls.push(`exec:${cmd}`), spawn: (bin, args) => { calls.push(`spawn:${args[1]}`); return { unref() {} }; },
-    validateAppFields: () => null, isValidId: (id) => /^[a-z0-9-]+$/.test(id), isChromeExtensionRepo: () => false, CHROME_EXT_ERROR: 'ext', addCaddyEntry: () => {}, renameCaddyEntry: () => {},
+    updateTabColors: (id, name) => calls.push(`tabs:${id}:${name}`), forViewer: (req, a) => a, execAsync: async (cmd) => calls.push(`exec:${cmd}`), spawn: (bin, args) => { calls.push(`spawn:${args[1]}`); return { unref() {} }; },
+    validateAppFields: () => null, isValidId: (id) => /^[a-z0-9-]+$/.test(id), isChromeExtensionRepo: () => false, CHROME_EXT_ERROR: 'ext', addCaddyEntry: (h, p) => calls.push(`caddy:add:${h}:${p}`), renameCaddyEntry: (o, n, p) => calls.push(`caddy:rename:${o}:${n}:${p}`),
   };
   require('../../routes/apps')(app, ctx);
   return { routes, calls, db, states };
@@ -73,7 +73,7 @@ test('POST merges the provisioned infra and reports the assigned port; PUT with 
   calls.length = 0;
   const u = await call(routes['PUT /api/apps/:id'], { params: { id: 'a' }, body: { localUrl: 'http://localhost:4100' } });
   assert.equal(u.status, 200); assert.equal(db.getApp('a').localUrl, 'http://localhost:4100');
-  assert.deepEqual(calls, ['setupInfra:a:http://localhost:4100', 'sse:reload::']);
+  assert.deepEqual(calls, ['setupInfra:a:http://localhost:4100', 'caddy:add:a:4100', 'sse:reload::'], 'provisioned host gets its block since the app had none');
   calls.length = 0;
   await call(routes['PUT /api/apps/:id'], { params: { id: 'a' }, body: { name: 'Renamed' } });
   assert.ok(!calls.some(x => x.startsWith('setupInfra')), 'a rename alone does not re-provision');
@@ -97,4 +97,16 @@ test('stop kills the port, boots out in the background and marks down; start kic
   assert.equal((await call(routes['POST /api/start/:id'], { params: { id: 'c' } })).status, 400);
   assert.equal((await call(routes['POST /api/stop/:id'], { params: { id: 'c' } })).status, 400);
   mock.timers.reset();
+});
+
+test('PUT renames the Caddy block when caddyUrl changes, adds one when there was none, and syncs the tab label on a rename', async () => {
+  const { routes, calls } = boot([{ ...A, caddyUrl: 'http://a.localhost' }, { ...B, caddyUrl: null }]);
+  await call(routes['PUT /api/apps/:id'], { params: { id: 'a' }, body: { caddyUrl: 'http://neu.localhost' } });
+  assert.ok(calls.includes('caddy:rename:a:neu:4000'), calls.join());
+  calls.length = 0;
+  await call(routes['PUT /api/apps/:id'], { params: { id: 'b' }, body: { caddyUrl: 'http://bee.localhost' } });
+  assert.ok(calls.includes('caddy:add:bee:4001'), calls.join());
+  calls.length = 0;
+  await call(routes['PUT /api/apps/:id'], { params: { id: 'a' }, body: { name: 'Renamed' } });
+  assert.ok(calls.includes('tabs:a:Renamed'), calls.join()); assert.ok(!calls.some(x => x.startsWith('caddy:')), 'a rename alone touches no Caddy block');
 });
