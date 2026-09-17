@@ -105,7 +105,7 @@ test('a candidate Caddyfile that fails validation never replaces the live file',
   const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'caddy-val-')); const cf = path.join(dir, 'Caddyfile'); fs.writeFileSync(cf, '# live\n');
   const caddy = require('../../lib/caddy')({ caddyfile: cf, errorRoot: dir, getLanIp: () => '1.2.3.4', exec: (cmd) => { if (/validate/.test(cmd)) throw new Error('adapt failed'); } });
-  caddy.addCaddyEntry('zzz-bad', 4001);
+  assert.equal(caddy.addCaddyEntry('zzz-bad', 4001), null, 'no proxy URL for a block that was never written');
   assert.equal(fs.readFileSync(cf, 'utf8'), '# live\n', 'live Caddyfile untouched'); assert.ok(!fs.existsSync(cf + '.candidate'));
   fs.rmSync(dir, { recursive: true, force: true });
 });
