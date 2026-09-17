@@ -461,7 +461,7 @@
     var tabLabel = (PROFILE_TABS.filter(function (t) { return t.key === S.modalTab; })[0] || { label: "" }).label;
     h += '<div class="toggle-row"><span class="modal-tab-title">' + esc(tabLabel) + "</span>" +
       '<div class="toggle-group"><span class="toggle-label ' + (app.disabled ? "off" : "on") + '">' + (app.disabled ? "OFF" : "ON") + "</span>" +
-      '<button class="toggle ' + (app.disabled ? "off" : "on") + '" data-act="toggle" data-id="' + esc(app.id) + '" data-name="' + esc(app.name) + '"><span class="toggle-knob" style="left:' + (app.disabled ? 2 : 18) + 'px"></span></button></div></div>';
+      (S.activeMachine ? '<span class="muted">read-only on a peer</span>' : '<button class="toggle ' + (app.disabled ? "off" : "on") + '" data-act="toggle" data-id="' + esc(app.id) + '" data-name="' + esc(app.name) + '"><span class="toggle-knob" style="left:' + (app.disabled ? 2 : 18) + 'px"></span></button>') + '</div></div>';
     // tabs
     h += '<div class="tabs">' + PROFILE_TABS.map(function (t) {
       var active = S.modalTab === t.key;
@@ -471,7 +471,7 @@
     if (S.modalTab !== "info") h += '<div class="panel">' + panelHTML(S.modalTab, S.profiles[app.id]) + "</div>";
     if (S.modalTab === "info") {
       h += infoRowsHTML(app);
-      h += '<div class="danger-zone"><button class="danger-btn" data-act="delete" data-id="' + esc(app.id) + '" data-name="' + esc(app.name) + '">Delete App</button></div>';
+      if (!S.activeMachine) h += '<div class="danger-zone"><button class="danger-btn" data-act="delete" data-id="' + esc(app.id) + '" data-name="' + esc(app.name) + '">Delete App</button></div>';
     }
     h += "</div></div>";
     return h;
@@ -596,6 +596,8 @@
     var el = e.target.closest("[data-act]");
     if (!el) { if (S.qrOpen) { S.qrOpen = false; render(); } return; }
     var act = el.getAttribute("data-act"), id = el.getAttribute("data-id"), name = el.getAttribute("data-name");
+    // A peer's apps are read-only from the hub: those buttons are not rendered, and this guards the rest.
+    if (S.activeMachine && ["start", "stop", "toggle", "delete"].indexOf(act) >= 0) { toast("Peer apps are read-only from the hub", 3000, "error"); render(); return; }
     switch (act) {
       case "open": openModal(id); break;
       case "close": closeModal(); break;
