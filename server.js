@@ -18,6 +18,7 @@ const { isChromeExtensionRepo, CHROME_EXT_ERROR } = require('./lib/chrome-ext');
 const makeCaddy = require('./lib/caddy');
 const makeLaunchd = require('./lib/launchd');
 const makeHealth = require('./lib/health');
+const makeInfra = require('./lib/infra');
 const { fetchJson, sweepSubnet, peerRecord, appRecord } = require('./lib/peers');
 
 const app = createApp();
@@ -148,93 +149,13 @@ const { createLaunchAgent, removeLaunchAgent } =
 
 // createLaunchAgent, removeLaunchAgent -> lib/launchd.js
 
-const PORT_RANGE_START = 3000;
-const PORT_RANGE_END = 9875; // below monitor port
-
-// --- Port allocation (provisioning and POST /api/apps) ---
-function isPortTaken(port, excludeId) {
-  for (const a of db.getApps()) {
-    if (excludeId && a.id === excludeId) continue;
-    if (a.localUrl) {
-      try { if (parseInt(new URL(a.localUrl).port) === port) return a.id; } catch (e) { dbg('isPortTaken', e); }
-    }
-    if (a.healthUrl) {
-      try { if (parseInt(new URL(a.healthUrl).port) === port) return a.id; } catch (e) { dbg('isPortTaken', e); }
-    }
-  }
-  return null;
-}
-function getNextAvailablePort() {
-  const usedPorts = new Set();
-  for (const a of db.getApps()) {
-    for (const u of [a.localUrl, a.healthUrl]) {   // both count, exactly as isPortTaken counts them
-      if (!u) continue;
-      try { const p = parseInt(new URL(u).port); if (p) usedPorts.add(p); } catch (e) { dbg('getNextAvailablePort', e); }
-    }
-  }
-  for (let p = PORT_RANGE_START; p <= PORT_RANGE_END; p++) {
-    if (!usedPorts.has(p)) return p;
-  }
-  return null;
-}
-
-// --- Full infra setup/teardown ---
+// Port allocation, Caddy block and LaunchAgent per app -> lib/infra.js (tested on any OS).
 // Caddy proxies and LaunchAgents are host features of a Homebrew macOS box. Anywhere
 // else the dashboard and API run in monitoring mode, exactly as the README promises.
 const CAN_PROVISION = process.platform === 'darwin';
-function setupInfra(id, data) {
-  const result = {};
-
-  // Port: use provided localUrl, healthUrl, or auto-assign
-  let port = null;
-  if (data.localUrl) {
-    try { port = new URL(data.localUrl).port; } catch (e) { dbg('setupInfra', e); }
-  }
-  if (!port && data.healthUrl) {
-    try { port = new URL(data.healthUrl).port; } catch (e) { dbg('setupInfra', e); }
-  }
-  if (!port) {
-    port = getNextAvailablePort();
-    if (port) {
-      result.localUrl = `http://localhost:${port}`;
-      result.healthUrl = `http://localhost:${port}`;
-    }
-  }
-
-  if (!CAN_PROVISION) return result;
-  // Caddy
-  if (port) {
-    result.caddyUrl = addCaddyEntry(id, port);
-  }
-
-  // LaunchAgent
-  if (data.localPath) {
-    const logPath = data.logPath || path.join(LOG_DIR, `${id}.log`);
-    const la = createLaunchAgent(id, data.localPath, logPath, data.startCommand);
-    result.launchAgent = la.launchAgent;
-    result.launchAgentPath = la.launchAgentPath;
-    result.logPath = logPath;
-  }
-
-  return result;
-}
-
-async function teardownInfra(app) {
-  // Takes the record, not the id: DELETE calls this before the row is gone, so the port is known.
-  const id = typeof app === 'string' ? app : app.id;
-  try {
-    const port = app && app.localUrl ? new URL(app.localUrl).port : null;
-    if (port) await killPort(port);
-  } catch (e) { dbg('teardown/killPort', e); }
-  if (!CAN_PROVISION) return;
-  if (app && app.launchAgent) { try { await execAsync(bootoutCmd(process.getuid(), app.launchAgent), { timeout: 10000 }); } catch (e) { dbg('teardown/bootout', e); } }
-  // A PUT may have renamed the Caddy host; tear down the block the record actually points at.
-  const host = app && app.caddyUrl ? String(app.caddyUrl).replace(/^https?:\/\//, '').replace(/\.localhost.*$/, '') : id;
-  removeCaddyEntry(host);
-  if (host !== id) removeCaddyEntry(id);
-  removeLaunchAgent(id);
-  console.log(`  cleanup: ${id}`);
-}
+const { isPortTaken, getNextAvailablePort, setupInfra, teardownInfra } = makeInfra({
+  canProvision: CAN_PROVISION, getApps: () => db.getApps(), addCaddyEntry, removeCaddyEntry, createLaunchAgent, removeLaunchAgent,
+  killPort, exec: execAsync, bootoutCmd, uid: process.getuid(), logDir: LOG_DIR, dbg, log: console.log });
 
 function getLanIp() {
   const ifaces = os.networkInterfaces();
