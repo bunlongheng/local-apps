@@ -9,7 +9,7 @@ const { execSync, spawn } = require('child_process');
 const execAsync = require('util').promisify(require('child_process').exec);
 const QRCode = require('qrcode');
 const db = require('./db');
-const { startCmd } = require('./launchctl-cmds');
+const { startCmd, killPort } = require('./launchctl-cmds');
 const { shouldTrip, rearmReason } = require('./lib/breaker');
 const { nextLevel, recordAttempt, l3Fixes } = require('./lib/escalation');
 const { isValidId, validateAppFields, xmlEscape } = require('./lib/validate');
@@ -228,7 +228,7 @@ function teardownInfra(id) {
     const app = db.getApp ? db.getApp(id) : null;
     if (app && app.localUrl) {
       const port = new URL(app.localUrl).port;
-      if (port) execSync(`lsof -ti :${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
+      if (port) killPort(port);
     }
   } catch (e) { dbg('line199', e); }
 
@@ -368,7 +368,7 @@ async function checkAll() {
       // outer !disabled guard skips future ticks until the re-arm above fires.
       if (shouldTrip(s, Date.now())) {
         try {
-          if (port) await execAsync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
+          if (port) await killPort(port);
           if (label) await execAsync(`launchctl bootout gui/${uid}/${label} 2>/dev/null`, { timeout: 10000 });
         } catch (e) { dbg('line340', e); }
         db.setAppDisabled(appCfg.id, true, 'breaker');
@@ -393,7 +393,7 @@ async function checkAll() {
       else if (level === 2) {
         recordAttempt(s, Date.now());
         try {
-          if (port) await execAsync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
+          if (port) await killPort(port);
           await execAsync(`launchctl bootout gui/${uid}/${label} 2>/dev/null; sleep 1; launchctl bootstrap gui/${uid} "${plistPath}" 2>/dev/null`, { timeout: 15000 });
           console.log(`  [L2] port-kill + reload: ${appCfg.id}`);
         } catch (e) { dbg('L2', e); }
@@ -417,7 +417,7 @@ async function checkAll() {
               console.log(`  [L3] clear .next cache: ${appCfg.id}`);
               try { await execAsync(`rm -rf "${dir}/.next" 2>/dev/null`, { timeout: 5000 }); } catch (e) { dbg('L3', e); }
             }
-            if (port) await execAsync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
+            if (port) await killPort(port);
           }
           await execAsync(startCmd(uid, label, plistPath), { timeout: 15000 });
           console.log(`  [L3] fix + restart: ${appCfg.id}`);
@@ -537,7 +537,7 @@ if (IS_MAIN) fs.watch(path.join(__dirname, 'public'), { recursive: true }, () =>
 
 // --- Routes live in routes/*.js, registered against a small ctx. LAN_IP, TAILSCALE_IP and
 // MACHINE_MODEL are getters because they refresh on timers. ---
-const ctx = { getNextAvailablePort, AUTH_TOKEN, CHROME_EXT_ERROR, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT, QRCode, addCaddyEntry, broadcast, checkSingle, clearState, db, dbg, execAsync, execSync, fetchJson, forViewer, getState, isChromeExtensionRepo, isValidId, peerRecord, renameCaddyEntry, setupInfra, spawn, sseClients, startCmd, sweepSubnet, teardownInfra, updateTabColors, validateAppFields,
+const ctx = { getNextAvailablePort, killPort, AUTH_TOKEN, CHROME_EXT_ERROR, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT, QRCode, addCaddyEntry, broadcast, checkSingle, clearState, db, dbg, execAsync, execSync, fetchJson, forViewer, getState, isChromeExtensionRepo, isValidId, peerRecord, renameCaddyEntry, setupInfra, spawn, sseClients, startCmd, sweepSubnet, teardownInfra, updateTabColors, validateAppFields,
   LAN_IP: () => LAN_IP, TAILSCALE_IP: () => TAILSCALE_IP, MACHINE_MODEL: () => MACHINE_MODEL };
 require('./routes/apps')(app, ctx);
 require('./routes/meta')(app, ctx);

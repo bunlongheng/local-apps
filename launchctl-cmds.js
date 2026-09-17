@@ -20,4 +20,19 @@ function startCmd(uid, label, plistPath) {
     + `launchctl kickstart gui/${uid}/${label} 2>/dev/null; }`;
 }
 
-module.exports = { startCmd };
+// Free a port without a shell: `lsof -ti:<port>` lists the pids, process.kill sends SIGKILL.
+// Replaces 5 copies of `lsof -ti:${port} | xargs kill -9` that carried 3 different timeouts.
+const { execFile } = require('child_process');
+function killPort(port, { timeoutMs = 5000 } = {}) {
+  return new Promise((resolve) => {
+    if (!port) return resolve(0);
+    execFile('lsof', ['-ti', `:${port}`], { timeout: timeoutMs }, (err, stdout) => {
+      const pids = String(stdout || '').split('\n').map((x) => parseInt(x, 10)).filter((n) => Number.isInteger(n) && n > 0);
+      let killed = 0;
+      for (const pid of pids) { try { process.kill(pid, 'SIGKILL'); killed++; } catch { /* already gone */ } }
+      resolve(killed);
+    });
+  });
+}
+
+module.exports = { startCmd, killPort };
