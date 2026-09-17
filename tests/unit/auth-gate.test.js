@@ -73,3 +73,9 @@ test('cross-site Origin on a mutation is refused even from loopback (CSRF)', () 
   assert.deepEqual(decide({ ...base, origin: undefined }), { allow: true }, 'CLI callers send no Origin');
   assert.deepEqual(decide({ ...base, method: 'GET', path: '/api/status', origin: 'https://evil.example' }), { allow: true }, 'reads are not CSRF-able');
 });
+
+test('registry and per-machine reads are sensitive off-box, plain status is not', () => {
+  const off = (p) => decide({ remoteAddress: '1.2.3.4', method: 'GET', path: p, token: null, configuredToken: '' });
+  for (const p of ['/api/log/x', '/api/capabilities', '/api/tab-colors', '/api/consistency', '/api/app-profiles', '/api/icon-sync', '/api/all-apps', '/api/machines/m1/apps']) assert.equal(off(p).status, 401, p);
+  for (const p of ['/api/status', '/api/apps', '/api/apps/x', '/api/machines', '/api/qr', '/']) assert.deepEqual(off(p), { allow: true }, p);
+});
