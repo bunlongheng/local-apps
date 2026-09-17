@@ -666,10 +666,14 @@
   render();
   Promise.all([loadFavicons(), loadMachines()]).then(function () {
     load();
-    api("/api/app-profiles").then(function (p) { S.profiles = p || {}; render(); }).catch(function () {});
-    api("/api/capabilities").then(function (c) { S.capabilities = c || {}; render(); }).catch(function () {});
-    api("/api/icon-sync").then(function (s) { S.iconSync = s || {}; render(); }).catch(function () {});
-    api("/api/tab-colors").then(function (t) { S.tabColors = t || {}; render(); }).catch(function () {});
+    // Hub extras exist on the hub role only; an agent-role dashboard does not ask for them.
+    api("/api/status").then(function (st) {
+      if (!st || st.machineRole !== "hub") return;
+      api("/api/app-profiles").then(function (p) { S.profiles = p || {}; render(); }).catch(function () {});
+      api("/api/capabilities").then(function (c) { S.capabilities = c || {}; render(); }).catch(function () {});
+      api("/api/icon-sync").then(function (s) { S.iconSync = s || {}; render(); }).catch(function () {});
+      api("/api/tab-colors").then(function (t) { S.tabColors = t || {}; render(); }).catch(function () {});
+    }).catch(function () {});
   });
   setInterval(function () { if (!sseOk) load(); }, 15000);
   setInterval(loadMachines, 30000);
