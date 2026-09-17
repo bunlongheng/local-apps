@@ -10,8 +10,8 @@ const execAsync = require('util').promisify(require('child_process').exec);
 const QRCode = require('qrcode');
 const db = require('./db');
 const { startCmd, bootoutCmd, killPort } = require('./launchctl-cmds');
-const { shouldTrip, rearmReason } = require('./lib/breaker');
-const { nextLevel, recordAttempt } = require('./lib/escalation');
+const { recordAttempt } = require('./lib/escalation');
+const { decide } = require('./lib/tick');
 const { runLevel } = require('./lib/chain');
 const { isValidId, validateAppFields, xmlEscape } = require('./lib/validate');
 const { isChromeExtensionRepo, CHROME_EXT_ERROR } = require('./lib/chrome-ext');
@@ -331,109 +331,51 @@ async function checkAll() {
   for (const [index, appCfg] of apps.entries()) {
     const s = getState(appCfg.id);
     s.lastChecked = new Date().toISOString();
-
-    const up = probes[index];
-    const newStatus = up ? 'up' : 'down';
-    if (s.status !== newStatus) {
-      // Flap detection: going down shortly after a restart means it crashed on us.
-      // Tracked in a rolling 2-min window that survives the 'up' counter reset below,
-      // so a start-then-crash app can't loop the escalation chain forever (L5 trips it).
-      if (newStatus === 'down' && s.status === 'up' && s.lastRestart && Date.now() - s.lastRestart < 120000) {
-        s.flapWindow = (s.flapWindow || []).filter(t => Date.now() - t < 120000);
-        s.flapWindow.push(Date.now());
-      }
-      s.status = newStatus;
-      broadcast({ type: 'update', id: appCfg.id, status: newStatus });
-      if (newStatus === 'down') broadcast({ type: 'alert', id: appCfg.id, name: appCfg.name });
-    }
-
+    const now = Date.now();
     // === Auto-restart escalation chain ===
     // Level 1 (30s):  detect down, kickstart via launchctl
     // Level 2 (90s):  still down? kill port, bootout+bootstrap fresh
     // Level 3 (180s): still down? read logs, try common fixes (npm install, port kill)
-    // Level 4 (300s): still down? deploy Claude Code agent to debug and fix
-    // Level 5 recovery: a breaker OFF (never a user OFF) re-arms when the port is
-    // observed up or after the cooldown, so a healthy app can't sit grey forever.
-    const rearm = IS_HUB && autoRestartEnabled ? rearmReason(appCfg, up, Date.now()) : null;
-    if (rearm) {
+    // Level 4 (300s): still down? hand to the local agent (opt-in)
+    // Level 5: breaker trips on 3 flaps in 2 min or a chain exhausted and still down; a
+    // breaker OFF re-arms when observed up or after the cooldown.
+    // Which of these fires is decided by lib/tick.js (pure, unit-tested); this loop only executes it.
+    const d = decide({ s, app: appCfg, up: probes[index], now, hub: IS_HUB, autoRestart: autoRestartEnabled });
+    if (d.changed) {
+      broadcast({ type: 'update', id: appCfg.id, status: d.status });
+      if (d.status === 'down') broadcast({ type: 'alert', id: appCfg.id, name: appCfg.name });
+    }
+    if (d.rearm) {
       db.setAppDisabled(appCfg.id, false);
       appCfg.disabled = false;
-      s.downSince = null; s.restartAttempts = 0; s.flapWindow = [];
-      console.log(`  [L5] re-armed ${appCfg.id} (${rearm})`);
-      broadcast({ type: 'update', id: appCfg.id, status: newStatus, disabled: false });
+      console.log(`  [L5] re-armed ${appCfg.id} (${d.rearm})`);
+      broadcast({ type: 'update', id: appCfg.id, status: d.status, disabled: false });
     }
-    if (IS_HUB && autoRestartEnabled && newStatus === 'down' && !appCfg.disabled && (appCfg.launchAgentPath || appCfg.launchAgent)) {
-      const uid = process.getuid();
-      const label = appCfg.launchAgent;
-      const plistPath = appCfg.launchAgentPath;
-      const downSince = s.downSince || (s.downSince = Date.now());
-      const downDuration = Date.now() - downSince;
-      const attempts = s.restartAttempts || 0;
-      const port = appCfg.localUrl ? (() => { try { return new URL(appCfg.localUrl).port; } catch { return null; } })() : null;
+    if (d.recovered && d.recovered.attempts > 0) console.log(`  ✓ recovered: ${appCfg.id} (after ${d.recovered.attempts} attempts, ${Math.round(d.recovered.downMs / 1000)}s)`);
+    if (!d.trip && !d.level) continue;
 
-      // Level 5: Circuit breaker. The chain is churning - stop trying and land the app
-      // cleanly OFF (disabled) instead of blinking yellow forever / flapping CPU in a loop.
-      // Trips on 3 flaps in 2 min, or the whole L1-L4 chain exhausted and still down
-      // (policy in lib/breaker.js). Runs before L1 so it intercepts; once disabled, the
-      // outer !disabled guard skips future ticks until the re-arm above fires.
-      if (shouldTrip(s, Date.now())) {
-        try {
-          if (port) await killPort(port);
-          if (label) await execAsync(bootoutCmd(uid, label), { timeout: 10000 });
-        } catch (e) { dbg('checkAll', e); }
-        db.setAppDisabled(appCfg.id, true, 'breaker');
-        appCfg.disabled = true;
-        console.log(`  [L5] circuit breaker -> disabled ${appCfg.id} (${s.flapWindow.length} flaps, ${attempts} attempts)`);
-        s.downSince = null; s.restartAttempts = 0; s.flapWindow = [];
-        broadcast({ type: 'update', id: appCfg.id, status: 'down', disabled: true });
-        broadcast({ type: 'alert', id: appCfg.id, name: appCfg.name, disabled: true });
-        continue;
-      }
-
-      // Which level fires is decided by lib/escalation.js (pure, unit-tested); this loop
-      // only executes it. Every level records the attempt before running its command.
-      const level = nextLevel(s, Date.now());
-      if (level >= 1 && level <= 3) {
-        recordAttempt(s, Date.now());
-        try {
-          await runLevel(level, { id: appCfg.id, uid, label, plistPath, port, dir: appCfg.localPath, logPath: appCfg.logPath || path.join(LOG_DIR, `${appCfg.id}.log`) },
-            { exec: execAsync, killPort, exists: fs.existsSync, log: console.log, warn: console.warn, startCmd, bootoutCmd });
-        } catch (e) { dbg(`L${level}`, e); }
-      }
-      // Level 4: hand the failure to the local agent (last resort, opt-in)
-      else if (level === 4) {
-        const dir = appCfg.localPath;
-        const logPath = appCfg.logPath || path.join(LOG_DIR, `${appCfg.id}.log`);
-        if (dir && fs.existsSync(dir)) {
-          console.log(`  [L4] deploying Claude agent: ${appCfg.id}`);
-          const prompt = `The app "${appCfg.id}" at ${dir} has been down for ${Math.round(downDuration/60000)} minutes. `
-            + `Port: ${port || '?'}. LaunchAgent: ${label}. `
-            + `Read the last 50 lines of ${logPath}, diagnose the issue, fix it, then run: `
-            + `${startCmd(uid, label, plistPath)} `
-            + `Wait 10s, verify http://localhost:${port} returns 200. If not, try harder.`;
-          // Opt-in only (`agent: true` in data/auto-restart.json), argv not a shell string, and a
-          // tool allowlist instead of --dangerously-skip-permissions: the prompt embeds
-          // app-derived text, and the agent runs inside a directory the hub does not control.
-          if (!autoRestartAgent) { console.log(`  [L4] agent disabled (set "agent": true in data/auto-restart.json): ${appCfg.id}`); }
-          else {
-            const args = ['-p', prompt, '--allowedTools', 'Read,Grep,Glob,Bash(launchctl:*),Bash(npm install:*),Bash(curl:*),Bash(tail:*)'];
-            try {
-              const out = fs.openSync(logPath, 'a');
-              spawn('claude', args, { cwd: dir, detached: true, stdio: ['ignore', out, out] }).unref();
-            } catch (e) { console.warn(`  [L4] could not start agent for ${appCfg.id}: ${e.message}`); }
-          }
-          s.lastRestart = Date.now();
-          s.restartAttempts = (s.restartAttempts || 0) + 1;
-        }
-      }
+    const uid = process.getuid();
+    const label = appCfg.launchAgent;
+    const plistPath = appCfg.launchAgentPath;
+    const port = appCfg.localUrl ? (() => { try { return new URL(appCfg.localUrl).port; } catch { return null; } })() : null;
+    if (d.trip) {
+      try {
+        if (port) await killPort(port);
+        if (label) await execAsync(bootoutCmd(uid, label), { timeout: 10000 });
+      } catch (e) { dbg('checkAll', e); }
+      db.setAppDisabled(appCfg.id, true, 'breaker');
+      appCfg.disabled = true;
+      console.log(`  [L5] circuit breaker -> disabled ${appCfg.id} (${d.trip.flaps} flaps, ${d.trip.attempts} attempts)`);
+      broadcast({ type: 'update', id: appCfg.id, status: 'down', disabled: true });
+      broadcast({ type: 'alert', id: appCfg.id, name: appCfg.name, disabled: true });
+      continue;
     }
-
-    // Reset escalation counters when app comes back up
-    if (newStatus === 'up' && s.downSince) {
-      if (s.restartAttempts > 0) console.log(`  ✓ recovered: ${appCfg.id} (after ${s.restartAttempts} attempts, ${Math.round((Date.now() - s.downSince)/1000)}s)`);
-      s.downSince = null;
-      s.restartAttempts = 0;
-    }
+    // Every level records the attempt before running its command.
+    recordAttempt(s, now);
+    try {
+      await runLevel(d.level, { id: appCfg.id, uid, label, plistPath, port, dir: appCfg.localPath, logPath: appCfg.logPath || path.join(LOG_DIR, `${appCfg.id}.log`), downMs: now - s.downSince },
+        { exec: execAsync, killPort, exists: fs.existsSync, log: console.log, warn: console.warn, startCmd, bootoutCmd, spawn, agent: autoRestartAgent, openLog: (p) => fs.openSync(p, 'a') });
+    } catch (e) { dbg(`L${d.level}`, e); }
   }
   } finally { checkAllRunning = false; }
 }
@@ -453,7 +395,7 @@ if (IS_MAIN) fs.watch(path.join(__dirname, 'public'), { recursive: true }, () =>
 
 // --- Routes live in routes/*.js, registered against a small ctx. LAN_IP, TAILSCALE_IP and
 // MACHINE_MODEL are getters because they refresh on timers. ---
-const ctx = { LOG_DIR, isLoopback, clientAddress, appRecord, bootoutCmd, getNextAvailablePort, isPortTaken, killPort, AUTH_TOKEN, CHROME_EXT_ERROR, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT, QRCode, addCaddyEntry, broadcast, checkSingle, clearState, db, dbg, execAsync, execSync, fetchJson, forViewer, getState, isChromeExtensionRepo, isValidId, peerRecord, renameCaddyEntry, setupInfra, spawn, sseClients, startCmd, sweepSubnet, teardownInfra, updateTabColors, validateAppFields,
+const ctx = { isLoopback, clientAddress, appRecord, bootoutCmd, getNextAvailablePort, isPortTaken, killPort, CHROME_EXT_ERROR, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT, QRCode, addCaddyEntry, broadcast, checkSingle, clearState, db, dbg, execAsync, fetchJson, forViewer, getState, isChromeExtensionRepo, isValidId, peerRecord, renameCaddyEntry, setupInfra, spawn, sseClients, startCmd, sweepSubnet, teardownInfra, updateTabColors, validateAppFields,
   LAN_IP: () => LAN_IP, TAILSCALE_IP: () => TAILSCALE_IP, MACHINE_MODEL: () => MACHINE_MODEL };
 require('./routes/apps')(app, ctx);
 require('./routes/meta')(app, ctx);

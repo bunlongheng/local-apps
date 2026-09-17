@@ -4,7 +4,7 @@ const os = require('os');
 // from ctx, so this file has no module-level state beyond what it declares itself.
 const fs = require('fs');
 
-const REQUIRED = ['isLoopback', 'clientAddress', 'bootoutCmd', 'PORT', 'MACHINE_ROLE', 'getNextAvailablePort', 'isPortTaken', 'killPort', 'db', 'dbg', 'broadcast', 'sseClients', 'getState', 'clearState', 'checkSingle', 'setupInfra', 'teardownInfra', 'updateTabColors', 'forViewer', 'startCmd', 'execAsync', 'spawn', 'validateAppFields', 'isValidId', 'isChromeExtensionRepo', 'CHROME_EXT_ERROR', 'addCaddyEntry', 'renameCaddyEntry'];
+const REQUIRED = ['LAN_IP', 'TAILSCALE_IP', 'MACHINE_MODEL', 'isLoopback', 'clientAddress', 'bootoutCmd', 'PORT', 'MACHINE_ROLE', 'getNextAvailablePort', 'isPortTaken', 'killPort', 'db', 'dbg', 'broadcast', 'sseClients', 'getState', 'clearState', 'checkSingle', 'setupInfra', 'teardownInfra', 'updateTabColors', 'forViewer', 'startCmd', 'execAsync', 'spawn', 'validateAppFields', 'isValidId', 'isChromeExtensionRepo', 'CHROME_EXT_ERROR', 'addCaddyEntry', 'renameCaddyEntry'];
 
 module.exports = function register(app, ctx) {
   // Fail at boot, not at request time, when server.js forgets to pass a dependency.

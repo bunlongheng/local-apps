@@ -40,3 +40,20 @@ test('L3 without a local dir skips the fixes and just restarts', async () => {
   const { calls, deps } = fakeDeps(); await runLevel(3, { ...APP, dir: null }, deps);
   assert.deepEqual(calls, [startCmd(501, 'com.example.x', '/tmp/x.plist')]);
 });
+
+test('L4 spawns the agent with argv (no shell) and an allowlist, only when opted in', async () => {
+  const spawned = [];
+  const { deps } = fakeDeps();
+  const l4 = { ...deps, spawn: (bin, args, opts) => { spawned.push({ bin, args, opts }); return { unref() {} }; }, openLog: () => 7, agent: true };
+  await runLevel(4, { ...APP, downMs: 300000 }, l4);
+  assert.equal(spawned.length, 1);
+  assert.equal(spawned[0].bin, 'claude');
+  assert.equal(spawned[0].args[0], '-p');
+  assert.match(spawned[0].args[1], /down for 5 minutes/);
+  assert.ok(!spawned[0].args.includes('--dangerously-skip-permissions'));
+  assert.equal(spawned[0].opts.cwd, '/tmp/x');
+  assert.deepEqual(spawned[0].opts.stdio, ['ignore', 7, 7]);
+  const off = { ...l4, agent: false };
+  await runLevel(4, APP, off);
+  assert.equal(spawned.length, 1, 'no spawn when the agent is not opted in');
+});

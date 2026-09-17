@@ -155,32 +155,40 @@ db.exec(`
 db.exec(`
 `);
 
+// The one INSERT shape for apps, shared by the JSON seeder and addApp so a new column is
+// added in exactly 1 place.
+const APP_INSERT = `(id, name, health_url, local_url, process_check, caddy_url, prod_url, prod_url2, local_path, log_path, repo, launch_agent, launch_agent_path, start_command, icon, tab_color, tab_icon)
+  VALUES (@id, @name, @healthUrl, @localUrl, @processCheck, @caddyUrl, @prodUrl, @prodUrl2, @localPath, @logPath, @repo, @launchAgent, @launchAgentPath, @startCommand, @icon, @tabColor, @tabIcon)`;
+function appInsertParams(a) {
+  return {
+    id: a.id,
+    name: a.name || a.id,
+    healthUrl: a.healthUrl || null,
+    localUrl: a.localUrl || null,
+    processCheck: a.processCheck || null,
+    caddyUrl: a.caddyUrl || null,
+    prodUrl: a.prodUrl || null,
+    prodUrl2: a.prodUrl2 ?? null,
+    localPath: a.localPath || null,
+    logPath: a.logPath || null,
+    repo: a.repo || null,
+    launchAgent: a.launchAgent || null,
+    launchAgentPath: a.launchAgentPath || null,
+    startCommand: a.startCommand || 'npm run dev',
+    icon: a.icon || null,
+    tabColor: a.tabColor ?? null,
+    tabIcon: a.tabIcon ?? null,
+  };
+}
+
 // --- Seed from JSON if DB is empty ---
 const count = db.prepare('SELECT COUNT(*) as n FROM apps').get().n;
 if (count === 0 && fs.existsSync(CONFIG_FILE)) {
   const apps = readJsonOrNull(CONFIG_FILE) || [];   // a bad config must not crash-loop the boot
-  const insert = db.prepare(`
-    INSERT OR IGNORE INTO apps (id, name, health_url, local_url, process_check, caddy_url, prod_url, local_path, log_path, repo, launch_agent, launch_agent_path, start_command, icon)
-    VALUES (@id, @name, @healthUrl, @localUrl, @processCheck, @caddyUrl, @prodUrl, @localPath, @logPath, @repo, @launchAgent, @launchAgentPath, @startCommand, @icon)
-  `);
+  const insert = db.prepare(`INSERT OR IGNORE INTO apps ${APP_INSERT}`);
   const tx = db.transaction((rows) => {
     for (const a of rows) {
-      insert.run({
-        id: a.id,
-        name: a.name || a.id,
-        healthUrl: a.healthUrl || null,
-        localUrl: a.localUrl || null,
-        processCheck: a.processCheck || null,
-        caddyUrl: a.caddyUrl || null,
-        prodUrl: a.prodUrl || null,
-        localPath: a.localPath || null,
-        logPath: a.logPath || null,
-        repo: a.repo || null,
-        launchAgent: a.launchAgent || null,
-        launchAgentPath: a.launchAgentPath || null,
-        startCommand: a.startCommand || 'npm run dev', prodUrl2: (a.prodUrl2 ?? null), tabColor: (a.tabColor ?? null), tabIcon: (a.tabIcon ?? null),
-        icon: a.icon || null,
-      });
+      insert.run(appInsertParams(a));
     }
   });
   tx(apps);
@@ -347,25 +355,7 @@ function upsertApp(data) {
     fields.push("updated_at = datetime('now')");
     db.prepare(`UPDATE apps SET ${fields.join(', ')} WHERE id = @id`).run(params);
   } else {
-    db.prepare(`
-      INSERT INTO apps (id, name, health_url, local_url, process_check, caddy_url, prod_url, prod_url2, local_path, log_path, repo, launch_agent, launch_agent_path, start_command, icon, tab_color, tab_icon)
-      VALUES (@id, @name, @healthUrl, @localUrl, @processCheck, @caddyUrl, @prodUrl, @prodUrl2, @localPath, @logPath, @repo, @launchAgent, @launchAgentPath, @startCommand, @icon, @tabColor, @tabIcon)
-    `).run({
-      id: data.id,
-      name: data.name || data.id,
-      healthUrl: data.healthUrl || null,
-      localUrl: data.localUrl || null,
-      processCheck: data.processCheck || null,
-      caddyUrl: data.caddyUrl || null,
-      prodUrl: data.prodUrl || null,
-      localPath: data.localPath || null,
-      logPath: data.logPath || null,
-      repo: data.repo || null,
-      launchAgent: data.launchAgent || null,
-      launchAgentPath: data.launchAgentPath || null,
-      startCommand: data.startCommand || 'npm run dev', prodUrl2: (data.prodUrl2 ?? null), tabColor: (data.tabColor ?? null), tabIcon: (data.tabIcon ?? null),
-      icon: data.icon || null,
-    });
+    db.prepare(`INSERT INTO apps ${APP_INSERT}`).run(appInsertParams(data));
     // Profile columns are not part of the INSERT; apply them through the UPDATE path so a
     // POST that carries about/features/... (as the in-app AI Instruction asks) keeps them.
     if (PROFILE_KEYS.some((k) => k in data)) return upsertApp(data);
