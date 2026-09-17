@@ -61,7 +61,7 @@ button { font-family: inherit; }
 /* Table */
 .apps { padding: 10px 0; }
 table.apps-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-table.apps-table th { text-align: left; padding: 8px 12px; color: var(--muted); font-size: 10px; font-weight: 600; }
+table.apps-table th { text-align: left; padding: 8px 12px; color: var(--muted); font-size: 11px; font-weight: 600; }
 table.apps-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 table.apps-table tr:last-child td { border-bottom: none; }
 table.apps-table tbody tr { cursor: pointer; transition: background 0.1s; }
@@ -120,9 +120,9 @@ table.apps-table tbody tr:hover { background: rgba(255,255,255,0.025); }
 .modal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
 .modal-head-inner { display: flex; align-items: center; gap: 8px; }
 .modal-title { font-size: 16px; font-weight: 700; line-height: 1; }
-.modal-checked { color: var(--muted); font-size: 9px; margin-top: -12px; margin-bottom: 16px; padding-left: 20px; }
+.modal-checked { color: var(--muted); font-size: 11px; margin-top: -12px; margin-bottom: 16px; padding-left: 20px; }
 .badges { display: flex; align-items: center; gap: 3px; margin-left: 4px; }
-.badge { font-size: 8px; font-weight: 700; padding: 2px 5px; border-radius: 3px; letter-spacing: 0.04em; transition: all 0.15s; background: rgba(255,255,255,0.02); color: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.06); }
+.badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; letter-spacing: 0.04em; transition: all 0.15s; background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.06); }
 .badge.active { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.9); border: 1px solid rgba(255,255,255,0.25); box-shadow: 0 0 6px rgba(255,255,255,0.08); }
 a.badge-link { text-decoration: none; display: inline-flex; align-items: center; }
 .gallery-icon { text-decoration: none; opacity: 0.4; transition: opacity 0.15s; display: inline-flex; align-items: center; margin-left: 8px; color: var(--muted); }
@@ -231,3 +231,5 @@ a.badge-link { text-decoration: none; display: inline-flex; align-items: center;
 @media (max-width: 768px) { .col-lan, .header-device-icon { display: none; } }
 
 .lock-badge { font-size: 0.85em; opacity: 0.9; margin-left: 2px; cursor: help; }
+.toast.error { background: #7f1d1d; color: #fee2e2; }
+[data-act][role="button"]:focus-visible, .modal-close:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
