@@ -27,7 +27,7 @@ Self-healing, multi-machine orchestrator that monitors and auto-fixes local web 
 - GET /api/events (SSE), GET /api/log/:id
 
 ## Tests
-- `npm test` (unit), `npm run test:coverage` (CI gate, server code only - public/app.js runs under jsdom in tests/unit/dashboard.test.js and is outside the coverage numbers), `npm run test:e2e` (needs a live :9875), `npm run test:all` (both)
+- `npm test` (unit), `npm run test:coverage` (CI gate over server code and public/app.js, which runs under jsdom as a vm.Script in tests/unit/dashboard.test.js), `npm run test:e2e` (needs a live :9875), `npm run test:all` (both)
 - The e2e lifecycle test registers and deletes an app, so it is skipped unless `E2E_MUTATE=1`. Never set that against the live hub; boot a scratch instance first:
   on macOS provisioning is real, so shadow `caddy` with a no-op first (a scratch CADDYFILE alone still runs `caddy reload` against the live daemon):
   `mkdir -p /tmp/nocaddy && printf '#!/bin/sh\nexit 0\n' > /tmp/nocaddy/caddy && chmod +x /tmp/nocaddy/caddy`

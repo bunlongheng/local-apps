@@ -1,13 +1,14 @@
 // Unit: public/app.js in jsdom - the dashboard's behaviour: off-box viewers see no controls, a silent
 // SSE stream reconnects after 60s, keyboardControls promotes rows but never overlays, clicks send the
 // matching requests, SSE frames re-render, the palette and modal tabs work, peers are read-only.
-// public/app.js is evaluated inside the jsdom window, so it is outside the coverage gate by design.
+// public/app.js runs inside the jsdom window as a vm.Script carrying its filename, so it is inside the coverage gate.
 // Timers and the clock are the window's own, replaced with a fake before app.js is evaluated, so
 // the test drives every interval deterministically.
 const { test } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const { JSDOM } = require('jsdom');
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -52,7 +53,9 @@ function boot({ status, machines = [], peerStatus = null }) {
     return Promise.resolve({ ok: p in routes, status: p in routes ? 200 : 404, headers: { get: () => 'application/json' }, json: () => Promise.resolve(routes[p]) });
   };
   w.confirm = () => true;
-  w.eval(APP_JS);
+  // A vm.Script with the real filename, not eval: V8 then attributes app.js to its file, so the
+  // dashboard counts toward the coverage gate like every other source file.
+  new vm.Script(APP_JS, { filename: path.join(ROOT, 'public', 'app.js') }).runInContext(dom.getInternalVMContext());
   // Bounded wait on the microtask/IO queue for the fetch chains, not a fixed sleep: a loaded runner must not flake.
   const settle = async (pred = () => true) => { for (let i = 0; i < 200; i++) { await new Promise((r) => setImmediate(r)); if (i >= 5 && pred()) return; } throw new Error('settle timeout'); };
   return { w, clock, sources, requests, settle, root: () => w.document.getElementById('root'), close: () => w.close() };

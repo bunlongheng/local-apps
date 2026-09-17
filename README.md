@@ -100,7 +100,7 @@ scripts/        generate-favicons, consistency, onboard-app.sh, storage-guard.sh
 tests/          unit/ (lib modules, db, db-migrate, consistency, launchctl-cmds, routes-apps, routes-machines, routes-meta, routes-security,
                 sw and dashboard under jsdom) and e2e/
                 npm test (unit), npm run test:e2e (needs the app on :9875), npm run test:all, npm run lint
-                the coverage gate measures server code only; dashboard behaviour is pinned by tests/unit/dashboard.test.js (jsdom)
+                the coverage gate covers server code and public/app.js (run under jsdom as a vm.Script in tests/unit/dashboard.test.js)
 ```
 
 ## License
