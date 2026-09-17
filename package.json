@@ -4,10 +4,10 @@
   "private": true,
   "description": "Local app process monitor with web dashboard",
   "scripts": {
-    "dev": "node --watch server.js",
+    "dev": "node --env-file-if-exists=.env --watch server.js",
     "build": "echo 'no build needed - static UI served on :9875'",
-    "start": "node server.js",
-    "server": "node --watch server.js",
+    "start": "node --env-file-if-exists=.env server.js",
+    "server": "node --env-file-if-exists=.env --watch server.js",
     "icons": "node scripts/generate-favicons.js",
     "lint": "eslint .",
     "test": "node --test 'tests/unit/**/*.test.js' 'tests/e2e/**/*.test.js'",
@@ -24,5 +24,8 @@
     "@resvg/resvg-js": "^2.6.2",
     "eslint": "^9.39.5",
     "sharp": "^0.35.3"
+  },
+  "engines": {
+    "node": ">=22.9"
   }
 }
