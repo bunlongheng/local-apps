@@ -180,10 +180,11 @@ module.exports = function register(app, ctx) {
     res.json(result);
   });
 
-  app.delete('/api/apps/:id', (req, res) => {
-    const deleted = db.deleteApp(req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'not found' });
-    teardownInfra(req.params.id);
+  app.delete('/api/apps/:id', async (req, res) => {
+    const a = db.getApp(req.params.id);
+    if (!a) return res.status(404).json({ error: 'not found' });
+    await teardownInfra(a);          // kill the process and unload the agent while the record still exists
+    db.deleteApp(req.params.id);
     clearState(req.params.id);
     broadcast({ type: 'update', id: req.params.id, status: 'removed' });
     res.json({ ok: true });
