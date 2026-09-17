@@ -56,7 +56,8 @@ jobs:
         run: brew install caddy
       - name: E2E lifecycle on the darwin branch (scratch Caddyfile and LaunchAgents dir, a live caddy)
         run: |
-          export CADDYFILE=$RUNNER_TEMP/Caddyfile; : > "$CADDYFILE"
+          # caddy refuses an empty Caddyfile ("adapting config: EOF"), so seed the global block only.
+          export CADDYFILE=$RUNNER_TEMP/Caddyfile; printf '{\n\tadmin localhost:2019\n}\n' > "$CADDYFILE"
           export LAUNCH_AGENTS_DIR=$RUNNER_TEMP/LaunchAgents; mkdir -p "$LAUNCH_AGENTS_DIR"
           # A real caddy (root, so the http://<id>.localhost block can bind :80); the server's
           # `caddy reload` talks to its admin endpoint, and the lifecycle asserts the block proxies.
@@ -68,5 +69,5 @@ jobs:
           for i in $(seq 1 20); do curl -sf http://127.0.0.1:9875/api/status > /dev/null && break; sleep 1; done
           CADDYFILE=$CADDYFILE LAUNCH_AGENTS_DIR=$LAUNCH_AGENTS_DIR E2E_MUTATE=1 npm run test:e2e || { echo '--- server log ---'; cat $RUNNER_TEMP/server.log; echo '--- caddy log ---'; cat $RUNNER_TEMP/caddy.log; exit 1; }
           kill %2; sudo pkill -x caddy || true
-          test -z "$(tr -d '[:space:]' < "$CADDYFILE")" || { echo 'lifecycle left a Caddy block behind:'; cat "$CADDYFILE"; exit 1; }
+          ! grep -q 'zzz-e2e' "$CADDYFILE" || { echo 'lifecycle left a Caddy block behind:'; cat "$CADDYFILE"; exit 1; }
           ls "$LAUNCH_AGENTS_DIR" | grep -q zzz-e2e && { echo 'lifecycle left a LaunchAgent behind'; exit 1; } || true
