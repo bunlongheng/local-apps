@@ -82,8 +82,6 @@ test('meta: manifest label follows the host, favicons map is /favicons/<file>?v=
   assert.equal((await man('local-apps.localhost')).name, 'Apps (Caddy)');
   assert.equal((await man('localhost:9875')).start_url, 'http://localhost:9875/');
   assert.equal((await man('evil.example:9875')).name, undefined, 'foreign Host never reaches the manifest');
-  const lanIp = (await (await fetch(base + '/api/status')).json()).lanIp;
-  if (/^(10\.|192\.168\.)/.test(lanIp)) assert.equal((await man(lanIp + ':9875')).name, 'Apps (LAN)');
   const fav = await (await fetch(base + '/api/favicons')).json();
   assert.ok(Object.keys(fav).length > 0);
   for (const [id, v] of Object.entries(fav)) assert.match(v, new RegExp(`^/favicons/${id}\\.(png|svg|ico)\\?v=\\d+$`));

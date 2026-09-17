@@ -6,6 +6,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { manifestLabel } = require('../lib/validate');
 
 // Repo root: moved handlers keep resolving files from the project, not from routes/.
 const ROOT = path.join(__dirname, '..');
@@ -113,11 +114,7 @@ module.exports = function register(app, ctx) {
 
   // --- Dynamic manifest (adapts name based on access method) ---
   app.get('/api/manifest', (req, res) => {
-    const host = req.hostname || req.headers.host || '';
-    let label = 'Local Apps';
-    if (host.startsWith('100.')) label = 'Apps (Tailscale)';
-    else if (host.startsWith('10.') || host.startsWith('192.168.')) label = 'Apps (LAN)';
-    else if (host.endsWith('.localhost')) label = 'Apps (Caddy)';
+    const label = manifestLabel(req.hostname || req.headers.host || '');
 
     const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'public', 'manifest.json'), 'utf8'));
     manifest.name = label;
