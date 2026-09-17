@@ -187,13 +187,16 @@ echo ""
 
 # Get assigned port
 APP_DATA=$(curl -s "$MONITOR/api/apps/$APP_ID" 2>/dev/null)
-APP_PORT=$(echo "$APP_DATA" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('local_url','').split(':')[-1] if d.get('local_url') else '?')" 2>/dev/null)
-APP_CADDY=$(echo "$APP_DATA" | python3 -c "import sys,json; print(json.load(sys.stdin).get('caddy_url','?'))" 2>/dev/null)
+# The API returns camelCase (localUrl, caddyUrl, repo); the tab alias is the registry convention _<id_with_underscores>.
+APP_PORT=$(echo "$APP_DATA" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('localUrl','').split(':')[-1] if d.get('localUrl') else '?')" 2>/dev/null)
+APP_CADDY=$(echo "$APP_DATA" | python3 -c "import sys,json; print(json.load(sys.stdin).get('caddyUrl') or '?')" 2>/dev/null)
+APP_REPO=$(echo "$APP_DATA" | python3 -c "import sys,json; print(json.load(sys.stdin).get('repo') or '')" 2>/dev/null)
+ALIAS_NAME="_${APP_ID//-/_}"
 
 echo "  App ID:      $APP_ID"
 echo "  Local:       http://localhost:$APP_PORT"
 echo "  Caddy:       $APP_CADDY"
-echo "  GitHub:      https://github.com/bunlongheng/$APP_ID"
+[ -n "$APP_REPO" ] && echo "  Repo:        $APP_REPO"
 echo "  Alias:       $ALIAS_NAME"
 echo ""
 echo -e "  ${YELLOW}Next: source ~/.zshrc && $ALIAS_NAME${NC}"
