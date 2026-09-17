@@ -675,3 +675,6 @@
   setInterval(loadMachines, 30000);
   setTimeout(connectSSE, 3000);
 })();
+
+// Service worker registration lives here, not inline, so the CSP can drop unsafe-inline for scripts.
+if ("serviceWorker" in navigator) { window.addEventListener("load", function () { navigator.serviceWorker.register("/sw.js").catch(function () {}); }); }
