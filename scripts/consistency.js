@@ -60,11 +60,16 @@ function checkApp(id) {
   const caddy = read(P.caddy);
   const row = dbRow(id);
   const canonAlias = "_" + id.replace(/-/g, "_");
+  // Aliases are GENERATED at shell start by _tab_defs() in ~/.claude-tabs.sh, which
+  // evals one function per key in tab-colors.json. They never appear as literal text
+  // in the file, so registry membership + a present generator IS the alias.
+  const generated = /_tab_defs\s*\(\)/.test(tabsh) && new RegExp(`"${id}"\\s*:`).test(colors);
   const aliasNames = tabsh.split("\n")
     .filter((l) => new RegExp(`_tab\\s+"${id}"`).test(l))
-    .map((l) => (l.match(/^\s*(_[a-z0-9_]+)\(\)/) || [])[1]).filter(Boolean);
-  const hasCanon = aliasNames.includes(canonAlias);
-  const shortcuts = aliasNames.filter((n) => n !== canonAlias);
+    .map((l) => (l.match(/^\s*(_[a-z0-9_-]+)\(\)/) || [])[1]).filter(Boolean);
+  const hasCanon = generated || aliasNames.includes(canonAlias);
+  // Hand-written aliases are drift - the generator already covers both spellings.
+  const shortcuts = aliasNames.filter((n) => n !== canonAlias && n !== "_" + id);
 
   // Vercel app? a deployed app has a .vercel/project.json in its repo. Only Vercel
   // apps must carry a prod_url in the modal (owner rule 2026-08-05); local-only exempt.
