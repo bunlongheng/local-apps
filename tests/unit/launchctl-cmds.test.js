@@ -76,12 +76,15 @@ test('killPort frees a real listener without a shell and resolves 0 on a free po
   const srv = net.createServer().listen(0, '127.0.0.1'); await new Promise(r => srv.once('listening', r));
   const port = srv.address().port;
   assert.equal(await killPort(0), 0, 'no port, nothing to do');
-  const free = await killPort(59997); assert.equal(free, 0, 'a free port kills nothing');
+
   // Our own process holds the port; killing it would end the test runner, so only assert
   // that lsof sees exactly this listener and that the pipeline is shell-free.
   const { execFileSync } = require('node:child_process');
   assert.equal(String(execFileSync('lsof', ['-ti', `:${port}`])).trim(), String(process.pid));
-  srv.close();
+  // The free-port branch is asserted on the port this test just owned and released: never a
+  // fixed number that something else on the host may be listening on.
+  const released = port; await new Promise(r => srv.close(r));
+  assert.equal(await killPort(released), 0, 'a just-released port kills nothing');
 });
 
 test('killPort actually kills a child holding the port', async () => {
