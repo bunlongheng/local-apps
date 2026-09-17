@@ -70,10 +70,5 @@ test('HTTP layer: X-Forwarded-For from a loopback socket demotes the caller (the
   assert.equal(w.status, 401, 'proxied LAN mutation is denied');
 });
 
-test('start and stop on a registered app return ok and update state (launchctl failures are tolerated)', async () => {
-  require('../../db').upsertApp({ id: 'zzz-run', localPath: '/tmp/zzz-run', launchAgent: 'com.example.zzz-run', launchAgentPath: '/tmp/zzz-run.plist', localUrl: 'http://localhost:59996' });
-  assert.equal(await req('POST', '/api/start/zzz-run'), 200);
-  assert.equal(await req('POST', '/api/stop/zzz-run'), 200);
-  const s = await (await fetch(base + '/api/status')).json();
-  assert.equal(s.apps.find(a => a.id === 'zzz-run').status, 'down', 'stop marks it down immediately');
-});
+// start/stop on a registered app run launchctl and lsof; that path is covered with spies in
+// routes-apps.test.js so this file never touches the host.
