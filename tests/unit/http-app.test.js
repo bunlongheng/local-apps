@@ -47,6 +47,8 @@ test('HEAD is answered by the GET handler with no body', async () => {
   const r = await fetch(base + '/api/apps/x', { method: 'HEAD' });
   assert.equal(r.status, 200);
   assert.equal((await r.text()).length, 0);
+  const st = await fetch(base + '/big.js', { method: 'HEAD' });
+  assert.equal(st.status, 200); assert.equal(st.headers.get('content-length'), '5000'); assert.equal((await st.text()).length, 0, 'static HEAD carries the length and no body');
 });
 
 test('JSON bodies: parsed, malformed is 400, oversize is 413', async () => {
