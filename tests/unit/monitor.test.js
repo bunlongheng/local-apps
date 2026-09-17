@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const makeMonitor = require('../../lib/monitor');
 
-function boot({ apps, decision, probe, getApps }) {
+function boot({ apps, decision, probe, getApps, killPort }) {
   const calls = [], states = {};
   const m = makeMonitor({
     getApps: getApps || (() => apps), setAppDisabled: (id, v, why) => calls.push(`disable:${id}:${v}:${why || ''}`),
@@ -12,7 +12,7 @@ function boot({ apps, decision, probe, getApps }) {
     runLevel: async (level, target) => calls.push(`runLevel:${level}:${target.id}:${target.port}`),
     recordAttempt: (s, t) => { calls.push('recordAttempt'); s.lastRestart = t; s.restartAttempts = (s.restartAttempts || 0) + 1; },
     readAutoRestart: () => ({ enabled: true }), hub: true, uid: 501, logDir: '/tmp/logs',
-    killPort: async (p) => calls.push(`killPort:${p}`), exec: async (cmd) => calls.push(`exec:${cmd}`), bootoutCmd: (u, l) => `bootout ${u} ${l}`, startCmd: () => 'start',
+    killPort: killPort || (async (p) => calls.push(`killPort:${p}`)), exec: async (cmd) => calls.push(`exec:${cmd}`), bootoutCmd: (u, l) => `bootout ${u} ${l}`, startCmd: () => 'start',
     spawn: () => {}, openLog: () => 0, exists: () => true, broadcast: (e) => calls.push(`sse:${e.type}:${e.id}:${e.status}${e.disabled === undefined ? '' : ':' + e.disabled}`),
     log: () => {}, warn: () => {}, dbg: () => {}, now: () => 1000,
   });
@@ -71,4 +71,10 @@ test('a throwing getApps or a rejecting probe rejects the tick but releases the 
   const b = boot({ apps: [{ ...APP }], decision: {}, probe: async () => { if (p++ === 0) throw new Error('probe died'); return true; } });
   await assert.rejects(b.m.checkAll(), /probe died/);
   assert.equal(await b.m.checkAll(), true);
+});
+
+test('a breaker trip still disables the app when freeing the port or booting out throws', async () => {
+  const { m, calls } = boot({ apps: [{ ...APP }], decision: { trip: { flaps: 3, attempts: 2 } }, killPort: async () => { throw new Error('lsof hiccup'); } });
+  assert.equal(await m.checkAll(), true);
+  assert.ok(calls.includes('disable:a:true:breaker'), calls.join()); assert.ok(calls.includes('sse:alert:a:undefined:true'));
 });
