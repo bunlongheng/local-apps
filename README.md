@@ -96,7 +96,7 @@ lib/            tested modules: http-app, auth-gate, validate, escalation, break
 db.js           SQLite data layer
 public/         vanilla-JS dashboard, service worker, offline page
 scripts/        generate-favicons, consistency, onboard-app.sh, storage-guard.sh (the owner's own tooling, kept for reference)
-tests/          npm run test:unit, npm test (e2e needs the app on :9875), npm run lint
+tests/          npm test (unit), npm run test:e2e (needs the app on :9875), npm run test:all, npm run lint
 ```
 
 ## License

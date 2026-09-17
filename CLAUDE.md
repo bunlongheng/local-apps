@@ -27,4 +27,4 @@ Self-healing, multi-machine orchestrator that monitors and auto-fixes local web 
 - GET /api/events (SSE), GET /api/log/:id
 
 ## Tests
-- `npm test` (unit + e2e), `npm run test:unit` (CI gate, coverage threshold), `npm run test:e2e` (needs a live :9875)
+- `npm test` (unit), `npm run test:coverage` (CI gate), `npm run test:e2e` (needs a live :9875), `npm run test:all` (both)
