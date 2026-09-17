@@ -60,6 +60,10 @@ No environment variables are required.
 | `CADDYFILE` | `/opt/homebrew/etc/Caddyfile` | Caddyfile the monitor edits |
 | `API_BIND` | `0.0.0.0` | `127.0.0.1` keeps the API off the LAN |
 | `LOCAL_APPS_TOKEN` | unset | grants a trusted LAN or tailnet machine control |
+| `LOCAL_APPS_DB` | `./local.db` | SQLite file; tests point it at a temp file |
+| `LOCAL_APPS_DEBUG` | unset | `1` logs the failures the restart chain tolerates |
+
+Optional integration: if `~/.claude/tab-colors.json` exists, the dashboard reads tab colors from it and renaming an app writes the label back. No file, no effect.
 
 ## Layout and tests
 

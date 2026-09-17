@@ -112,6 +112,8 @@ app.use(serveStatic(path.join(__dirname, 'public')));
 
 // --- Caddy reverse-proxy management -> lib/caddy.js ---
 
+// Optional integration: ~/.claude/tab-colors.json is the owner's terminal-tab registry. When
+// the file exists, a rename keeps its label in sync; when it does not, this is a no-op.
 function updateTabColors(id, label, caddyUrl) {
   const colorsPath = path.join(os.homedir(), '.claude', 'tab-colors.json');
   try {
