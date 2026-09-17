@@ -4,12 +4,12 @@ const os = require('os');
 // from ctx, so this file has no module-level state beyond what it declares itself.
 const fs = require('fs');
 
-const REQUIRED = ['bootoutCmd', 'PORT', 'MACHINE_ROLE', 'getNextAvailablePort', 'isPortTaken', 'killPort', 'db', 'dbg', 'broadcast', 'sseClients', 'getState', 'clearState', 'checkSingle', 'setupInfra', 'teardownInfra', 'updateTabColors', 'forViewer', 'startCmd', 'execAsync', 'spawn', 'validateAppFields', 'isValidId', 'isChromeExtensionRepo', 'CHROME_EXT_ERROR', 'addCaddyEntry', 'renameCaddyEntry'];
+const REQUIRED = ['isLoopback', 'clientAddress', 'bootoutCmd', 'PORT', 'MACHINE_ROLE', 'getNextAvailablePort', 'isPortTaken', 'killPort', 'db', 'dbg', 'broadcast', 'sseClients', 'getState', 'clearState', 'checkSingle', 'setupInfra', 'teardownInfra', 'updateTabColors', 'forViewer', 'startCmd', 'execAsync', 'spawn', 'validateAppFields', 'isValidId', 'isChromeExtensionRepo', 'CHROME_EXT_ERROR', 'addCaddyEntry', 'renameCaddyEntry'];
 
 module.exports = function register(app, ctx) {
   // Fail at boot, not at request time, when server.js forgets to pass a dependency.
   for (const k of REQUIRED) if (!(k in ctx)) throw new Error(`routes/apps.js: ctx is missing ${k}`);
-  const { bootoutCmd, PORT, MACHINE_ROLE, getNextAvailablePort, isPortTaken, killPort, db, dbg, broadcast, sseClients, getState, clearState, checkSingle, setupInfra, teardownInfra, updateTabColors, forViewer, startCmd, execAsync, spawn, validateAppFields, isValidId, isChromeExtensionRepo, CHROME_EXT_ERROR, addCaddyEntry, renameCaddyEntry } = ctx;
+  const { isLoopback, clientAddress, bootoutCmd, PORT, MACHINE_ROLE, getNextAvailablePort, isPortTaken, killPort, db, dbg, broadcast, sseClients, getState, clearState, checkSingle, setupInfra, teardownInfra, updateTabColors, forViewer, startCmd, execAsync, spawn, validateAppFields, isValidId, isChromeExtensionRepo, CHROME_EXT_ERROR, addCaddyEntry, renameCaddyEntry } = ctx;
 
 
   // --- CRUD: Apps ---
@@ -52,7 +52,7 @@ module.exports = function register(app, ctx) {
         tabIcon: a.tabIcon || null,
       };
     });
-    res.json({ apps: apps.map(a => forViewer(req, a)), lanIp: ctx.LAN_IP(), tailscaleIp: ctx.TAILSCALE_IP(), machineModel: ctx.MACHINE_MODEL(), machineRole: MACHINE_ROLE, monitorUrl: `http://${ctx.LAN_IP()}:${PORT}` });
+    res.json({ apps: apps.map(a => forViewer(req, a)), viewer: isLoopback(clientAddress(req)) ? 'loopback' : 'offbox', lanIp: ctx.LAN_IP(), tailscaleIp: ctx.TAILSCALE_IP(), machineModel: ctx.MACHINE_MODEL(), machineRole: MACHINE_ROLE, monitorUrl: `http://${ctx.LAN_IP()}:${PORT}` });
   });
 
   app.get('/api/apps', (req, res) => {
