@@ -269,7 +269,14 @@
   }
   function copySvg() { return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'; }
 
-  function dotClass(app) { return app.status === "up" ? "up" : app.disabled ? "disabled" : "starting-up"; }
+  // up / starting-up (only while this dashboard is starting it) / disabled / down / unknown.
+  function dotClass(app) {
+    if (app.status === "up") return "up";
+    if (S.startingApps[app.id]) return "starting-up";
+    if (app.disabled) return "disabled";
+    return app.status === "down" ? "down" : "unknown";
+  }
+  function dotHTML(app) { var c = dotClass(app); return '<span class="dot ' + c + '" title="' + c + '"><span class="sr-only">' + c + '</span></span>'; }
 
   function headerHTML(access) {
     var isTail = access.mode === "tailscale";
@@ -327,7 +334,7 @@
       var hostU = lanish ? (app.lanUrl || app.localUrl || "#") : (app.caddyUrl || app.localUrl || "#");
       var lanU = isTail ? (app.tailscaleUrl || "#") : (app.lanUrl || app.localUrl || "#");
       h += '<tr data-act="open" data-id="' + esc(app.id) + '" tabindex="0">';
-      h += '<td class="col-app"><div class="app-cell"><span class="dot ' + dotClass(app) + '"></span>' +
+      h += '<td class="col-app"><div class="app-cell">' + dotHTML(app) + '' +
         appIcon(app.id, app.name, app.icon, 32, app.status !== "up") +
         '<div class="app-meta"><a class="app-name' + (app.disabled ? " disabled" : "") + '" href="' + esc(safeUrl(best)) + '" target="_blank" rel="noopener" data-stop>' + esc(app.name) + "</a>";
       if (S.startingApps[app.id]) {
@@ -430,7 +437,7 @@
     }
     var h = '<div class="overlay" data-act="overlay-modal"><div class="modal" role="dialog" aria-modal="true" aria-label="' + esc(app.name) + '">';
     h += '<button class="modal-close" data-act="close" aria-label="Close">✕</button>';
-    h += '<div class="modal-head"><div class="modal-head-inner"><span class="dot ' + dotClass(app) + '"></span>' + appIcon(app.id, app.name, app.icon, 32, app.status !== "up") +
+    h += '<div class="modal-head"><div class="modal-head-inner">' + dotHTML(app) + '' + appIcon(app.id, app.name, app.icon, 32, app.status !== "up") +
       '<span class="modal-title">' + esc(app.name) + "</span>";
     h += '<div class="badges">' + badges.map(function (b) {
       var span = '<span class="badge' + (b.active ? " active" : "") + '" title="' + esc(b.title) + '">' + b.label + "</span>";
