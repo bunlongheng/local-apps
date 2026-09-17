@@ -8,7 +8,7 @@ const os = require('os');
 const path = require('path');
 
 // Repo root: moved handlers keep resolving files from the project, not from routes/.
-const ROOT = require('path').join(__dirname, '..');
+const ROOT = path.join(__dirname, '..');
 
 const REQUIRED = ['IS_HUB', 'db', 'dbg', 'validateAppFields', 'QRCode', 'PORT'];
 

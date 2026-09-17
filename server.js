@@ -140,7 +140,6 @@ function updateTabColors(id, label, caddyUrl) {
   } catch (e) { dbg('updateTabColors', e); }
 }
 
-
 // --- LaunchAgent management ---
 const LAUNCH_AGENTS_DIR = path.join(os.homedir(), 'Library', 'LaunchAgents');
 const USERNAME = os.userInfo().username;
@@ -149,10 +148,8 @@ const { createLaunchAgent, removeLaunchAgent } =
 
 // createLaunchAgent, removeLaunchAgent -> lib/launchd.js
 
-// --- Port allocation ---
 const PORT_RANGE_START = 3000;
 const PORT_RANGE_END = 9875; // below monitor port
-
 
 // --- Port allocation (provisioning and POST /api/apps) ---
 function isPortTaken(port, excludeId) {
@@ -430,41 +427,11 @@ async function checkAll() {
   } finally { checkAllRunning = false; }
 }
 
-
-
-
-
-
-
-
-
 // Validate app id: lowercase alphanumeric, hyphens only, 1-64 chars
 // isValidId, isSafePath, isSafeCommand, validateAppFields, xmlEscape -> lib/validate.js
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // --- Machine Sync API ---
 // Each machine exposes its app list + identity. Machines can pull from each other.
-
 
 // --- File watcher (public dir only) ---
 let reloadTimer = null;
@@ -472,7 +439,6 @@ if (IS_MAIN) fs.watch(path.join(__dirname, 'public'), { recursive: true }, () =>
   clearTimeout(reloadTimer);
   reloadTimer = setTimeout(() => broadcast({ type: 'reload' }), 200);
 });
-
 
 // --- Routes live in routes/*.js, registered against a small ctx. LAN_IP, TAILSCALE_IP and
 // MACHINE_MODEL are getters because they refresh on timers. ---
@@ -488,13 +454,11 @@ if (IS_MAIN) {
   setInterval(checkAll, CHECK_INTERVAL);
 }
 
-
-
 // NOTE (2026-05-21): A2A (agent-to-agent) was removed from local-apps and consolidated
 // into the dashboard app at :3003 (POST /api/a2a). local-apps is monitoring-only - do not
 // re-add an A2A endpoint here. The single A2A server lives in ~/Sites/claude.
 
-// Global error handler — no stack traces leaked, but honest status codes.
+// Global error handler - no stack traces leaked, but honest status codes.
 // A thrown error with an explicit .status keeps it (400/404/...); everything else is
 // a real server fault -> 500, so clients and monitoring can tell the two apart.
 app.use((err, req, res, _next) => {

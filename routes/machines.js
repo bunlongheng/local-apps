@@ -10,7 +10,7 @@ module.exports = function register(app, ctx) {
   for (const k of REQUIRED) if (!(k in ctx)) throw new Error(`routes/machines.js: ctx is missing ${k}`);
   const { appRecord, db, dbg, fetchJson, sweepSubnet, peerRecord, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT } = ctx;
 
-  // --- Machines (peers) — auto-discovery ---
+  // --- Machines (peers) - auto-discovery ---
   let discoveredPeers = [];
   const missed = new Map();   // machine id -> consecutive missed sweeps // live peers found on network
 
@@ -118,7 +118,7 @@ module.exports = function register(app, ctx) {
       db.upsertMachine({ id: m.id, hostname: clean.hostname === m.ip ? m.hostname : clean.hostname, ip: m.ip, port: m.port, model: clean.model || m.model });
         console.log(`  Online: ${info.hostname || m.ip} (${info.appCount} apps)`);
       } catch {
-        // unreachable — skip silently
+        // unreachable - skip silently
       }
     }
   }
