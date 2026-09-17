@@ -31,3 +31,11 @@ test('sweepSubnet probes 253 hosts, skips self, caps concurrency, keeps only hit
   assert.deepEqual(found, [{ ip: '1.2.3.7' }]);
   assert.deepEqual(await sweepSubnet('N/A', probe), []);
 });
+
+test('peerRecord keeps only a plain hostname, sane model and count; anything else falls back', () => {
+  const { peerRecord } = require('../../lib/peers');
+  assert.deepEqual(peerRecord('1.2.3.4', 9875, { hostname: 'pi5', model: 'Raspberry Pi 5', appCount: 3 }), { id: 'pi5', hostname: 'pi5', ip: '1.2.3.4', port: 9875, model: 'Raspberry Pi 5', appCount: 3 });
+  const bad = peerRecord('1.2.3.4', 9875, { hostname: '<img src=x onerror=alert(1)>', model: '<b>x</b>', appCount: 'lots' });
+  assert.equal(bad.hostname, '1.2.3.4'); assert.equal(bad.model, 'bxb'); assert.equal(bad.appCount, 0);
+  assert.equal(peerRecord('1.2.3.4', 9875, null).hostname, '1.2.3.4');
+});

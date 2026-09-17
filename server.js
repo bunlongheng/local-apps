@@ -17,7 +17,7 @@ const { isChromeExtensionRepo, CHROME_EXT_ERROR } = require('./lib/chrome-ext');
 const makeCaddy = require('./lib/caddy');
 const makeLaunchd = require('./lib/launchd');
 const makeHealth = require('./lib/health');
-const { fetchJson, sweepSubnet } = require('./lib/peers');
+const { fetchJson, sweepSubnet, peerRecord } = require('./lib/peers');
 
 const app = createApp();
 // True only when run directly (node server.js), false when require()d by a test - lets the
@@ -851,7 +851,7 @@ let discoveredPeers = []; // live peers found on network
 
 function probeHost(ip, port = 9875) {
   return fetchJson(`http://${ip}:${port}/api/machine`, 2000)
-    .then((info) => ({ id: info.hostname || ip, hostname: info.hostname, ip, port, model: info.model, appCount: info.appCount }))
+    .then((info) => peerRecord(ip, port, info))
     .catch(() => null);
 }
 
