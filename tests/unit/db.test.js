@@ -88,3 +88,12 @@ test('upsertApp keeps profile fields on create, not only on update', () => {
   assert.deepEqual(a.features, ['a', 'b']);
   assert.equal(a.sortOrder, 3);
 });
+
+test('machines and remote apps: upsert, list, delete', () => {
+  db.upsertMachine({ id: 'peer-t', hostname: 'peer-t', ip: '1.2.3.4', port: 9875, model: 'Mac' });
+  assert.ok(db.getMachines().some(m => m.id === 'peer-t'));
+  db.syncRemoteApps('peer-t', [{ id: 'ra', name: 'RA', localUrl: 'http://localhost:1', status: 'up' }, { id: '../x' }]);
+  assert.deepEqual(db.getRemoteApps('peer-t').map(r => r.id), ['ra'], 'the invalid record was dropped by the sanitiser');
+  db.deleteRemoteApps('peer-t'); db.deleteMachine('peer-t');
+  assert.equal(db.getRemoteApps('peer-t').length, 0); assert.ok(!db.getMachines().some(m => m.id === 'peer-t'));
+});
