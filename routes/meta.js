@@ -29,19 +29,19 @@ module.exports = function register(app, ctx) {
         const e = json[k];
         if (e && typeof e.r === 'number') out[k] = { label: e.label || k.toUpperCase(), color: toHex(e.r, e.g, e.b), icon: e.icon || '' };
       }
-    } catch (e) { dbg('line476', e); }
+    } catch (e) { dbg('meta', e); }
     // Fallback: DB tab colors for anything not defined in the json.
     try {
       const dbc = db.getTabColors() || {};
       for (const k of Object.keys(dbc)) if (!out[k]) out[k] = dbc[k];
-    } catch (e) { dbg('line481', e); }
+    } catch (e) { dbg('meta', e); }
     // Merge the shell alias (e.g. _bheng) per key from ~/.claude-tabs.sh.
     try {
       const sh = fs.readFileSync(path.join(os.homedir(), '.claude-tabs.sh'), 'utf8');
       const re = /(_[A-Za-z0-9]+)\(\)\s*\{\s*_tab\s+"([^"]+)"/g;
       let m;
       while ((m = re.exec(sh))) if (out[m[2]] && !out[m[2]].alias) out[m[2]].alias = m[1];
-    } catch (e) { dbg('line488', e); }
+    } catch (e) { dbg('meta', e); }
     res.json(out);
   });
 
@@ -76,7 +76,7 @@ module.exports = function register(app, ctx) {
           map[id] = '/favicons/' + f + '?v=' + Math.floor(mtime);
         }
       }
-    } catch (e) { dbg('line718', e); }
+    } catch (e) { dbg('meta', e); }
     res.setHeader('Cache-Control', 'no-cache');
     res.json(map);
   });
@@ -155,7 +155,7 @@ module.exports = function register(app, ctx) {
               const favSize = fs.statSync(fav).size;
               const appSize = fs.statSync(full).size;
               synced = favSize === appSize;
-            } catch (e) { dbg('line992', e); }
+            } catch (e) { dbg('meta', e); }
             break;
           }
         }
@@ -193,19 +193,19 @@ module.exports = function register(app, ctx) {
           return args.some(arg => typeof arg === 'string' && arg.includes(a.id));
         });
         let hasMcpFile = false;
-        try { hasMcpFile = fs.readdirSync(dir).some(f => f.includes('mcp') && (f.endsWith('.js') || f.endsWith('.ts'))); } catch (e) { dbg('line1027', e); }
+        try { hasMcpFile = fs.readdirSync(dir).some(f => f.includes('mcp') && (f.endsWith('.js') || f.endsWith('.ts'))); } catch (e) { dbg('meta', e); }
         // Also check ~/.claude/mcp-servers/ for files matching this app
         const mcpServersDir = path.join(os.homedir(), '.claude', 'mcp-servers');
         let hasMcpServerFile = false;
         if (fs.existsSync(mcpServersDir)) {
-          try { hasMcpServerFile = fs.readdirSync(mcpServersDir).some(f => f.includes(a.id)); } catch (e) { dbg('line1032', e); }
+          try { hasMcpServerFile = fs.readdirSync(mcpServersDir).some(f => f.includes(a.id)); } catch (e) { dbg('meta', e); }
         }
         if (hasProjMcp || globalRef || hasMcpFile || hasMcpServerFile) {
           flags.mcp = true;
           if (globalRef) flags.mcpName = globalRef[0];
           if (hasProjMcp) flags.mcpPath = path.join(dir, '.mcp.json');
         }
-      } catch (e) { dbg('line1039', e); }
+      } catch (e) { dbg('meta', e); }
 
       // API: Next.js app/api, Express server, pages/api
       try {
@@ -215,7 +215,7 @@ module.exports = function register(app, ctx) {
             fs.existsSync(path.join(dir, 'src', 'server.ts'))) {
           flags.api = true;
         }
-      } catch (e) { dbg('line1049', e); }
+      } catch (e) { dbg('meta', e); }
 
       // CLI: bin field in package.json or cli files or script in ~/.local/bin
       try {
@@ -230,7 +230,7 @@ module.exports = function register(app, ctx) {
           const content = localBinText.get(b) || '';
           if (content.includes(a.id) || content.includes(dir)) { flags.cli = true; flags.cliBin = b; break; }
         }
-      } catch (e) { dbg('line1066', e); }
+      } catch (e) { dbg('meta', e); }
 
       if (Object.keys(flags).length > 0) result[a.id] = flags;
     }

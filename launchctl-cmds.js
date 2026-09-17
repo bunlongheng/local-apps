@@ -35,4 +35,9 @@ function killPort(port, { timeoutMs = 5000 } = {}) {
   });
 }
 
-module.exports = { startCmd, killPort };
+// Unload a service. Shared by toggle, bulk-toggle, stop, DELETE teardown and the breaker.
+function bootoutCmd(uid, label) {
+  return `launchctl bootout gui/${uid}/${label} 2>/dev/null`;
+}
+
+module.exports = { startCmd, bootoutCmd, killPort };

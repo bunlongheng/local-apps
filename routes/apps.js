@@ -4,12 +4,12 @@ const os = require('os');
 // from ctx, so this file has no module-level state beyond what it declares itself.
 const fs = require('fs');
 
-const REQUIRED = ['PORT', 'MACHINE_ROLE', 'getNextAvailablePort', 'isPortTaken', 'killPort', 'db', 'dbg', 'broadcast', 'sseClients', 'getState', 'clearState', 'checkSingle', 'setupInfra', 'teardownInfra', 'updateTabColors', 'forViewer', 'startCmd', 'execAsync', 'execSync', 'spawn', 'validateAppFields', 'isValidId', 'isChromeExtensionRepo', 'CHROME_EXT_ERROR', 'addCaddyEntry', 'renameCaddyEntry'];
+const REQUIRED = ['bootoutCmd', 'PORT', 'MACHINE_ROLE', 'getNextAvailablePort', 'isPortTaken', 'killPort', 'db', 'dbg', 'broadcast', 'sseClients', 'getState', 'clearState', 'checkSingle', 'setupInfra', 'teardownInfra', 'updateTabColors', 'forViewer', 'startCmd', 'execAsync', 'execSync', 'spawn', 'validateAppFields', 'isValidId', 'isChromeExtensionRepo', 'CHROME_EXT_ERROR', 'addCaddyEntry', 'renameCaddyEntry'];
 
 module.exports = function register(app, ctx) {
   // Fail at boot, not at request time, when server.js forgets to pass a dependency.
   for (const k of REQUIRED) if (!(k in ctx)) throw new Error(`routes/apps.js: ctx is missing ${k}`);
-  const { PORT, MACHINE_ROLE, getNextAvailablePort, isPortTaken, killPort, db, dbg, broadcast, sseClients, getState, clearState, checkSingle, setupInfra, teardownInfra, updateTabColors, forViewer, startCmd, execAsync, execSync, spawn, validateAppFields, isValidId, isChromeExtensionRepo, CHROME_EXT_ERROR, addCaddyEntry, renameCaddyEntry } = ctx;
+  const { bootoutCmd, PORT, MACHINE_ROLE, getNextAvailablePort, isPortTaken, killPort, db, dbg, broadcast, sseClients, getState, clearState, checkSingle, setupInfra, teardownInfra, updateTabColors, forViewer, startCmd, execAsync, execSync, spawn, validateAppFields, isValidId, isChromeExtensionRepo, CHROME_EXT_ERROR, addCaddyEntry, renameCaddyEntry } = ctx;
 
 
   // --- CRUD: Apps ---
@@ -63,7 +63,7 @@ module.exports = function register(app, ctx) {
     // If disabling, also stop the app
     if (newState && a.launchAgent) {
       const uid = process.getuid();
-      try { await execAsync(`launchctl bootout gui/${uid}/${a.launchAgent} 2>/dev/null`, { timeout: 10000 }); } catch (e) { dbg('toggle/bootout', e); }
+      try { await execAsync(bootoutCmd(uid, a.launchAgent), { timeout: 10000 }); } catch (e) { dbg('toggle/bootout', e); }
       const s = getState(a.id);
       s.status = 'down';
       s.downSince = null;
@@ -95,7 +95,7 @@ module.exports = function register(app, ctx) {
       db.setAppDisabled(a.id, shouldDisable);
       // Stop newly disabled apps
       if (shouldDisable && !wasDisabled && a.launchAgent) {
-        jobs.push(execAsync(`launchctl bootout gui/${uid}/${a.launchAgent} 2>/dev/null`, { timeout: 10000 }).catch(() => {}));
+        jobs.push(execAsync(bootoutCmd(uid, a.launchAgent), { timeout: 10000 }).catch(() => {}));
         const s = getState(a.id);
         s.status = 'down';
         s.downSince = null;
@@ -138,7 +138,7 @@ module.exports = function register(app, ctx) {
             suggestedUrl: suggested ? `http://localhost:${suggested}` : null
           });
         }
-      } catch (e) { dbg('line617', e); }
+      } catch (e) { dbg('/api/apps', e); }
     }
 
     // Auto-setup infra (caddy, hosts, launch agent)
@@ -151,7 +151,7 @@ module.exports = function register(app, ctx) {
     const result = db.upsertApp(merged);
     // Extract assigned port for clear response
     let assignedPort = null;
-    try { assignedPort = parseInt(new URL(result.localUrl).port); } catch (e) { dbg('line630', e); }
+    try { assignedPort = parseInt(new URL(result.localUrl).port); } catch (e) { dbg('/api/apps', e); }
     broadcast({ type: 'reload' });
     res.status(201).json({ ...result, assignedPort });
   });
@@ -177,7 +177,7 @@ module.exports = function register(app, ctx) {
             suggestedUrl: suggested ? `http://localhost:${suggested}` : null
           });
         }
-      } catch (e) { dbg('line657', e); }
+      } catch (e) { dbg('/api/apps/:id', e); }
     }
 
     // Re-setup infra if localUrl or localPath changed
@@ -282,7 +282,7 @@ module.exports = function register(app, ctx) {
       const port = appCfg.localUrl ? (() => { try { return new URL(appCfg.localUrl).port; } catch { return null; } })() : null;
       // Kill port first (instant), then bootout in background
       if (port) killPort(port);
-      spawn('bash', ['-c', `launchctl bootout gui/${uid}/${label} 2>/dev/null`], { detached: true, stdio: 'ignore' }).unref();
+      spawn('bash', ['-c', bootoutCmd(uid, label)], { detached: true, stdio: 'ignore' }).unref();
       // Update status immediately
       const s = getState(appCfg.id);
       s.status = 'down';
