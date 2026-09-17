@@ -271,22 +271,18 @@ let TAILSCALE_IP = getTailscaleIp();
 setInterval(() => { TAILSCALE_IP = getTailscaleIp(); }, 60000).unref();
 
 // --- Machine model detection ---
-const MACHINE_MODEL = (() => {
-  try {
-    const name = execSync('system_profiler SPHardwareDataType 2>/dev/null', { timeout: 10000 }).toString();
-    const match = name.match(/Model Name:\s*(.+)/);
-    if (match) return match[1].trim();
-  } catch (e) { dbg('getTailscaleIp', e); }
-  // Fallback: sysctl hw.model (works in sandboxed envs where system_profiler fails)
-  try {
-    const hw = execSync('/usr/sbin/sysctl -n hw.model 2>/dev/null', { timeout: 5000 }).toString().trim();
-    if (hw.includes('Macmini') || hw.includes('Mac16,')) return 'Mac mini';
-    if (hw.includes('MacBookPro') || hw.includes('Mac15,') || hw.includes('Mac14,')) return 'MacBook Pro';
-    if (hw.includes('MacBookAir')) return 'MacBook Air';
-    if (hw.startsWith('Mac')) return 'Mac mini';
-  } catch (e) { dbg('getTailscaleIp', e); }
-  return null;
+// sysctl answers in ~20 ms; system_profiler can take seconds, so it refines the label after boot
+// instead of blocking the listener.
+let MACHINE_MODEL = (() => {
+  try { const hw = execSync('/usr/sbin/sysctl -n hw.model 2>/dev/null', { timeout: 5000 }).toString().trim(); return hw.includes('Macmini') || hw.startsWith('Mac16,') ? 'Mac mini' : (hw || 'Mac'); }
+  catch { return process.platform === 'darwin' ? 'Mac' : os.type(); }
 })();
+setTimeout(() => {
+  require('child_process').exec('system_profiler SPHardwareDataType 2>/dev/null', { timeout: 10000 }, (err, out) => {
+    if (err) return dbg('system_profiler', err);
+    const m = String(out).match(/Model Name: (.+)/); if (m) MACHINE_MODEL = m[1].trim();
+  });
+}, 5000).unref();
 
 // --- HTTP client (used across peer sync + health checks) ---
 
