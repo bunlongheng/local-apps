@@ -1,11 +1,14 @@
 // e2e: app registry endpoints. Read-only smoke checks plus mutation guards that
 // reject bad input. The mutation cases use ids that do not exist, so nothing in
 // apps.config.json is created, changed, or deleted.
-const { test, before } = require('node:test');
+const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const { api, serverUp } = require('./helpers');
 
 const MISSING = 'zzz-not-a-real-app-xyz';
+
+// Should a guard ever regress, the ids these tests send are removed again (404 is the normal answer).
+after(() => Promise.all(['zzz-guard-evil-path', 'zzz-guard-evil-cmd', MISSING].map(id => api('DELETE', `/api/apps/${id}`))));
 
 before(async () => {
   if (!await serverUp()) {
@@ -64,13 +67,13 @@ test('create app with invalid id -> 400 (no app created)', async () => {
 });
 
 test('create app with shell-metachar localPath -> 400 (no plist injection)', async () => {
-  const { status, json } = await api('POST', '/api/apps', { id: 'guard-evil-path', localPath: '/tmp/x";touch /tmp/pwned;"' });
+  const { status, json } = await api('POST', '/api/apps', { id: 'zzz-guard-evil-path', localPath: '/tmp/x";touch /tmp/pwned;"' });
   assert.equal(status, 400);
   assert.match(json.error, /localPath/);
 });
 
 test('create app with injected startCommand -> 400 (no command injection)', async () => {
-  const { status, json } = await api('POST', '/api/apps', { id: 'guard-evil-cmd', localPath: '/tmp/ok', startCommand: 'npm run dev; rm -rf /' });
+  const { status, json } = await api('POST', '/api/apps', { id: 'zzz-guard-evil-cmd', localPath: '/tmp/ok', startCommand: 'npm run dev; rm -rf /' });
   assert.equal(status, 400);
   assert.match(json.error, /startCommand/);
 });
