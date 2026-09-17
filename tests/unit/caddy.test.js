@@ -3,7 +3,7 @@
 // `caddyfile` path the factory is given, so every test here points at a
 // throwaway file in a temp dir (never the real Caddyfile) and injects a fake
 // `exec` so `caddy validate`/`caddy reload` never actually run.
-const { test, after, mock } = require('node:test');
+const { test, after } = require('node:test');
 const TMP_DIRS = [];
 after(() => { for (const d of TMP_DIRS) fs.rmSync(d, { recursive: true, force: true }); });
 const assert = require('node:assert');
@@ -89,7 +89,6 @@ test('adding an entry installs the shipped offline.html next to the Caddyfile', 
   caddy.addCaddyEntry('zzz-off', 4010);
   assert.ok(fs.existsSync(path.join(dir, 'offline.html')), 'offline.html copied into errorRoot');
   assert.match(fs.readFileSync(path.join(dir, 'offline.html'), 'utf8'), /not running/);
-  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('addCaddyEntry is an upsert: a new port rewrites the block, the same port is a no-op', () => {
@@ -100,7 +99,6 @@ test('addCaddyEntry is an upsert: a new port rewrites the block, the same port i
   const c = fs.readFileSync(cf, 'utf8');
   assert.equal((c.match(/zzz-up\.localhost \{/g) || []).length, 1, 'exactly 1 block');
   assert.match(c, /reverse_proxy 127\.0\.0\.1:4000/); assert.doesNotMatch(c, /127\.0\.0\.1:3000/);
-  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('a candidate Caddyfile that fails validation never replaces the live file', () => {
@@ -109,18 +107,16 @@ test('a candidate Caddyfile that fails validation never replaces the live file',
   const caddy = require('../../lib/caddy')({ caddyfile: cf, errorRoot: dir, getLanIp: () => '1.2.3.4', exec: (cmd) => { if (/validate/.test(cmd)) throw new Error('adapt failed'); } });
   assert.equal(caddy.addCaddyEntry('zzz-bad', 4001), null, 'no proxy URL for a block that was never written');
   assert.equal(fs.readFileSync(cf, 'utf8'), '# live\n', 'live Caddyfile untouched'); assert.ok(!fs.existsSync(cf + '.candidate'));
-  fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('a failing reload is a warning: the block is on disk, the domain is returned, and the failure is reported once', () => {
+test('a failing reload is a warning: the block is on disk, the domain is returned, and the failure is reported once', (t) => {
   const fs2 = require('node:fs'), dir = TMP_DIRS[TMP_DIRS.push(fs2.mkdtempSync(path.join(os.tmpdir(), 'caddy-reload-'))) - 1];
   const cf = path.join(dir, 'Caddyfile'); fs2.writeFileSync(cf, '');
-  const warn = mock.method(console, 'warn', () => {});
+  const warn = t.mock.method(console, 'warn', () => {});   // restored by the test context, pass or fail
   const caddy = require('../../lib/caddy')({ caddyfile: cf, errorRoot: dir, getLanIp: () => '1.2.3.4', exec: (cmd) => { if (/^caddy reload/.test(cmd)) throw new Error('admin endpoint down'); } });
   assert.equal(caddy.addCaddyEntry('zzz-r', 4002), 'http://zzz-r.localhost');
   assert.ok(fs2.readFileSync(cf, 'utf8').includes('zzz-r.localhost'), 'block written despite the failed reload');
   assert.equal(warn.mock.callCount(), 1); assert.match(String(warn.mock.calls[0].arguments[0]), /caddy reload failed/);
-  warn.mock.restore();
 });
 
 test('removeCaddyEntry returns false and keeps the block when the candidate is rejected; no reload', () => {
