@@ -80,6 +80,7 @@ No environment variables are required.
 |---------|---------|---------|
 | `MACHINE_ROLE` | `hub` | `hub` runs bots and auto-fix; `agent` reports only |
 | `CADDYFILE` | `/opt/homebrew/etc/Caddyfile` | Caddyfile the monitor edits |
+| `LAUNCH_AGENTS_DIR` | `~/Library/LaunchAgents` | where per-app plists are written (a scratch dir for tests) |
 | `API_BIND` | `0.0.0.0` | `127.0.0.1` keeps the API off the LAN |
 | `LOCAL_APPS_TOKEN` | unset | grants a trusted LAN or tailnet machine control |
 | `LOCAL_APPS_DB` | `./local.db` | SQLite file; tests point it at a temp file |

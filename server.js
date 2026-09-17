@@ -131,7 +131,7 @@ app.use(serveStatic(path.join(__dirname, 'public')));
 const { updateTabColors } = makeTabColors({ home: os.homedir(), dbg });
 
 // --- LaunchAgent management ---
-const LAUNCH_AGENTS_DIR = path.join(os.homedir(), 'Library', 'LaunchAgents');
+const LAUNCH_AGENTS_DIR = process.env.LAUNCH_AGENTS_DIR || path.join(os.homedir(), 'Library', 'LaunchAgents');   // override for a scratch instance
 const USERNAME = os.userInfo().username;
 const { createLaunchAgent, removeLaunchAgent } =
   makeLaunchd({ username: USERNAME, launchAgentsDir: LAUNCH_AGENTS_DIR, npmPath: NPM_PATH, xmlEscape, exec: execSync });

@@ -31,4 +31,4 @@ Self-healing, multi-machine orchestrator that monitors and auto-fixes local web 
 - The e2e lifecycle test registers and deletes an app, so it is skipped unless `E2E_MUTATE=1`. Never set that against the live hub; boot a scratch instance first:
   on macOS provisioning is real, so shadow `caddy` with a no-op first (a scratch CADDYFILE alone still runs `caddy reload` against the live daemon):
   `mkdir -p /tmp/nocaddy && printf '#!/bin/sh\nexit 0\n' > /tmp/nocaddy/caddy && chmod +x /tmp/nocaddy/caddy`
-  `PATH=/tmp/nocaddy:$PATH HOME=$(mktemp -d) MACHINE_ROLE=agent API_BIND=127.0.0.1 CADDYFILE=/tmp/Caddyfile LOCAL_APPS_DB=/tmp/e2e.db node server.js` then `E2E_MUTATE=1 npm run test:e2e`.
+  `PATH=/tmp/nocaddy:$PATH HOME=$(mktemp -d) MACHINE_ROLE=agent API_BIND=127.0.0.1 CADDYFILE=/tmp/Caddyfile LAUNCH_AGENTS_DIR=/tmp/LaunchAgents LOCAL_APPS_DB=/tmp/e2e.db node server.js` then `E2E_MUTATE=1 npm run test:e2e`.

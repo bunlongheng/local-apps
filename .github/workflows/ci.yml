@@ -55,9 +55,10 @@ jobs:
       - name: E2E lifecycle on the darwin branch (scratch Caddyfile and LaunchAgents dir)
         run: |
           export CADDYFILE=$RUNNER_TEMP/Caddyfile; : > "$CADDYFILE"
+          export LAUNCH_AGENTS_DIR=$RUNNER_TEMP/LaunchAgents; mkdir -p "$LAUNCH_AGENTS_DIR"
           MACHINE_ROLE=agent API_BIND=127.0.0.1 LOCAL_APPS_DB=$RUNNER_TEMP/ci-local.db node server.js > $RUNNER_TEMP/server.log 2>&1 &
           for i in $(seq 1 20); do curl -sf http://127.0.0.1:9875/api/status > /dev/null && break; sleep 1; done
           E2E_MUTATE=1 npm run test:e2e || { echo '--- server log ---'; cat $RUNNER_TEMP/server.log; exit 1; }
           kill %1
           test -z "$(tr -d '[:space:]' < "$CADDYFILE")" || { echo 'lifecycle left a Caddy block behind:'; cat "$CADDYFILE"; exit 1; }
-          ls ~/Library/LaunchAgents 2>/dev/null | grep -q zzz-e2e && { echo 'lifecycle left a LaunchAgent behind'; exit 1; } || true
+          ls "$LAUNCH_AGENTS_DIR" | grep -q zzz-e2e && { echo 'lifecycle left a LaunchAgent behind'; exit 1; } || true
