@@ -85,9 +85,9 @@ module.exports = function register(app, ctx) {
     const url = `http://${m.ip}:${m.port || 9875}/api/status`;
     try {
       const data = await fetchJson(url, 5000);
-      const hostname = data.apps?.[0]?.hostname || m.hostname;
-      const model = data.machineModel || m.model;
-      db.upsertMachine({ id: m.id, hostname, ip: m.ip, port: m.port, model });
+      // Same sanitiser as discovery: a peer's hostname and model never reach the db verbatim.
+      const clean = peerRecord(m.ip, m.port, { hostname: data.apps?.[0]?.hostname, model: data.machineModel, appCount: (data.apps || []).length });
+      db.upsertMachine({ id: m.id, hostname: clean.hostname === m.ip ? m.hostname : clean.hostname, ip: m.ip, port: m.port, model: clean.model || m.model });
       // Only sanitised app records leave this hub; the peer's raw document is never proxied.
       res.json({ apps: (data.apps || []).map(appRecord).filter(Boolean), machineModel: String(data.machineModel || '').slice(0, 40), lanIp: String(data.lanIp || '').slice(0, 45) });
     } catch (err) {
@@ -114,7 +114,8 @@ module.exports = function register(app, ctx) {
     for (const m of machines) {
       try {
         const info = await fetchJson(`http://${m.ip}:${m.port || 9875}/api/machine`, 3000);
-        db.upsertMachine({ id: m.id, hostname: info.hostname || m.hostname, ip: m.ip, port: m.port, model: info.model || m.model });
+        const clean = peerRecord(m.ip, m.port, info);
+      db.upsertMachine({ id: m.id, hostname: clean.hostname === m.ip ? m.hostname : clean.hostname, ip: m.ip, port: m.port, model: clean.model || m.model });
         console.log(`  Online: ${info.hostname || m.ip} (${info.appCount} apps)`);
       } catch {
         // unreachable — skip silently
