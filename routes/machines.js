@@ -42,7 +42,7 @@ module.exports = function register(app, ctx) {
         if (data.apps && Array.isArray(data.apps)) {
           db.syncRemoteApps(p.id, data.apps);
         }
-      } catch (e) { dbg('line877', e); }
+      } catch (e) { dbg('machines', e); }
     }
   }
 

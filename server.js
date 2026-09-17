@@ -9,7 +9,7 @@ const { execSync, spawn } = require('child_process');
 const execAsync = require('util').promisify(require('child_process').exec);
 const QRCode = require('qrcode');
 const db = require('./db');
-const { startCmd, killPort } = require('./launchctl-cmds');
+const { startCmd, bootoutCmd, killPort } = require('./launchctl-cmds');
 const { shouldTrip, rearmReason } = require('./lib/breaker');
 const { nextLevel, recordAttempt, l3Fixes } = require('./lib/escalation');
 const { isValidId, validateAppFields, xmlEscape } = require('./lib/validate');
@@ -62,7 +62,7 @@ const MACHINE_ROLE = (() => {
   if (process.env.MACHINE_ROLE) return process.env.MACHINE_ROLE;
   const roleFile = path.join(__dirname, 'machine-role.json');
   if (fs.existsSync(roleFile)) {
-    try { return JSON.parse(fs.readFileSync(roleFile, 'utf8')).role || 'hub'; } catch (e) { dbg('line65', e); }
+    try { return JSON.parse(fs.readFileSync(roleFile, 'utf8')).role || 'hub'; } catch (e) { dbg('misc', e); }
   }
   return 'hub';
 })();
@@ -136,7 +136,7 @@ function updateTabColors(id, label, caddyUrl) {
       colors[key].label = label.toUpperCase();
       fs.writeFileSync(colorsPath, JSON.stringify(colors, null, 2));
     }
-  } catch (e) { dbg('line122', e); }
+  } catch (e) { dbg('updateTabColors', e); }
 }
 
 
@@ -158,10 +158,10 @@ function isPortTaken(port, excludeId) {
   for (const a of db.getApps()) {
     if (excludeId && a.id === excludeId) continue;
     if (a.localUrl) {
-      try { if (parseInt(new URL(a.localUrl).port) === port) return a.id; } catch (e) { dbg('line585', e); }
+      try { if (parseInt(new URL(a.localUrl).port) === port) return a.id; } catch (e) { dbg('isPortTaken', e); }
     }
     if (a.healthUrl) {
-      try { if (parseInt(new URL(a.healthUrl).port) === port) return a.id; } catch (e) { dbg('line588', e); }
+      try { if (parseInt(new URL(a.healthUrl).port) === port) return a.id; } catch (e) { dbg('isPortTaken', e); }
     }
   }
   return null;
@@ -170,7 +170,7 @@ function getNextAvailablePort() {
   const usedPorts = new Set();
   for (const a of db.getApps()) {
     if (a.localUrl) {
-      try { usedPorts.add(parseInt(new URL(a.localUrl).port)); } catch (e) { dbg('line142', e); }
+      try { usedPorts.add(parseInt(new URL(a.localUrl).port)); } catch (e) { dbg('getNextAvailablePort', e); }
     }
   }
   for (let p = PORT_RANGE_START; p <= PORT_RANGE_END; p++) {
@@ -189,10 +189,10 @@ function setupInfra(id, data) {
   // Port: use provided localUrl, healthUrl, or auto-assign
   let port = null;
   if (data.localUrl) {
-    try { port = new URL(data.localUrl).port; } catch (e) { dbg('line158', e); }
+    try { port = new URL(data.localUrl).port; } catch (e) { dbg('setupInfra', e); }
   }
   if (!port && data.healthUrl) {
-    try { port = new URL(data.healthUrl).port; } catch (e) { dbg('line161', e); }
+    try { port = new URL(data.healthUrl).port; } catch (e) { dbg('setupInfra', e); }
   }
   if (!port) {
     port = getNextAvailablePort();
@@ -228,7 +228,7 @@ async function teardownInfra(app) {
     if (port) await killPort(port);
   } catch (e) { dbg('teardown/killPort', e); }
   if (!CAN_PROVISION) return;
-  if (app && app.launchAgent) { try { await execAsync(`launchctl bootout gui/${process.getuid()}/${app.launchAgent} 2>/dev/null`, { timeout: 10000 }); } catch (e) { dbg('teardown/bootout', e); } }
+  if (app && app.launchAgent) { try { await execAsync(bootoutCmd(process.getuid(), app.launchAgent), { timeout: 10000 }); } catch (e) { dbg('teardown/bootout', e); } }
   removeCaddyEntry(id);
   removeLaunchAgent(id);
   console.log(`  cleanup: ${id}`);
@@ -269,7 +269,7 @@ const MACHINE_MODEL = (() => {
     const name = execSync('system_profiler SPHardwareDataType 2>/dev/null', { timeout: 10000 }).toString();
     const match = name.match(/Model Name:\s*(.+)/);
     if (match) return match[1].trim();
-  } catch (e) { dbg('line239', e); }
+  } catch (e) { dbg('getTailscaleIp', e); }
   // Fallback: sysctl hw.model (works in sandboxed envs where system_profiler fails)
   try {
     const hw = execSync('/usr/sbin/sysctl -n hw.model 2>/dev/null', { timeout: 5000 }).toString().trim();
@@ -277,7 +277,7 @@ const MACHINE_MODEL = (() => {
     if (hw.includes('MacBookPro') || hw.includes('Mac15,') || hw.includes('Mac14,')) return 'MacBook Pro';
     if (hw.includes('MacBookAir')) return 'MacBook Air';
     if (hw.startsWith('Mac')) return 'Mac mini';
-  } catch (e) { dbg('line247', e); }
+  } catch (e) { dbg('getTailscaleIp', e); }
   return null;
 })();
 
@@ -369,8 +369,8 @@ async function checkAll() {
       if (shouldTrip(s, Date.now())) {
         try {
           if (port) await killPort(port);
-          if (label) await execAsync(`launchctl bootout gui/${uid}/${label} 2>/dev/null`, { timeout: 10000 });
-        } catch (e) { dbg('line340', e); }
+          if (label) await execAsync(bootoutCmd(uid, label), { timeout: 10000 });
+        } catch (e) { dbg('checkAll', e); }
         db.setAppDisabled(appCfg.id, true, 'breaker');
         appCfg.disabled = true;
         console.log(`  [L5] circuit breaker -> disabled ${appCfg.id} (${s.flapWindow.length} flaps, ${attempts} attempts)`);
@@ -394,7 +394,7 @@ async function checkAll() {
         recordAttempt(s, Date.now());
         try {
           if (port) await killPort(port);
-          await execAsync(`launchctl bootout gui/${uid}/${label} 2>/dev/null; sleep 1; launchctl bootstrap gui/${uid} "${plistPath}" 2>/dev/null`, { timeout: 15000 });
+          await execAsync(`${bootoutCmd(uid, label)}; sleep 1; launchctl bootstrap gui/${uid} "${plistPath}" 2>/dev/null`, { timeout: 15000 });
           console.log(`  [L2] port-kill + reload: ${appCfg.id}`);
         } catch (e) { dbg('L2', e); }
       }
@@ -405,7 +405,7 @@ async function checkAll() {
           if (dir && fs.existsSync(dir)) {
             const logPath = appCfg.logPath || `/tmp/${appCfg.id}.log`;
             let logTail = '';
-            try { logTail = (await execAsync(`tail -30 "${logPath}" 2>/dev/null`, { timeout: 5000 })).stdout; } catch (e) { dbg('line375', e); }
+            try { logTail = (await execAsync(`tail -30 "${logPath}" 2>/dev/null`, { timeout: 5000 })).stdout; } catch (e) { dbg('checkAll', e); }
             const fixes = l3Fixes(logTail);
             if (fixes.npmInstall) {
               console.log(`  [L3] npm install: ${appCfg.id}`);
@@ -507,7 +507,7 @@ if (IS_MAIN) fs.watch(path.join(__dirname, 'public'), { recursive: true }, () =>
 
 // --- Routes live in routes/*.js, registered against a small ctx. LAN_IP, TAILSCALE_IP and
 // MACHINE_MODEL are getters because they refresh on timers. ---
-const ctx = { appRecord, getNextAvailablePort, isPortTaken, killPort, AUTH_TOKEN, CHROME_EXT_ERROR, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT, QRCode, addCaddyEntry, broadcast, checkSingle, clearState, db, dbg, execAsync, execSync, fetchJson, forViewer, getState, isChromeExtensionRepo, isValidId, peerRecord, renameCaddyEntry, setupInfra, spawn, sseClients, startCmd, sweepSubnet, teardownInfra, updateTabColors, validateAppFields,
+const ctx = { appRecord, bootoutCmd, getNextAvailablePort, isPortTaken, killPort, AUTH_TOKEN, CHROME_EXT_ERROR, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT, QRCode, addCaddyEntry, broadcast, checkSingle, clearState, db, dbg, execAsync, execSync, fetchJson, forViewer, getState, isChromeExtensionRepo, isValidId, peerRecord, renameCaddyEntry, setupInfra, spawn, sseClients, startCmd, sweepSubnet, teardownInfra, updateTabColors, validateAppFields,
   LAN_IP: () => LAN_IP, TAILSCALE_IP: () => TAILSCALE_IP, MACHINE_MODEL: () => MACHINE_MODEL };
 require('./routes/apps')(app, ctx);
 require('./routes/meta')(app, ctx);
