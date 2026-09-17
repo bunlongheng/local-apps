@@ -122,7 +122,8 @@
       return ct.indexOf("application/json") !== -1 ? r.json() : r.text();
     });
   }
-  function toast(msg, ms) {
+  function toast(msg, ms, kind) {
+    S.toastKind = kind || "";
     S.toast = msg; render();
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { S.toast = null; render(); }, ms || 2000);
@@ -232,7 +233,7 @@
       S.apps = S.apps.map(function (a) { return a.id === id ? Object.assign({}, a, { status: "down" }) : a; });
       if (S.modalApp && S.modalApp.id === id) S.modalApp = Object.assign({}, S.modalApp, { status: "down" });
       toast("Stopped"); render();
-    }).catch(function () {});
+    }).catch(function () { toast("Stop failed", 3000, "error"); render(); });
   }
   function toggleApp(id, name) {
     api("/api/apps/" + id + "/toggle", { method: "POST" }).then(function (d) {
@@ -425,8 +426,8 @@
       var ok = sync.hasFavicon && sync.hasAppIcon && sync.synced;
       badges.push({ label: "ICON", active: ok, title: !sync.hasFavicon ? "No favicon in local-apps" : !sync.hasAppIcon ? "App repo has no icon file" : sync.synced ? "Icon synced with app repo" : "Icon out of sync with app repo" });
     }
-    var h = '<div class="overlay" data-act="overlay-modal"><div class="modal">';
-    h += '<button class="modal-close" data-act="close">✕</button>';
+    var h = '<div class="overlay" data-act="overlay-modal"><div class="modal" role="dialog" aria-modal="true" aria-label="' + esc(app.name) + '">';
+    h += '<button class="modal-close" data-act="close" aria-label="Close">✕</button>';
     h += '<div class="modal-head"><div class="modal-head-inner"><span class="dot ' + dotClass(app) + '"></span>' + appIcon(app.id, app.name, app.icon, 32, app.status !== "up") +
       '<span class="modal-title">' + esc(app.name) + "</span>";
     h += '<div class="badges">' + badges.map(function (b) {
@@ -477,8 +478,9 @@
       '<div class="help-block">' + esc(HELP_TEXT) + "</div></div></div>";
   }
 
-  function toastHTML() { return '<div class="toast' + (S.toast ? " show" : "") + '">' + esc(S.toast || "Copied") + "</div>"; }
+  function toastHTML() { return '<div class="toast' + (S.toast ? " show" : "") + (S.toastKind === "error" ? " error" : "") + '" role="status" aria-live="polite">' + esc(S.toast || "Copied") + "</div>"; }
 
+  var lastModalId = null;
   function render() {
     var access = detectAccessMode();
     var root = document.getElementById("root");
@@ -491,8 +493,10 @@
     fixIconImgs(root);
     keyboardControls(root);
     if (logTop !== null) { var l2 = document.getElementById("logBody"); if (l2) l2.scrollTop = logTop; }
-    if (focusKey && focusKey !== "|") { var parts = focusKey.split("|"); var sel = '[data-act="' + parts[0] + '"]' + (parts[1] ? '[data-id="' + parts[1] + '"]' : ""); var again = root.querySelector(sel); if (again) again.focus(); }
-    else if (S.modalApp) { var close = root.querySelector(".modal .modal-close"); if (close && !root.querySelector(".modal :focus")) close.focus(); }
+    var modalId = S.modalApp ? S.modalApp.id : null;
+    if (modalId && modalId !== lastModalId) { var close = root.querySelector(".modal .modal-close"); if (close) close.focus(); }
+    else if (focusKey && focusKey !== "|") { var parts = focusKey.split("|"); var sel = '[data-act="' + parts[0] + '"]' + (parts[1] ? '[data-id="' + parts[1] + '"]' : ""); var again = root.querySelector(sel); if (again) again.focus(); }
+    lastModalId = modalId;
   }
   // Rows and chips are clickable via data-act; make them reachable by keyboard too.
   function keyboardControls(root) {

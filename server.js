@@ -108,6 +108,15 @@ app.use((req, res, next) => {
   return res.status(d.status).json({ error: 'unauthorized - control actions and sensitive reads require LOCAL_APPS_TOKEN off localhost' });
 });
 
+// The dashboard shell is served with a real asset stamp (mtime of app.js/app.css) in place
+// of the hand-typed ?v= so a deploy busts the 1h asset cache by itself; the shell is no-cache.
+const INDEX_HTML = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+const ASSET_STAMP = Math.max(...['app.js', 'app.css'].map(f => { try { return Math.floor(fs.statSync(path.join(__dirname, 'public', f)).mtimeMs); } catch { return 0; } }));
+app.get('/', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.end(INDEX_HTML.replace(/\?v=\d+/g, `?v=${ASSET_STAMP}`));
+});
 app.use(serveStatic(path.join(__dirname, 'public')));
 
 // --- Caddy reverse-proxy management -> lib/caddy.js ---
