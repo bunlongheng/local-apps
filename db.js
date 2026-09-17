@@ -298,12 +298,14 @@ function rowToApp(row) {
   };
 }
 
+// Hot-path statements prepared once; getApps runs per /api/status, per tick, per peer sync.
+const STMT = { allApps: db.prepare('SELECT * FROM apps ORDER BY created_at'), oneApp: db.prepare('SELECT * FROM apps WHERE id = ?') };
 function getApps() {
-  return db.prepare('SELECT * FROM apps ORDER BY created_at').all().map(rowToApp);
+  return STMT.allApps.all().map(rowToApp);
 }
 
 function getApp(id) {
-  return rowToApp(db.prepare('SELECT * FROM apps WHERE id = ?').get(id));
+  return rowToApp(STMT.oneApp.get(id));
 }
 
 const PROFILE_KEYS = ['about', 'features', 'architect', 'deploy', 'security', 'performance', 'prompt', 'sortOrder'];
