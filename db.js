@@ -178,7 +178,7 @@ if (count === 0 && fs.existsSync(CONFIG_FILE)) {
         repo: a.repo || null,
         launchAgent: a.launchAgent || null,
         launchAgentPath: a.launchAgentPath || null,
-        startCommand: a.startCommand || 'npm run dev',
+        startCommand: a.startCommand || 'npm run dev', prodUrl2: (a.prodUrl2 ?? null), tabColor: (a.tabColor ?? null), tabIcon: (a.tabIcon ?? null),
         icon: a.icon || null,
       });
     }
@@ -348,8 +348,8 @@ function upsertApp(data) {
     db.prepare(`UPDATE apps SET ${fields.join(', ')} WHERE id = @id`).run(params);
   } else {
     db.prepare(`
-      INSERT INTO apps (id, name, health_url, local_url, process_check, caddy_url, prod_url, local_path, log_path, repo, launch_agent, launch_agent_path, start_command, icon)
-      VALUES (@id, @name, @healthUrl, @localUrl, @processCheck, @caddyUrl, @prodUrl, @localPath, @logPath, @repo, @launchAgent, @launchAgentPath, @startCommand, @icon)
+      INSERT INTO apps (id, name, health_url, local_url, process_check, caddy_url, prod_url, prod_url2, local_path, log_path, repo, launch_agent, launch_agent_path, start_command, icon, tab_color, tab_icon)
+      VALUES (@id, @name, @healthUrl, @localUrl, @processCheck, @caddyUrl, @prodUrl, @prodUrl2, @localPath, @logPath, @repo, @launchAgent, @launchAgentPath, @startCommand, @icon, @tabColor, @tabIcon)
     `).run({
       id: data.id,
       name: data.name || data.id,
@@ -363,7 +363,7 @@ function upsertApp(data) {
       repo: data.repo || null,
       launchAgent: data.launchAgent || null,
       launchAgentPath: data.launchAgentPath || null,
-      startCommand: data.startCommand || 'npm run dev',
+      startCommand: data.startCommand || 'npm run dev', prodUrl2: (data.prodUrl2 ?? null), tabColor: (data.tabColor ?? null), tabIcon: (data.tabIcon ?? null),
       icon: data.icon || null,
     });
     // Profile columns are not part of the INSERT; apply them through the UPDATE path so a
