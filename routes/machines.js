@@ -11,7 +11,8 @@ module.exports = function register(app, ctx) {
   const { appRecord, db, dbg, fetchJson, sweepSubnet, peerRecord, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT } = ctx;
 
   // --- Machines (peers) — auto-discovery ---
-  let discoveredPeers = []; // live peers found on network
+  let discoveredPeers = [];
+  const missed = new Map();   // machine id -> consecutive missed sweeps // live peers found on network
 
   function probeHost(ip, port = 9875) {
     return fetchJson(`http://${ip}:${port}/api/machine`, 2000)
@@ -27,13 +28,13 @@ module.exports = function register(app, ctx) {
     for (const p of discoveredPeers) {
       db.upsertMachine(p);
     }
-    // Remove stale machines no longer on network
+    // Drop a machine only after 2 consecutive missed sweeps: 1 miss is a sleeping laptop or a
+    // lost probe, not a departure.
     const liveIps = new Set(discoveredPeers.map(p => p.ip));
     for (const m of db.getMachines()) {
-      if (!liveIps.has(m.ip)) {
-        db.deleteMachine(m.id);
-        db.deleteRemoteApps(m.id);
-      }
+      if (liveIps.has(m.ip)) { missed.delete(m.id); continue; }
+      const n = (missed.get(m.id) || 0) + 1; missed.set(m.id, n);
+      if (n >= 2) { db.deleteMachine(m.id); db.deleteRemoteApps(m.id); missed.delete(m.id); }
     }
     // Fetch and store apps from each peer
     for (const p of discoveredPeers) {
