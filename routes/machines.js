@@ -3,7 +3,11 @@
 // from ctx, so this file has no module-level state beyond what it declares itself.
 const os = require('os');
 
+const REQUIRED = ['db', 'dbg', 'fetchJson', 'sweepSubnet', 'peerRecord', 'IS_HUB', 'IS_MAIN', 'MACHINE_ROLE', 'PORT'];
+
 module.exports = function register(app, ctx) {
+  // Fail at boot, not at request time, when server.js forgets to pass a dependency.
+  for (const k of REQUIRED) if (!(k in ctx)) throw new Error(`routes/machines.js: ctx is missing ${k}`);
   const { db, dbg, fetchJson, sweepSubnet, peerRecord, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT } = ctx;
 
   // --- Machines (peers) — auto-discovery ---
