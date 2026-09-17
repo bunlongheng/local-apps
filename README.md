@@ -21,6 +21,8 @@ Register an app once. Local Apps assigns it a port, writes its Caddy reverse pro
 
 ## Quick start
 
+Node 22 or newer (`.nvmrc` is set; `nvm use` picks it up).
+
 ```bash
 git clone https://github.com/bunlongheng/local-apps.git
 cd local-apps
