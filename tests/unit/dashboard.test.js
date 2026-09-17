@@ -4,7 +4,9 @@
 // public/app.js runs inside the jsdom window as a vm.Script carrying its filename, so it is inside the coverage gate.
 // Timers and the clock are the window's own, replaced with a fake before app.js is evaluated, so
 // the test drives every interval deterministically.
-const { test } = require('node:test');
+const { test, after } = require('node:test');
+const WINDOWS = [];   // every jsdom window boot() made, closed in after() whether or not a test failed
+after(() => { for (const w of WINDOWS) { try { w.close(); } catch { /* already closed */ } } });
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -40,7 +42,7 @@ function fakeClock(w) {
 
 function boot({ status, machines = [], peerStatus = null, failMutations = false, hub = {}, token = null }) {
   const dom = new JSDOM(INDEX, { url: 'http://localhost:9875/', runScripts: 'outside-only', pretendToBeVisual: true });
-  const w = dom.window;
+  const w = dom.window; WINDOWS.push(w);
   const clock = fakeClock(w);
   const sources = [];
   w.EventSource = class { constructor(url) { this.url = url; this.closed = false; sources.push(this); } close() { this.closed = true; } };
@@ -63,7 +65,7 @@ function boot({ status, machines = [], peerStatus = null, failMutations = false,
   new vm.Script(APP_JS, { filename: path.join(ROOT, 'public', 'app.js') }).runInContext(dom.getInternalVMContext());
   // Bounded wait on the microtask/IO queue for the fetch chains, not a fixed sleep: a loaded runner must not flake.
   const settle = async (pred = () => true) => { for (let i = 0; i < 200; i++) { await new Promise((r) => setImmediate(r)); if (i >= 5 && pred()) return; } throw new Error('settle timeout'); };
-  return { w, clock, sources, requests, gets, sentHeaders, routes, settle, root: () => w.document.getElementById('root'), close: () => w.close() };
+  return { w, clock, sources, requests, gets, sentHeaders, routes, settle, root: () => w.document.getElementById('root') };
 }
 
 test('an off-box viewer gets no toggle, start/stop or delete controls; on the box they render', async () => {
@@ -76,14 +78,12 @@ test('an off-box viewer gets no toggle, start/stop or delete controls; on the bo
   assert.equal(off.root().querySelector('[data-act="delete"]'), null, 'no delete off-box');
   assert.equal(off.root().querySelector('[data-act="start"], [data-act="stop"]'), null, 'no start/stop off-box');
   assert.match(off.root().textContent, /read-only off-box/);
-  off.close();
   const on = boot({ status: { apps: APPS, viewer: 'loopback', machineRole: 'agent', lanIp: '10.0.0.5' } });
   await on.settle();
   on.root().querySelector('tr[data-act="open"]').click(); await on.settle();
   assert.ok(on.root().querySelector('[data-act="toggle"][role="switch"]'), 'toggle renders on the box');
   assert.ok(on.root().querySelector('[data-act="delete"]'), 'delete renders on the box');
   assert.ok(on.root().querySelector('[data-act="stop"]'), 'stop renders on the box for an up app');
-  on.close();
 });
 
 test('a silent SSE stream is closed and reopened after 60s without a heartbeat; a live one is left alone', async () => {
@@ -100,7 +100,6 @@ test('a silent SSE stream is closed and reopened after 60s without a heartbeat; 
   t.clock.tick(30000);                                  // now 75s since the last frame
   assert.equal(first.closed, true, 'silent for over 60s: closed');
   assert.equal(t.sources.length, 2, 'and reopened');
-  t.close();
 });
 
 test('keyboardControls promotes rows and chips to role=button, never the overlay or the dialog', async () => {
@@ -112,7 +111,6 @@ test('keyboardControls promotes rows and chips to role=button, never the overlay
   const overlay = t.root().querySelector('[data-act="overlay-modal"]');
   assert.ok(overlay); assert.equal(overlay.getAttribute('role'), null, 'backdrop is not a button'); assert.equal(overlay.hasAttribute('tabindex'), false);
   assert.equal(t.root().querySelector('[role="dialog"]').getAttribute('tabindex'), null);
-  t.close();
 });
 
 const ON = { apps: APPS, viewer: 'loopback', machineRole: 'agent', lanIp: '10.0.0.5' };
@@ -130,7 +128,6 @@ test('clicking stop, toggle and delete sends the matching request and the row fo
   assert.equal(t.root().querySelector('[data-act="toggle"]').getAttribute('aria-checked'), 'false', 'switch reflects disabled=true from the answer');
   t.root().querySelector('[data-act="delete"]').click(); await t.settle();
   assert.deepEqual(t.requests.at(-1), { method: 'DELETE', path: '/api/apps/alpha' });
-  t.close();
 });
 
 test('an SSE update frame re-renders the row; a removed frame drops it; an alert frame toasts', async () => {
@@ -143,7 +140,6 @@ test('an SSE update frame re-renders the row; a removed frame drops it; an alert
   assert.match(t.root().textContent, /Alpha went down/);
   es.onmessage({ data: JSON.stringify({ type: 'update', id: 'alpha', status: 'removed' }) });
   assert.equal(t.root().querySelector('tr[data-act="open"]'), null, 'row gone');
-  t.close();
 });
 
 test('the palette opens on Cmd+K, filters as you type, arrows move the active option and Enter opens the modal', async () => {
@@ -161,7 +157,6 @@ test('the palette opens on Cmd+K, filters as you type, arrows move the active op
   assert.equal(t.w.document.getElementById('cmdk-input'), null, 'palette closed');
   assert.equal(t.root().querySelector('[role="dialog"]').getAttribute('aria-label'), 'Beta', 'modal opened on the highlighted app');
   key(t.w, 'Escape'); assert.equal(t.root().querySelector('[role="dialog"]'), null, 'Escape closes the modal');
-  t.close();
 });
 
 test('modal tabs switch the active pane; a discovered peer renders a machine tab whose apps are read-only', async () => {
@@ -178,7 +173,6 @@ test('modal tabs switch the active pane; a discovered peer renders a machine tab
   assert.match(t.root().querySelector('tr[data-act="open"]').textContent, /Remote A/);
   t.root().querySelector('tr[data-act="open"]').click(); await t.settle();
   assert.equal(t.root().querySelector('[data-act="toggle"]'), null); assert.match(t.root().textContent, /read-only on a peer/);
-  t.close();
 });
 
 test('QR overlay, help dialog, copy buttons and the log tail of a down app', async () => {
@@ -198,7 +192,6 @@ test('QR overlay, help dialog, copy buttons and the log tail of a down app', asy
   assert.match(t.w.document.getElementById('logBody').textContent, /ready on 4000/, 'a down app opens with its log tail');
   t.root().querySelector('.copy-btn[data-act="copy"]').click(); await t.settle();
   assert.equal(copied.at(-1), 'http://alpha.localhost', 'first info row is the Caddy host');
-  t.close();
 });
 
 test('a failed stop, toggle or delete leaves the row as it was and says so; a cancelled confirm sends no DELETE', async () => {
@@ -216,7 +209,6 @@ test('a failed stop, toggle or delete leaves the row as it was and says so; a ca
   t.root().querySelector('[data-act="delete"]').click(); await t.settle(() => /Delete failed/.test(t.root().textContent));
   assert.deepEqual(t.requests.at(-1), { method: 'DELETE', path: '/api/apps/alpha' });
   assert.ok(t.root().querySelector('tr[data-act="open"]'), 'row still present after a failed delete');
-  t.close();
 });
 
 test('start posts, shows the startup phase from the 2s log poll, and gives up after 60s; a failed start says so', async () => {
@@ -239,13 +231,11 @@ test('start posts, shows the startup phase from the 2s log poll, and gives up af
   assert.ok(logPolls() >= 2, 'the poll fetched the log while starting');
   const before = logPolls(); t.clock.tick(10000); await t.settle();
   assert.equal(logPolls(), before, 'the log poll is cleared after the give-up');
-  t.close();
   const f = boot({ status: { ...ON, apps: [{ ...APPS[0], status: 'down' }] }, failMutations: true });
   await f.settle();
   f.root().querySelector('tr[data-act="open"]').click(); await f.settle();
   f.root().querySelector('[data-act="start"]').click(); await f.settle(() => /Start failed/.test(f.root().textContent));
   assert.equal(f.w.document.querySelector('.phase-chip'), null, 'no startup row after a failed start');
-  f.close();
 });
 
 test('on a hub the modal renders the profile panel, capability badges and the tab chip; the stored token is forwarded on control calls', async () => {
@@ -261,7 +251,6 @@ test('on a hub the modal renders the profile panel, capability badges and the ta
   t.root().querySelector('[data-act="tab"][data-tab="info"]').click(); await t.settle();
   t.root().querySelector('[data-act="stop"]').click(); await t.settle();
   assert.equal(t.sentHeaders.at(-1)['x-local-apps-token'], 'tok-123', 'stored token rides on control calls');
-  t.close();
   const plain = boot({ status: ON });
   await plain.settle();
   plain.root().querySelector('tr[data-act="open"]').click(); await plain.settle();
@@ -270,5 +259,4 @@ test('on a hub the modal renders the profile panel, capability badges and the ta
   assert.ok(!plain.gets.includes('/api/app-profiles'), 'an agent-role dashboard never asks for hub extras');
   plain.root().querySelector('[data-act="search"]').click(); await plain.settle();
   assert.ok(plain.w.document.getElementById('cmdk-input'), 'the header search icon opens the palette');
-  plain.close();
 });
