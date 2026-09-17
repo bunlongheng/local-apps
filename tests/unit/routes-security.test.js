@@ -69,6 +69,14 @@ test('HTTP layer: X-Forwarded-For from a loopback socket demotes the caller (the
   assert.equal(r.status, 200);
   const a = await r.json();
   assert.equal(a.localPath, undefined, 'proxied LAN viewer must not see paths');
+  // Every stripped key, on every viewer route: a leaked logPath or startCommand is a real disclosure.
+  const KEYS = app.OFFBOX_STRIP; assert.equal(KEYS.length, 13);
+  for (const k of KEYS) assert.equal(a[k], undefined, `/api/apps/:id leaks ${k} off-box`);
+  const list = await (await fetch(base + '/api/apps', { headers: { 'x-forwarded-for': '1.2.3.4' } })).json();
+  const st = await (await fetch(base + '/api/status', { headers: { 'x-forwarded-for': '1.2.3.4' } })).json();
+  for (const row of [list.find(x => x.id === 'zzz-prof'), st.apps.find(x => x.id === 'zzz-prof')]) for (const k of KEYS) assert.equal(row[k], undefined, `list/status leaks ${k} off-box`);
+  const onbox = await (await fetch(base + '/api/apps/zzz-prof')).json();
+  assert.equal(onbox.localPath, '/tmp/zzz-prof', 'loopback still sees everything');
   const w = await fetch(base + '/api/stop/zzz-prof', { method: 'POST', headers: { 'x-forwarded-for': '1.2.3.4' } });
   assert.equal(w.status, 401, 'proxied LAN mutation is denied');
 });
@@ -172,4 +180,17 @@ test('POST and PUT /api/apps refuse a localPath whose repo root holds a Chrome e
   const put = await fetch(base + '/api/apps/zzz-prof', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ localPath: ext }) });
   assert.equal(put.status, 400); assert.equal((await put.json()).error, CHROME_EXT_ERROR);
   assert.equal((await (await fetch(base + '/api/apps/zzz-prof')).json()).localPath, '/tmp/zzz-prof', 'row unchanged');
+});
+
+test('the global error handler answers 500 with a fixed message: no exception detail leaks', async () => {
+  const { mock } = require('node:test');
+  const db = require('../../db');
+  const m = mock.method(db, 'getApps', () => { throw new Error('secret detail'); });
+  const err = mock.method(console, 'error', () => {});
+  try {
+    const r = await fetch(base + '/api/status');
+    assert.equal(r.status, 500); assert.deepEqual(await r.json(), { error: 'Internal error' });
+    assert.equal(err.mock.callCount(), 1); assert.match(String(err.mock.calls[0].arguments[0]), /secret detail/, 'the detail goes to the server log only');
+  } finally { m.mock.restore(); err.mock.restore(); }
+  assert.equal((await fetch(base + '/api/status')).status, 200, 'the server is fine afterwards');
 });
