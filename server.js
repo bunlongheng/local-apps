@@ -1021,6 +1021,9 @@ app.get('/api/capabilities', (req, res) => {
 
   const localBinDir = path.join(os.homedir(), '.local', 'bin');
   const localBins = fs.existsSync(localBinDir) ? fs.readdirSync(localBinDir) : [];
+  // Read each ~/.local/bin script once per request, not once per app per request.
+  const localBinText = new Map();
+  for (const b of localBins) { try { localBinText.set(b, fs.readFileSync(path.join(localBinDir, b), 'utf8')); } catch (e) { dbg('capabilities', e); } }
 
   for (const a of apps) {
     const dir = a.localPath;
@@ -1069,10 +1072,8 @@ app.get('/api/capabilities', (req, res) => {
       if (fs.existsSync(path.join(dir, 'cli.js')) || fs.existsSync(path.join(dir, 'bin', 'cli.js'))) flags.cli = true;
       for (const b of localBins) {
         if (b === 'tabs' || b === 'tab') continue; // Skip tab manager (matches all apps)
-        try {
-          const content = fs.readFileSync(path.join(localBinDir, b), 'utf8');
-          if (content.includes(a.id) || content.includes(dir)) { flags.cli = true; flags.cliBin = b; break; }
-        } catch (e) { dbg('line1064', e); }
+        const content = localBinText.get(b) || '';
+        if (content.includes(a.id) || content.includes(dir)) { flags.cli = true; flags.cliBin = b; break; }
       }
     } catch (e) { dbg('line1066', e); }
 
