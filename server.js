@@ -11,6 +11,7 @@ const QRCode = require('qrcode');
 const db = require('./db');
 const { startCmd } = require('./launchctl-cmds');
 const { shouldTrip, rearmReason } = require('./lib/breaker');
+const { nextLevel, recordAttempt, l3Fixes } = require('./lib/escalation');
 const { isValidId, validateAppFields, xmlEscape } = require('./lib/validate');
 const { isChromeExtensionRepo, CHROME_EXT_ERROR } = require('./lib/chrome-ext');
 const makeCaddy = require('./lib/caddy');
@@ -321,7 +322,6 @@ async function checkAll() {
       const downSince = s.downSince || (s.downSince = Date.now());
       const downDuration = Date.now() - downSince;
       const attempts = s.restartAttempts || 0;
-      const lastRestart = s.lastRestart || 0;
       const port = appCfg.localUrl ? (() => { try { return new URL(appCfg.localUrl).port; } catch { return null; } })() : null;
 
       // Level 5: Circuit breaker. The chain is churning - stop trying and land the app
@@ -343,68 +343,51 @@ async function checkAll() {
         continue;
       }
 
-      // Level 1: Quick kickstart (first attempt, or 60s since last try)
-      // kickstart fails if the service was booted out (LaunchAgent purge) - bootstrap the plist as fallback
-      if (attempts === 0 || (attempts === 1 && Date.now() - lastRestart > 60000)) {
-        // Count the attempt before it runs: a failing launchctl used to skip this, so a
-        // broken plist retried this level forever instead of escalating to the next.
-        s.lastRestart = Date.now();
-        s.restartAttempts = (s.restartAttempts || 0) + 1;
+      // Which level fires is decided by lib/escalation.js (pure, unit-tested); this loop
+      // only executes it. Every level records the attempt before running its command.
+      const level = nextLevel(s, Date.now());
+      if (level === 1) {
+        recordAttempt(s, Date.now());
         try {
           await execAsync(startCmd(uid, label, plistPath), { timeout: 15000 });
           console.log(`  [L1] kickstart: ${appCfg.id}`);
         } catch {}
       }
-
-      // Level 2: Kill port + full reload (90s+ down, attempt 2)
-      else if (attempts <= 2 && downDuration > 90000 && Date.now() - lastRestart > 60000) {
-        // Count the attempt before it runs: a failing launchctl used to skip this, so a
-        // broken plist retried this level forever instead of escalating to the next.
-        s.lastRestart = Date.now();
-        s.restartAttempts = (s.restartAttempts || 0) + 1;
+      else if (level === 2) {
+        recordAttempt(s, Date.now());
         try {
           if (port) await execAsync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
           await execAsync(`launchctl bootout gui/${uid}/${label} 2>/dev/null; sleep 1; launchctl bootstrap gui/${uid} "${plistPath}" 2>/dev/null`, { timeout: 15000 });
           console.log(`  [L2] port-kill + reload: ${appCfg.id}`);
         } catch {}
       }
-
-      // Level 3: Common fixes - npm install, clear .next cache (180s+ down)
-      else if (attempts <= 3 && downDuration > 180000 && Date.now() - lastRestart > 60000) {
-        // Count the attempt before it runs: a failing launchctl used to skip this, so a
-        // broken plist retried this level forever instead of escalating to the next.
-        s.lastRestart = Date.now();
-        s.restartAttempts = (s.restartAttempts || 0) + 1;
+      else if (level === 3) {
+        recordAttempt(s, Date.now());
         try {
           const dir = appCfg.localPath;
           if (dir && fs.existsSync(dir)) {
-            // Check logs for common errors
             const logPath = appCfg.logPath || `/tmp/${appCfg.id}.log`;
             let logTail = '';
             try { logTail = (await execAsync(`tail -30 "${logPath}" 2>/dev/null`, { timeout: 5000 })).stdout; } catch {}
-            // Module not found -> npm install
-            if (logTail.includes('Cannot find module') || logTail.includes('MODULE_NOT_FOUND')) {
+            const fixes = l3Fixes(logTail);
+            if (fixes.npmInstall) {
               console.log(`  [L3] npm install: ${appCfg.id}`);
               // --ignore-scripts: a registered app dir is attacker-influencable, so never
               // run its package lifecycle scripts (preinstall/postinstall) during auto-heal.
               try { await execAsync(`cd "${dir}" && npm install --ignore-scripts 2>/dev/null`, { timeout: 60000 }); } catch (e) { console.warn(`  [L3] npm install failed: ${appCfg.id}: ${e.message}`); }
             }
-            // Build cache corrupt -> clear .next
-            if (logTail.includes('.next') || logTail.includes('ENOENT') || logTail.includes('Build error')) {
+            if (fixes.clearNext) {
               console.log(`  [L3] clear .next cache: ${appCfg.id}`);
               try { await execAsync(`rm -rf "${dir}/.next" 2>/dev/null`, { timeout: 5000 }); } catch {}
             }
-            // Port still stuck
             if (port) await execAsync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
           }
-          // Restart after fixes
           await execAsync(startCmd(uid, label, plistPath), { timeout: 15000 });
           console.log(`  [L3] fix + restart: ${appCfg.id}`);
         } catch {}
       }
-
-      // Level 4: Deploy Claude Code agent to debug (300s+ down, last resort)
-      else if (attempts <= 4 && downDuration > 300000 && Date.now() - lastRestart > 120000) {
+      // Level 4: hand the failure to the local agent (last resort, opt-in)
+      else if (level === 4) {
         const dir = appCfg.localPath;
         const logPath = appCfg.logPath || `/tmp/${appCfg.id}.log`;
         if (dir && fs.existsSync(dir)) {
