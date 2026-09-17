@@ -220,21 +220,18 @@ function setupInfra(id, data) {
   return result;
 }
 
-function teardownInfra(id) {
+async function teardownInfra(app) {
+  // Takes the record, not the id: DELETE calls this before the row is gone, so the port is known.
+  const id = typeof app === 'string' ? app : app.id;
+  try {
+    const port = app && app.localUrl ? new URL(app.localUrl).port : null;
+    if (port) await killPort(port);
+  } catch (e) { dbg('teardown/killPort', e); }
   if (!CAN_PROVISION) return;
+  if (app && app.launchAgent) { try { await execAsync(`launchctl bootout gui/${process.getuid()}/${app.launchAgent} 2>/dev/null`, { timeout: 10000 }); } catch (e) { dbg('teardown/bootout', e); } }
   removeCaddyEntry(id);
   removeLaunchAgent(id);
-
-  // Kill any running process
-  try {
-    const app = db.getApp ? db.getApp(id) : null;
-    if (app && app.localUrl) {
-      const port = new URL(app.localUrl).port;
-      if (port) killPort(port);
-    }
-  } catch (e) { dbg('line199', e); }
-
-  console.log(`  ✅ full cleanup: ${id}`);
+  console.log(`  cleanup: ${id}`);
 }
 
 function getLanIp() {
