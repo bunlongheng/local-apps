@@ -5,7 +5,11 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { Response } = globalThis;   // the fetch Response class Node ships; named so eslint's node env sees it
+const { Response } = globalThis;
+const SW = path.join(__dirname, '..', '..', 'public', 'sw.js');
+const SRC = fs.readFileSync(SW, 'utf8');
+// A vm.Script with the real filename so V8 attributes sw.js to its file and it counts toward the gate.
+const runSw = (ctx) => new vm.Script(SRC, { filename: SW }).runInNewContext(ctx);   // the fetch Response class Node ships; named so eslint's node env sees it
 
 function boot({ online = true, cached = null } = {}) {
   const listeners = {}, puts = [];
@@ -13,7 +17,7 @@ function boot({ online = true, cached = null } = {}) {
   const caches = { open: async () => ({ put: async (req) => puts.push(req.url) }), match: async () => cached, keys: async () => ['app-cache-v1', 'app-cache-v3'], delete: async () => true };
   const fetch = async () => { if (!online) throw new Error('offline'); return new Response('page', { status: 200 }); };
   const ctx = { self, caches, fetch, Response, URL, Promise, console };
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'sw.js'), 'utf8'), ctx);
+  runSw(ctx);
   const dispatch = (method, url) => {
     let answered = null;
     listeners.fetch({ request: { method, url }, respondWith: (p) => { answered = p; } });
@@ -48,7 +52,7 @@ test('activate drops every cache but the current one', async () => {
   const t = boot(); const deleted = [];
   const caches = { keys: async () => ['app-cache-v1', 'app-cache-v3'], delete: async (k) => deleted.push(k) };
   const self2 = { addEventListener: (n, fn) => { t.listeners[n] = fn; }, skipWaiting: () => {}, clients: { claim: () => {} }, location: { origin: 'x' } };
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'sw.js'), 'utf8'), { self: self2, caches, fetch: async () => {}, Response, URL, Promise, console });
+  runSw({ self: self2, caches, fetch: async () => {}, Response, URL, Promise, console });
   let done; t.listeners.activate({ waitUntil: (p) => { done = p; } }); await done;
   assert.deepEqual(deleted, ['app-cache-v1']);
 });
