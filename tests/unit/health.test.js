@@ -17,3 +17,13 @@ test('tcpCheck is true for 2xx, false for 5xx, refused and timeout; checkSingle 
   assert.deepEqual(events.at(-1), { type: 'update', id: 'a', status: 'up' });
   srv.closeAllConnections?.(); srv.close();
 });
+
+test('tcpCheck probes with HEAD and falls back to GET only on 405/501', async () => {
+  const seen = [];
+  const srv = http.createServer((q, r) => { seen.push(q.method); if (q.method === 'HEAD') { r.statusCode = 405; return r.end(); } r.end('ok'); });
+  await new Promise(r => srv.listen(0, '127.0.0.1', r));
+  const h = makeHealth({ broadcast: () => {} });
+  assert.equal(await h.tcpCheck(`http://127.0.0.1:${srv.address().port}/`), true);
+  assert.deepEqual(seen, ['HEAD', 'GET']);
+  srv.closeAllConnections?.(); srv.close();
+});
