@@ -254,8 +254,13 @@ setInterval(() => { LAN_IP = getLanIp(); }, 60000).unref();
 
 // --- Tailscale IP detection (cached; refreshed on an interval, not per request) ---
 function getTailscaleIp() {
-  try { return execSync('/usr/local/bin/tailscale ip -4 2>/dev/null', { timeout: 5000 }).toString().trim(); }
-  catch { return null; }
+  // Tailscale ships as a Homebrew formula, a Mac App Store app, or the standalone package; look
+  // in PATH first, then the 3 known locations.
+  const bins = ['tailscale', '/opt/homebrew/bin/tailscale', '/usr/local/bin/tailscale', '/Applications/Tailscale.app/Contents/MacOS/Tailscale'];
+  for (const b of bins) {
+    try { const ip = execSync(`${b} ip -4 2>/dev/null`, { timeout: 5000 }).toString().trim(); if (ip) return ip; } catch (e) { dbg('tailscale', e); }
+  }
+  return null;
 }
 let TAILSCALE_IP = getTailscaleIp();
 // Refresh out-of-band so the hot /api/status path never shells out (execSync would
