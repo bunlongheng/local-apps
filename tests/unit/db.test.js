@@ -97,3 +97,8 @@ test('machines and remote apps: upsert, list, delete', () => {
   db.deleteRemoteApps('peer-t'); db.deleteMachine('peer-t');
   assert.equal(db.getRemoteApps('peer-t').length, 0); assert.ok(!db.getMachines().some(m => m.id === 'peer-t'));
 });
+
+test('upsertApp keeps prodUrl2, tabColor and tabIcon on create', () => {
+  const a = db.upsertApp({ id: 'zzz-extra', localPath: '/tmp/zzz', prodUrl2: 'https://x.example', tabColor: '#123456', tabIcon: 'X' });
+  assert.equal(a.prodUrl2, 'https://x.example'); assert.equal(a.tabColor, '#123456'); assert.equal(a.tabIcon, 'X');
+});
