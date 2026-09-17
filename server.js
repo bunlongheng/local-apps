@@ -88,9 +88,6 @@ app.use(jsonBody());
 // may still VIEW non-sensitive status (without paths), but every action and sensitive read is denied. Historically:
 // open (unchanged default), so this never breaks an existing single-machine setup; set
 // it to lock the LAN/tailnet surface. Sensitive GETs = any log reader (/api/log/*, /api/*/log).
-// NOTE: enabling the token currently requires the caller to send the header; wiring the
-// dashboard fetches to forward it from localStorage is a tracked follow-up, so today the
-// gate is meant for API/CLI clients.
 // Trust-loopback auth policy lives in lib/auth-gate.js (pure + unit-tested). See it for the rule.
 const { decide: authDecide, isLoopback, effectiveAddress } = require('./lib/auth-gate');
 // Off-box viewers (the LAN/tailnet dashboard) get status without filesystem paths or launchd internals.

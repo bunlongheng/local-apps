@@ -56,6 +56,20 @@ One Node 22 process on `node:http`, no framework, no build step. `server.js` ser
 
 On the `hub` role only, 5 routes serve the owner's own workflow rather than the product: `/api/tab-colors`, `/api/consistency`, `/api/app-profiles`, `/api/icon-sync`, `/api/capabilities`. They read optional local files and repos; on an `agent` machine they are not registered.
 
+## API
+
+The dashboard talks to these same-origin routes; peers read `/api/status` server-side. Off-box callers may read status but every mutation needs `x-local-apps-token`.
+
+| Route | What |
+|-------|------|
+| `GET /api/status`, `GET /api/apps`, `GET /api/apps/:id` | registry with live status (paths stripped off-box) |
+| `POST /api/apps`, `PUT /api/apps/:id`, `DELETE /api/apps/:id` | register, edit, remove (removal kills the process and unloads the agent) |
+| `POST /api/start/:id`, `POST /api/stop/:id`, `POST /api/apps/:id/toggle`, `POST /api/apps/bulk-toggle` | lifecycle |
+| `GET /api/log/:id` | last 30 lines of the app log |
+| `GET /api/events` | SSE: `update`, `alert`, `reload` |
+| `GET /api/machines`, `GET /api/machine`, `GET /api/machines/:id/apps`, `GET /api/machines/:id/status` | peers |
+| `GET /api/qr`, `GET /api/manifest`, `GET /api/favicons` | dashboard support |
+
 ## Configuration
 
 Self-healing is opt-in. Copy `data/auto-restart.example.json` to `data/auto-restart.json` (`{"enabled": true}`) to turn the L1-L5 chain on; add `"agent": true` to allow L4 to hand a failure to a local Claude Code CLI. Without the file the hub only monitors.
