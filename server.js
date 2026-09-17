@@ -19,6 +19,7 @@ const makeCaddy = require('./lib/caddy');
 const makeLaunchd = require('./lib/launchd');
 const makeHealth = require('./lib/health');
 const makeInfra = require('./lib/infra');
+const makeMonitor = require('./lib/monitor');
 const { fetchJson, sweepSubnet, peerRecord, appRecord } = require('./lib/peers');
 
 const app = createApp();
@@ -225,81 +226,14 @@ function broadcast(data) {
 const { getState, clearState, tcpCheck, processCheck, checkSingle } = makeHealth({ broadcast });
 
 // --- Health check loop ---
-let checkAllRunning = false;
-async function checkAll() {
-  // Re-entrancy guard: a slow tick (serial tcp checks + auto-restart execSync) can
-  // outlast the 30s interval; overlapping runs would stack restart attempts and block
-  // the event loop further. Skip a tick if the previous one is still in flight.
-  if (checkAllRunning) return;
-  checkAllRunning = true;
-  try {
-  const apps = db.getApps();
-  // Probe every app concurrently. The checks are independent reads with no shared state,
-  // and serially they cost ~555ms across 64 apps when the down ones refuse instantly -
-  // but a *hung* app burns the full 3s timeout, so ~10 of those used to push a tick past
-  // its own 30s interval. The escalation loop below stays sequential on purpose: it shells
-  // out, and 65 concurrent `npm install`s would be worse than a slow tick.
-  const probes = await Promise.all(apps.map((appCfg) => {
-    if (appCfg.healthUrl) return tcpCheck(appCfg.healthUrl);
-    if (appCfg.processCheck) return processCheck(appCfg.processCheck);
-    return false;
-  }));
-
-  // Read once per tick, not once per app: 2 booleans that cannot change mid-tick.
-  const autoRestartCfg = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'auto-restart.json'), 'utf8')); } catch { return {}; } })();
-  const autoRestartEnabled = !!autoRestartCfg.enabled;
-  const autoRestartAgent = autoRestartCfg.agent === true;
-  for (const [index, appCfg] of apps.entries()) {
-    const s = getState(appCfg.id);
-    s.lastChecked = new Date().toISOString();
-    const now = Date.now();
-    // === Auto-restart escalation chain ===
-    // Level 1 (30s):  detect down, kickstart via launchctl
-    // Level 2 (90s):  still down? kill port, bootout+bootstrap fresh
-    // Level 3 (180s): still down? read logs, try common fixes (npm install, port kill)
-    // Level 4 (300s): still down? hand to the local agent (opt-in)
-    // Level 5: breaker trips on 3 flaps in 2 min or a chain exhausted and still down; a
-    // breaker OFF re-arms when observed up or after the cooldown.
-    // Which of these fires is decided by lib/tick.js (pure, unit-tested); this loop only executes it.
-    const d = decide({ s, app: appCfg, up: probes[index], now, hub: IS_HUB, autoRestart: autoRestartEnabled });
-    if (d.changed) {
-      broadcast({ type: 'update', id: appCfg.id, status: d.status });
-      if (d.status === 'down') broadcast({ type: 'alert', id: appCfg.id, name: appCfg.name });
-    }
-    if (d.rearm) {
-      db.setAppDisabled(appCfg.id, false);
-      appCfg.disabled = false;
-      console.log(`  [L5] re-armed ${appCfg.id} (${d.rearm})`);
-      broadcast({ type: 'update', id: appCfg.id, status: d.status, disabled: false });
-    }
-    if (d.recovered && d.recovered.attempts > 0) console.log(`  ✓ recovered: ${appCfg.id} (after ${d.recovered.attempts} attempts, ${Math.round(d.recovered.downMs / 1000)}s)`);
-    if (!d.trip && !d.level) continue;
-
-    const uid = process.getuid();
-    const label = appCfg.launchAgent;
-    const plistPath = appCfg.launchAgentPath;
-    const port = appCfg.localUrl ? (() => { try { return new URL(appCfg.localUrl).port; } catch { return null; } })() : null;
-    if (d.trip) {
-      try {
-        if (port) await killPort(port);
-        if (label) await execAsync(bootoutCmd(uid, label), { timeout: 10000 });
-      } catch (e) { dbg('checkAll', e); }
-      db.setAppDisabled(appCfg.id, true, 'breaker');
-      appCfg.disabled = true;
-      console.log(`  [L5] circuit breaker -> disabled ${appCfg.id} (${d.trip.flaps} flaps, ${d.trip.attempts} attempts)`);
-      broadcast({ type: 'update', id: appCfg.id, status: 'down', disabled: true });
-      broadcast({ type: 'alert', id: appCfg.id, name: appCfg.name, disabled: true });
-      continue;
-    }
-    // Every level records the attempt before running its command.
-    recordAttempt(s, now);
-    try {
-      await runLevel(d.level, { id: appCfg.id, uid, label, plistPath, port, dir: appCfg.localPath, logPath: appCfg.logPath || path.join(LOG_DIR, `${appCfg.id}.log`), downMs: now - s.downSince },
-        { exec: execAsync, killPort, exists: fs.existsSync, log: console.log, warn: console.warn, startCmd, bootoutCmd, spawn, agent: autoRestartAgent, openLog: (p) => fs.openSync(p, 'a') });
-    } catch (e) { dbg(`L${d.level}`, e); }
-  }
-  } finally { checkAllRunning = false; }
-}
+// The 30s tick lives in lib/monitor.js (tested with every side effect faked); this is the wiring.
+const { checkAll } = makeMonitor({
+  getApps: () => db.getApps(), setAppDisabled: (id, v, why) => db.setAppDisabled(id, v, why),
+  probe: (a) => a.healthUrl ? tcpCheck(a.healthUrl) : a.processCheck ? processCheck(a.processCheck) : Promise.resolve(false),
+  getState, decide, runLevel, recordAttempt,
+  readAutoRestart: () => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'auto-restart.json'), 'utf8')); } catch { return {}; } },
+  hub: IS_HUB, uid: process.getuid(), logDir: LOG_DIR, killPort, exec: execAsync, bootoutCmd, startCmd, spawn,
+  openLog: (p) => fs.openSync(p, 'a'), exists: fs.existsSync, broadcast, log: console.log, warn: console.warn, dbg, now: Date.now });
 
 // Validate app id: lowercase alphanumeric, hyphens only, 1-64 chars
 // isValidId, isSafePath, isSafeCommand, validateAppFields, xmlEscape -> lib/validate.js
