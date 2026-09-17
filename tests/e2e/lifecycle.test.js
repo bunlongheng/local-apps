@@ -10,8 +10,16 @@ const ID = 'zzz-e2e-lifecycle';
 // Mutating: opt in explicitly so `npm run test:e2e` against the live hub never provisions anything.
 const MUTATE = process.env.E2E_MUTATE === '1';
 const opts = { skip: MUTATE ? false : 'set E2E_MUTATE=1 against a scratch instance' };
-// Status caddy answers for the app's hostname on :80; null when nothing listens.
-async function viaCaddy() { try { return (await fetch('http://127.0.0.1:80/', { headers: { host: `${ID}.localhost` }, redirect: 'manual', signal: AbortSignal.timeout(3000) })).status; } catch { return null; } }
+// What caddy answers for the app's hostname on :80: 'offline' when the block is live (the upstream
+// port is dead, so handle_errors serves public/offline.html), 'proxied' for anything else the block
+// returns, 'none' when nothing serves that host.
+async function viaCaddy() {
+  try {
+    const r = await fetch('http://127.0.0.1:80/', { headers: { host: `${ID}.localhost` }, redirect: 'manual', signal: AbortSignal.timeout(3000) });
+    const body = await r.text();
+    return r.status === 502 || body.includes('<title>App is off</title>') ? 'offline' : 'proxied';
+  } catch { return 'none'; }
+}
 function freePort() { return new Promise((r) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); }); }
 
 before(async () => { if (!await serverUp()) throw new Error('local-apps server not reachable - start it first'); if (MUTATE) await api('DELETE', `/api/apps/${ID}`); });
@@ -34,7 +42,7 @@ test('POST -> GET -> PUT -> DELETE round-trips an app', opts, async () => {
     if (process.env.CADDYFILE) assert.ok(fs.readFileSync(process.env.CADDYFILE, 'utf8').includes(`${ID}.localhost`), 'block present in the Caddyfile');
     if (process.env.LAUNCH_AGENTS_DIR) assert.ok(fs.existsSync(got.json.launchAgentPath) && got.json.launchAgentPath.startsWith(process.env.LAUNCH_AGENTS_DIR), 'plist present in the scratch dir');
     // With a live caddy the reload must have taken: the host proxies (to a dead port, so 502), not 404.
-    if (process.env.CADDY_LIVE === '1') assert.equal(await viaCaddy(), 502, 'caddy serves the new block');
+    if (process.env.CADDY_LIVE === '1') assert.equal(await viaCaddy(), 'offline', 'caddy serves the new block and its offline page');
   }
 
   const status = await api('GET', '/api/status');
@@ -47,7 +55,7 @@ test('POST -> GET -> PUT -> DELETE round-trips an app', opts, async () => {
   assert.equal(del.status, 200);
   if (process.platform === 'darwin' && process.env.CADDYFILE) assert.ok(!fs.readFileSync(process.env.CADDYFILE, 'utf8').includes(`${ID}.localhost`), 'block removed');
   if (process.platform === 'darwin' && got.json.launchAgentPath) assert.ok(!fs.existsSync(got.json.launchAgentPath), 'plist removed');
-  if (process.platform === 'darwin' && process.env.CADDY_LIVE === '1') assert.notEqual(await viaCaddy(), 502, 'caddy dropped the block');
+  if (process.platform === 'darwin' && process.env.CADDY_LIVE === '1') assert.notEqual(await viaCaddy(), 'offline', 'caddy dropped the block');
   assert.equal((await api('GET', `/api/apps/${ID}`)).status, 404);
 });
 
