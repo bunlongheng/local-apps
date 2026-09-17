@@ -1,6 +1,8 @@
 // Unit: lib/tab-colors.js against a temp home - the id key wins, the caddy host is the fallback,
 // labels are uppercased, and a missing registry is a no-op.
-const { test } = require('node:test');
+const { test, after } = require('node:test');
+const TMP_DIRS = [];
+after(() => { for (const d of TMP_DIRS) fs.rmSync(d, { recursive: true, force: true }); });
 const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -8,7 +10,7 @@ const path = require('node:path');
 const makeTabColors = require('../../lib/tab-colors');
 
 function home(registry) {
-  const h = fs.mkdtempSync(path.join(os.tmpdir(), 'tabs-'));
+  const h = TMP_DIRS[TMP_DIRS.push(fs.mkdtempSync(path.join(os.tmpdir(), 'tabs-'))) - 1];
   if (registry) { fs.mkdirSync(path.join(h, '.claude')); fs.writeFileSync(path.join(h, '.claude', 'tab-colors.json'), JSON.stringify(registry)); }
   return h;
 }
