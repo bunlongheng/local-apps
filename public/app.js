@@ -394,7 +394,7 @@
     if (port) {
       var host = app.caddyUrl ? stripProto(app.caddyUrl) : app.id + ".localhost";
       var extra = "";
-      if (app.launchAgent) {
+      if (app.launchAgent && !S.activeMachine && S.viewer !== "offbox") {   // off-box the gate refuses these; do not draw them
         extra = isDown
           ? '<button class="mini-btn start" data-act="start" data-id="' + esc(app.id) + '"' + (isStarting ? " disabled" : "") + '>' + (isStarting ? '<span class="spin-dot"></span> Starting' : "Start") + "</button>"
           : '<button class="mini-btn stop" data-act="stop" data-id="' + esc(app.id) + '">Stop</button>';
