@@ -106,7 +106,7 @@ module.exports = function register(app, ctx) {
       db.setAppDisabled(a.id, shouldDisable);
       // Stop newly disabled apps
       if (shouldDisable && !wasDisabled && a.launchAgent) {
-        jobs.push(execAsync(bootoutCmd(uid, a.launchAgent), { timeout: 10000 }).catch(() => {}));
+        jobs.push(execAsync(bootoutCmd(uid, a.launchAgent), { timeout: 10000 }).catch((e) => dbg('bulk-toggle/bootout', e)));
         const s = getState(a.id);
         s.status = 'down';
         s.downSince = null;
@@ -115,7 +115,7 @@ module.exports = function register(app, ctx) {
       }
       // Start newly enabled apps
       if (!shouldDisable && wasDisabled && a.launchAgent) {
-        jobs.push(execAsync(startCmd(uid, a.launchAgent, a.launchAgentPath), { timeout: 15000 }).catch(() => {}));
+        jobs.push(execAsync(startCmd(uid, a.launchAgent, a.launchAgentPath), { timeout: 15000 }).catch((e) => dbg('bulk-toggle/start', e)));
       }
       results.push({ id: a.id, disabled: shouldDisable });
     }
