@@ -214,10 +214,13 @@
 
   // ---- actions ----------------------------------------------------------
   var modalInvoker = null;   // the element that opened the dialog, focused again on close
+  // Attribute values go back into a selector string; ids are validated server-side but the
+  // selector must still be safe for any value.
+  function cssEsc(v) { v = String(v); return (window.CSS && window.CSS.escape) ? window.CSS.escape(v) : v.replace(/["\\\]]/g, "\\$&"); }
   function openModal(id) {
     var app = S.apps.filter(function (a) { return a.id === id; })[0]; if (!app) return;
     // Remember the opener by its data attributes: render() replaces the node, so the element itself dies.
-    var inv = document.activeElement; modalInvoker = inv && inv.getAttribute ? '[data-act="' + (inv.getAttribute('data-act') || '') + '"]' + (inv.getAttribute('data-id') ? '[data-id="' + inv.getAttribute('data-id') + '"]' : '') : null;
+    var inv = document.activeElement; modalInvoker = inv && inv.getAttribute ? '[data-act="' + cssEsc(inv.getAttribute('data-act') || '') + '"]' + (inv.getAttribute('data-id') ? '[data-id="' + cssEsc(inv.getAttribute('data-id')) + '"]' : '') : null;
     S.modalApp = app; S.modalTab = "info"; S.logLines = [];
     render();
     if (app.status === "down" && app.logPath) loadLog(id);
@@ -516,7 +519,7 @@
     if (modalId && modalId !== lastModalId) { var close = root.querySelector(".modal .modal-close"); if (close) close.focus(); }
     else if (focusKey && focusKey.replace(/\|/g, "")) {
       var parts = focusKey.split("|"), keys = ["data-act", "data-id", "data-tab", "data-machine", "data-copy"], sel = "";
-      for (var q = 0; q < keys.length; q++) if (parts[q]) sel += "[" + keys[q] + '="' + parts[q].replace(/"/g, "") + '"]';
+      for (var q = 0; q < keys.length; q++) if (parts[q]) sel += "[" + keys[q] + '="' + cssEsc(parts[q]) + '"]';
       var again = sel && root.querySelector(sel); if (again) again.focus();
     }
     lastModalId = modalId;
@@ -561,7 +564,7 @@
     if (!cmdk.matches.length) return '<div class="cmdk-empty">No apps match "' + esc(cmdk.q) + '"</div>';
     return cmdk.matches.map(function (a, idx) {
       var c = avatarColor(a.id), active = idx === cmdk.i;
-      return '<div class="cmdk-item' + (active ? " active" : "") + '" role="option" aria-selected="' + (active ? "true" : "false") + '" data-cmdk-i="' + idx + '"' +
+      return '<div class="cmdk-item' + (active ? " active" : "") + '" id="cmdk-opt-' + idx + '" role="option" aria-selected="' + (active ? "true" : "false") + '" data-cmdk-i="' + idx + '"' +
         (active ? ' style="background:' + c[0] + '26"' : "") + '>' +
         appIcon(a.id, a.name, a.icon, 40) +
         '<div class="cmdk-meta"><div class="cmdk-name">' + esc(a.name || a.id) + '</div><div class="cmdk-slug">/' + esc(a.id) + "</div></div>" +
@@ -571,6 +574,8 @@
   function renderCmdkResults() {
     var r = document.getElementById("cmdk-results");
     if (r) { r.innerHTML = cmdkResultsHTML(); fixIconImgs(r); }
+    var inp = document.getElementById("cmdk-input");
+    if (inp) { if (cmdk.matches.length) inp.setAttribute("aria-activedescendant", "cmdk-opt-" + cmdk.i); else inp.removeAttribute("aria-activedescendant"); }
   }
   function openCmdK() {
     if (cmdk.open) return;
