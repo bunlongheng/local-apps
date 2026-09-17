@@ -88,10 +88,11 @@ app.use(jsonBody());
 // dashboard fetches to forward it from localStorage is a tracked follow-up, so today the
 // gate is meant for API/CLI clients.
 // Trust-loopback auth policy lives in lib/auth-gate.js (pure + unit-tested). See it for the rule.
-const { decide: authDecide, isLoopback } = require('./lib/auth-gate');
+const { decide: authDecide, isLoopback, effectiveAddress } = require('./lib/auth-gate');
 // Off-box viewers (the LAN/tailnet dashboard) get status without filesystem paths or launchd internals.
 const OFFBOX_STRIP = ['localPath', 'logPath', 'launchAgentPath', 'launchAgent', 'startCommand', 'processCheck'];
-const forViewer = (req, a) => { if (isLoopback(req.socket.remoteAddress || '')) return a; const o = { ...a }; for (const k of OFFBOX_STRIP) delete o[k]; return o; };
+const clientAddress = (req) => effectiveAddress(req.socket.remoteAddress || '', req.get('x-forwarded-for'));
+const forViewer = (req, a) => { if (isLoopback(clientAddress(req))) return a; const o = { ...a }; for (const k of OFFBOX_STRIP) delete o[k]; return o; };
 const AUTH_TOKEN = process.env.LOCAL_APPS_TOKEN || '';
 app.use((req, res, next) => {
   const d = authDecide({
@@ -102,6 +103,7 @@ app.use((req, res, next) => {
     configuredToken: AUTH_TOKEN,
     host: req.headers.host,
     origin: req.get('origin'),
+    forwardedFor: req.get('x-forwarded-for'),
     allowedHosts: [LAN_IP, TAILSCALE_IP, os.hostname(), `${os.hostname()}.local`],
   });
   if (d.allow) return next();
