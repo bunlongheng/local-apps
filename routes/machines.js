@@ -3,12 +3,12 @@
 // from ctx, so this file has no module-level state beyond what it declares itself.
 const os = require('os');
 
-const REQUIRED = ['db', 'dbg', 'fetchJson', 'sweepSubnet', 'peerRecord', 'IS_HUB', 'IS_MAIN', 'MACHINE_ROLE', 'PORT'];
+const REQUIRED = ['appRecord', 'db', 'dbg', 'fetchJson', 'sweepSubnet', 'peerRecord', 'IS_HUB', 'IS_MAIN', 'MACHINE_ROLE', 'PORT'];
 
 module.exports = function register(app, ctx) {
   // Fail at boot, not at request time, when server.js forgets to pass a dependency.
   for (const k of REQUIRED) if (!(k in ctx)) throw new Error(`routes/machines.js: ctx is missing ${k}`);
-  const { db, dbg, fetchJson, sweepSubnet, peerRecord, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT } = ctx;
+  const { appRecord, db, dbg, fetchJson, sweepSubnet, peerRecord, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT } = ctx;
 
   // --- Machines (peers) — auto-discovery ---
   let discoveredPeers = []; // live peers found on network
@@ -87,7 +87,8 @@ module.exports = function register(app, ctx) {
       const hostname = data.apps?.[0]?.hostname || m.hostname;
       const model = data.machineModel || m.model;
       db.upsertMachine({ id: m.id, hostname, ip: m.ip, port: m.port, model });
-      res.json(data);
+      // Only sanitised app records leave this hub; the peer's raw document is never proxied.
+      res.json({ apps: (data.apps || []).map(appRecord).filter(Boolean), machineModel: String(data.machineModel || '').slice(0, 40), lanIp: String(data.lanIp || '').slice(0, 45) });
     } catch (err) {
       res.status(502).json({ error: `unreachable: ${err.message}` });
     }

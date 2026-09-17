@@ -228,7 +228,9 @@ function upsertRemoteApp(machineId, app) {
   });
 }
 
+const { appRecord } = require('./lib/peers');
 function syncRemoteApps(machineId, apps) {
+  apps = apps.map(appRecord).filter(Boolean);   // never store a peer's record verbatim
   const tx = db.transaction((machineId, apps) => {
     // Remove old apps from this machine
     db.prepare('DELETE FROM remote_apps WHERE machine_id = ?').run(machineId);
