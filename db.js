@@ -85,8 +85,8 @@ for (const [col, type] of profileColumns) {
 
 // Migrate data from app-profiles.json into the new columns
 const PROFILES_FILE = path.join(__dirname, 'data', 'app-profiles.json');
-if (fs.existsSync(PROFILES_FILE)) {
-  const profiles = JSON.parse(fs.readFileSync(PROFILES_FILE, 'utf8'));
+const profiles = fs.existsSync(PROFILES_FILE) ? readJsonOrNull(PROFILES_FILE) : null;
+if (profiles) {
   const updateProfile = db.prepare(`
     UPDATE apps SET
       about = @about,
@@ -120,8 +120,13 @@ if (fs.existsSync(PROFILES_FILE)) {
 // terminal-only tabs (jira, slack, ssh sessions) that are not monitored apps, and
 // auto-creating them bloated the dashboard. Curated apps live in apps.config.json.
 const TAB_COLORS_FILE = path.join(os.homedir(), '.claude', 'tab-colors.json');
-if (fs.existsSync(TAB_COLORS_FILE)) {
-  const tabColors = JSON.parse(fs.readFileSync(TAB_COLORS_FILE, 'utf8'));
+// Both side files are optional inputs: a malformed one must be skipped, never a boot
+// crash loop under launchd KeepAlive.
+function readJsonOrNull(file) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { console.warn(`  db: skipping ${path.basename(file)} (${e.message})`); return null; }
+}
+const tabColors = fs.existsSync(TAB_COLORS_FILE) ? readJsonOrNull(TAB_COLORS_FILE) : null;
+if (tabColors) {
   const updateTabColor = db.prepare(`
     UPDATE apps SET tab_color = @color, tab_icon = @icon, updated_at = datetime('now')
     WHERE id = @id AND tab_color IS NULL
