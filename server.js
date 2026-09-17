@@ -301,7 +301,9 @@ async function checkAll() {
     // Level 2 (90s):  still down? kill port, bootout+bootstrap fresh
     // Level 3 (180s): still down? read logs, try common fixes (npm install, port kill)
     // Level 4 (300s): still down? deploy Claude Code agent to debug and fix
-    const autoRestartEnabled = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'auto-restart.json'), 'utf8')).enabled; } catch { return false; } })();
+    const autoRestartCfg = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'auto-restart.json'), 'utf8')); } catch { return {}; } })();
+    const autoRestartEnabled = !!autoRestartCfg.enabled;
+    const autoRestartAgent = autoRestartCfg.agent === true;
     // Level 5 recovery: a breaker OFF (never a user OFF) re-arms when the port is
     // observed up or after the cooldown, so a healthy app can't sit grey forever.
     const rearm = IS_HUB && autoRestartEnabled ? rearmReason(appCfg, up, Date.now()) : null;
@@ -412,8 +414,17 @@ async function checkAll() {
             + `Read the last 50 lines of ${logPath}, diagnose the issue, fix it, then run: `
             + `${startCmd(uid, label, plistPath)} `
             + `Wait 10s, verify http://localhost:${port} returns 200. If not, try harder.`;
-          const agentCmd = `cd "${dir}" && claude -p "${prompt.replace(/"/g, '\\"')}" --dangerously-skip-permissions 2>/dev/null &`;
-          try { spawn('bash', ['-c', agentCmd], { detached: true, stdio: 'ignore' }).unref(); } catch {}
+          // Opt-in only (`agent: true` in data/auto-restart.json), argv not a shell string, and a
+          // tool allowlist instead of --dangerously-skip-permissions: the prompt embeds
+          // app-derived text, and the agent runs inside a directory the hub does not control.
+          if (!autoRestartAgent) { console.log(`  [L4] agent disabled (set "agent": true in data/auto-restart.json): ${appCfg.id}`); }
+          else {
+            const args = ['-p', prompt, '--allowedTools', 'Read,Grep,Glob,Bash(launchctl:*),Bash(npm install:*),Bash(npm run:*),Bash(curl:*),Bash(tail:*)'];
+            try {
+              const out = fs.openSync(logPath, 'a');
+              spawn('claude', args, { cwd: dir, detached: true, stdio: ['ignore', out, out] }).unref();
+            } catch (e) { console.warn(`  [L4] could not start agent for ${appCfg.id}: ${e.message}`); }
+          }
           s.lastRestart = Date.now();
           s.restartAttempts = (s.restartAttempts || 0) + 1;
         }
