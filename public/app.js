@@ -191,6 +191,8 @@
           render();
         }
         if (msg.type === "reload") load();
+        // Down and breaker alerts from the health loop: say it, do not just recolour a dot.
+        if (msg.type === "alert") toast((msg.name || msg.id) + (msg.disabled ? " parked OFF by the circuit breaker" : " went down"), 4000, "error");
       };
       es.onerror = function () { sseOk = false; es.close(); setTimeout(connect, 3000); };
     }
