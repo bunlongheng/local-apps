@@ -12,6 +12,7 @@ const path = require('node:path');
 const TMP_DB = path.join(os.tmpdir(), `local-apps-routes-${process.pid}.db`);
 process.env.LOCAL_APPS_DB = TMP_DB;
 process.env.MACHINE_ROLE = 'hub';   // the hub registers every route; do not depend on machine-role.json
+process.env.LOCAL_APPS_TOKEN = 'zzz-tok';   // exercises the header wiring; loopback callers never need it
 const app = require('../../server');
 
 let server, base;
@@ -76,12 +77,14 @@ test('HTTP layer: X-Forwarded-For from a loopback socket demotes the caller (the
 test('meta: manifest label follows the host, favicons map is /favicons/<file>?v=, qr is a data URL, profiles carry the 7 keys', async () => {
   // fetch() drops a caller-set Host header, so the manifest probe goes through node:http.
   const http = require('node:http');
-  const man = (host) => new Promise((resolve, reject) => http.get(base + '/api/manifest', { headers: { host } }, (r) => { let b = ''; r.on('data', (c) => { b += c; }); r.on('end', () => resolve(JSON.parse(b))); }).on('error', reject));
+  const man = (host) => new Promise((resolve, reject) => http.get(base + '/api/manifest', { headers: { host } }, (r) => { let b = ''; r.on('data', (c) => { b += c; }); r.on('end', () => resolve(Object.assign(JSON.parse(b), { status: r.statusCode }))); }).on('error', reject));
   // Only hosts the auth gate allows (loopback, *.localhost, this machine's LAN ip) reach the handler:
   // an arbitrary Host header is a DNS-rebinding attempt and is refused before routing.
   assert.equal((await man('local-apps.localhost')).name, 'Apps (Caddy)');
   assert.equal((await man('localhost:9875')).start_url, 'http://localhost:9875/');
-  assert.equal((await man('evil.example:9875')).name, undefined, 'foreign Host never reaches the manifest');
+  const foreign = await man('evil.example:9875');
+  assert.equal(foreign.status, 421, 'foreign Host is a DNS-rebinding attempt: 421'); assert.equal(foreign.name, undefined);
+  assert.equal((await man('local-apps.localhost')).status, 200);
   const fav = await (await fetch(base + '/api/favicons')).json();
   assert.ok(Object.keys(fav).length > 0);
   for (const [id, v] of Object.entries(fav)) assert.match(v, new RegExp(`^/favicons/${id}\\.(png|svg|ico)\\?v=\\d+$`));
@@ -131,4 +134,27 @@ test('/api/log/:id returns exactly the last 30 lines of a log larger than the 64
   assert.deepEqual(await (await fetch(base + '/api/log/zzz-log')).json(), { lines: [] });
   db.upsertApp({ id: 'zzz-nolog', localPath: '/tmp/zzz-nolog' });
   assert.deepEqual(await (await fetch(base + '/api/log/zzz-nolog')).json(), { lines: [] }, 'no logPath configured');
+});
+
+test('off-box callers are let through by x-local-apps-token and refused without it or with a wrong one', async () => {
+  const off = (p, method, token) => fetch(base + p, { method, headers: { 'x-forwarded-for': '1.2.3.4', ...(token ? { 'x-local-apps-token': token } : {}) } });
+  assert.equal((await off('/api/log/zzz-prof', 'GET')).status, 401);
+  assert.equal((await off('/api/log/zzz-prof', 'GET', 'wrong')).status, 401);
+  assert.equal((await off('/api/log/zzz-prof', 'GET', 'zzz-tok')).status, 200);
+  assert.equal((await off('/api/apps/zzz-prof/toggle', 'POST')).status, 401);
+  const r = await off('/api/apps/zzz-prof/toggle', 'POST', 'zzz-tok');
+  assert.equal(r.status, 200, 'a mutation with the token is allowed off-box');
+  await off('/api/apps/zzz-prof/toggle', 'POST', 'zzz-tok');   // flip back
+});
+
+test('every response carries the security headers: frame denial, nosniff, a CSP with no inline scripts', async () => {
+  for (const p of ['/', '/api/status']) {
+    const r = await fetch(base + p);
+    assert.equal(r.headers.get('x-frame-options'), 'DENY');
+    assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(r.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
+    const csp = r.headers.get('content-security-policy');
+    assert.match(csp, /frame-ancestors 'none'/); assert.match(csp, /script-src 'self'(;|$)/); assert.match(csp, /object-src 'none'/);
+    assert.ok(!/script-src[^;]*unsafe-inline/.test(csp), 'no inline scripts');
+  }
 });
