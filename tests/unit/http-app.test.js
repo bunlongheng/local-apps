@@ -20,6 +20,7 @@ before(async () => {
   app.get('/api/apps/:id', (req, res) => res.json({ id: req.params.id }));
   app.post('/api/echo', (req, res) => res.json(req.body));
   app.get('/api/boom', () => { throw new Error('kaboom'); });
+  app.get('/api/boom-async', async () => { throw new Error('async kaboom'); });
   app.use(serveStatic(root));
   app.use((err, req, res, _next) => res.status(500).json({ error: err.message }));
   await new Promise(r => { server = app.listen(0, '127.0.0.1', r); });
@@ -82,4 +83,27 @@ test('static: If-Modified-Since at or after the mtime gets 304, older gets 200',
   assert.equal(same.status, 304);
   const older = await fetch(base + '/big.js', { headers: { 'if-modified-since': new Date(Date.parse(lm) - 60000).toUTCString() } });
   assert.equal(older.status, 200);
+});
+
+test('an async handler rejection reaches the error middleware exactly like a sync throw', async () => {
+  const r = await fetch(base + '/api/boom-async');
+  assert.equal(r.status, 500); assert.deepEqual(await r.json(), { error: 'async kaboom' });
+  assert.equal((await fetch(base + '/api/apps/still-up')).status, 200, 'the process survived the rejection');
+});
+
+test('without an error middleware the router answers a generic 500; a throwing error handler falls through to it', async () => {
+  const bare = createApp(); bare.get('/x', () => { throw new Error('secret detail'); });
+  const s1 = await new Promise(r => { const sv = bare.listen(0, '127.0.0.1', () => r(sv)); });
+  try {
+    const r = await fetch(`http://127.0.0.1:${s1.address().port}/x`);
+    assert.equal(r.status, 500); assert.deepEqual(await r.json(), { error: 'internal error' }, 'no detail leaks without a handler');
+  } finally { s1.close(); }
+  const chain = createApp(); chain.get('/x', () => { throw new Error('first'); });
+  chain.use((err, _req, _res, _next) => { throw new Error('handler broke: ' + err.message); });   // arity 4 keeps it an error handler
+  chain.use((err, req, res, _next) => res.status(500).json({ error: err.message }));
+  const s2 = await new Promise(r => { const sv = chain.listen(0, '127.0.0.1', () => r(sv)); });
+  try {
+    const r = await fetch(`http://127.0.0.1:${s2.address().port}/x`);
+    assert.equal(r.status, 500); assert.deepEqual(await r.json(), { error: 'handler broke: first' }, 'the next error handler gets the new error');
+  } finally { s2.close(); }
 });
