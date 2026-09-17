@@ -55,6 +55,8 @@ jobs:
           cache: npm
       - name: Install
         run: npm ci
+      - name: Unit tests on darwin (pgrep, lsof, launchctl paths for real; the coverage gate stays on ubuntu)
+        run: npm test
       - name: Caddy
         run: brew install caddy
       - name: E2E lifecycle on the darwin branch (scratch Caddyfile and LaunchAgents dir, a live caddy)
