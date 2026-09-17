@@ -4,19 +4,19 @@
 // Registered by server.js as require('./routes/meta')(app, ctx). Everything a handler needs comes
 // from ctx, so this file has no module-level state beyond what it declares itself.
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { manifestLabel } = require('../lib/validate');
 
 // Repo root: moved handlers keep resolving files from the project, not from routes/.
 const ROOT = path.join(__dirname, '..');
 
-const REQUIRED = ['LAN_IP', 'IS_HUB', 'db', 'dbg', 'QRCode', 'PORT'];
+const REQUIRED = ['LAN_IP', 'IS_HUB', 'db', 'dbg', 'QRCode', 'PORT', 'home'];
 
 module.exports = function register(app, ctx) {
   // Fail at boot, not at request time, when server.js forgets to pass a dependency.
   for (const k of REQUIRED) if (!(k in ctx)) throw new Error(`routes/meta.js: ctx is missing ${k}`);
-  const { IS_HUB, db, dbg, QRCode, PORT } = ctx;
+  // home: the owner's home dir (tab registry, MCP config, ~/.local/bin); tests point it at a fixture.
+  const { IS_HUB, db, dbg, QRCode, PORT, home } = ctx;
 
   // --- Tab Colors ---
   if (IS_HUB) app.get('/api/tab-colors', (req, res) => {
@@ -25,7 +25,7 @@ module.exports = function register(app, ctx) {
     // Primary source: ~/.claude/tab-colors.json (the same file that drives the terminal
     // _tab colors), so the dashboard chip and the claude tab always match.
     try {
-      const json = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', 'tab-colors.json'), 'utf8'));
+      const json = JSON.parse(fs.readFileSync(path.join(home, '.claude', 'tab-colors.json'), 'utf8'));
       for (const k of Object.keys(json)) {
         const e = json[k];
         if (e && typeof e.r === 'number') out[k] = { label: e.label || k.toUpperCase(), color: toHex(e.r, e.g, e.b), icon: e.icon || '' };
@@ -38,7 +38,7 @@ module.exports = function register(app, ctx) {
     } catch (e) { dbg('meta', e); }
     // Merge the shell alias (e.g. _bheng) per key from ~/.claude-tabs.sh.
     try {
-      const sh = fs.readFileSync(path.join(os.homedir(), '.claude-tabs.sh'), 'utf8');
+      const sh = fs.readFileSync(path.join(home, '.claude-tabs.sh'), 'utf8');
       const re = /(_[A-Za-z0-9]+)\(\)\s*\{\s*_tab\s+"([^"]+)"/g;
       let m;
       while ((m = re.exec(sh))) if (out[m[2]] && !out[m[2]].alias) out[m[2]].alias = m[1];
@@ -166,12 +166,12 @@ module.exports = function register(app, ctx) {
   if (IS_HUB) app.get('/api/capabilities', (req, res) => {
     const apps = db.getApps();
     const globalMcp = (() => {
-      try { return JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', '.mcp.json'), 'utf8')); } catch { return {}; }
+      try { return JSON.parse(fs.readFileSync(path.join(home, '.claude', '.mcp.json'), 'utf8')); } catch { return {}; }
     })();
     const mcpServers = globalMcp.mcpServers || {};
     const result = {};
 
-    const localBinDir = path.join(os.homedir(), '.local', 'bin');
+    const localBinDir = path.join(home, '.local', 'bin');
     const localBins = fs.existsSync(localBinDir) ? fs.readdirSync(localBinDir) : [];
     // Read each ~/.local/bin script once per request, not once per app per request.
     const localBinText = new Map();
@@ -192,7 +192,7 @@ module.exports = function register(app, ctx) {
         let hasMcpFile = false;
         try { hasMcpFile = fs.readdirSync(dir).some(f => f.includes('mcp') && (f.endsWith('.js') || f.endsWith('.ts'))); } catch (e) { dbg('meta', e); }
         // Also check ~/.claude/mcp-servers/ for files matching this app
-        const mcpServersDir = path.join(os.homedir(), '.claude', 'mcp-servers');
+        const mcpServersDir = path.join(home, '.claude', 'mcp-servers');
         let hasMcpServerFile = false;
         if (fs.existsSync(mcpServersDir)) {
           try { hasMcpServerFile = fs.readdirSync(mcpServersDir).some(f => f.includes(a.id)); } catch (e) { dbg('meta', e); }
