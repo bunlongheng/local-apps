@@ -1,4 +1,6 @@
-// Hub extras: tab colors, consistency, favicons, profiles, manifest, QR, icon sync, capabilities.
+// Hub extras. tab colors, consistency, profiles, icon sync and capabilities read the hub owner's
+// registry and repos, so they register on the hub role only; favicons, manifest and QR serve the
+// dashboard on every role.
 // Registered by server.js as require('./routes/meta')(app, ctx). Everything a handler needs comes
 // from ctx, so this file has no module-level state beyond what it declares itself.
 const fs = require('fs');
@@ -9,10 +11,10 @@ const path = require('path');
 const ROOT = require('path').join(__dirname, '..');
 
 module.exports = function register(app, ctx) {
-  const { db, dbg, validateAppFields, QRCode, PORT } = ctx;
+  const { IS_HUB, db, dbg, validateAppFields, QRCode, PORT } = ctx;
 
   // --- Tab Colors ---
-  app.get('/api/tab-colors', (req, res) => {
+  if (IS_HUB) app.get('/api/tab-colors', (req, res) => {
     const out = {};
     const toHex = (r, g, b) => '#' + [r, g, b].map((v) => (v | 0).toString(16).padStart(2, '0')).join('');
     // Primary source: ~/.claude/tab-colors.json (the same file that drives the terminal
@@ -42,7 +44,7 @@ module.exports = function register(app, ctx) {
   // Consistency police: the same artifact matrix /onboard enforces (favicon, stickies
   // icon+registry, tab color+alias, caddy, launch-agent, profile, repo+prod). Backed by
   // scripts/consistency.js so onboard and the dashboard never drift. Optional ?id=<app>.
-  app.get('/api/consistency', (req, res) => {
+  if (IS_HUB) app.get('/api/consistency', (req, res) => {
     try {
       const id = (req.query.id || '').replace(/[^a-z0-9-]/gi, '');
       // In-process: the script reads the same db.js and does synchronous file checks only,
@@ -76,7 +78,7 @@ module.exports = function register(app, ctx) {
   });
 
   // --- App profiles (about, architect, deploy, security, performance) ---
-  app.get('/api/app-profiles', (req, res) => {
+  if (IS_HUB) app.get('/api/app-profiles', (req, res) => {
     const apps = db.getApps();
     const profiles = {};
     for (const a of apps) {
@@ -93,7 +95,7 @@ module.exports = function register(app, ctx) {
     res.json(profiles);
   });
 
-  app.put('/api/app-profiles/:id', (req, res) => {
+  if (IS_HUB) app.put('/api/app-profiles/:id', (req, res) => {
     const existing = db.getApp(req.params.id);
     if (!existing) return res.status(404).json({ error: 'not found' });
     // Profile route writes profile columns only. Spreading req.body let a caller rewrite
@@ -129,7 +131,7 @@ module.exports = function register(app, ctx) {
   });
 
   // Icon sync check: compare local-apps favicon vs app's own icon
-  app.get('/api/icon-sync', (req, res) => {
+  if (IS_HUB) app.get('/api/icon-sync', (req, res) => {
     const apps = db.getApps();
     const result = {};
     for (const a of apps) {
@@ -160,7 +162,7 @@ module.exports = function register(app, ctx) {
   });
 
   // App capabilities: MCP, API, CLI detection
-  app.get('/api/capabilities', (req, res) => {
+  if (IS_HUB) app.get('/api/capabilities', (req, res) => {
     const apps = db.getApps();
     const globalMcp = (() => {
       try { return JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', '.mcp.json'), 'utf8')); } catch { return {}; }
