@@ -41,8 +41,8 @@ function boot({ peers = [], statusByIp = {} } = {}) {
       throw new Error('unexpected ' + url);
     },
   };
-  const { discoverPeers } = require('../../routes/machines')(app, ctx);
-  return { db, routes, discoverPeers, ctx, peers };
+  const { discoverPeers, startupSync } = require('../../routes/machines')(app, ctx);
+  return { db, routes, discoverPeers, startupSync, ctx, peers };
 }
 
 test('a discovered peer lands in the db with its sanitised apps', async () => {
@@ -101,4 +101,17 @@ test('GET /api/all-apps and /api/machines/:id/apps map snake_case rows to the ca
   const one = await call(t.routes['GET /api/machines/:id/apps'], { id });
   assert.deepEqual(one.body, [{ id: 'remote-a', name: 'A', healthUrl: 'http://localhost:3001', localUrl: 'http://localhost:3001', caddyUrl: 'http://a.localhost', prodUrl: 'https://a.example.com', repo: 'https://github.com/x/a', icon: 'a.png', status: 'up', syncedAt: 'T' }]);
   assert.deepEqual((await call(t.routes['GET /api/machines/:id/apps'], { id: 'nope' })).body, []);
+});
+
+test('startupSync refreshes a reachable known machine and leaves an unreachable one untouched', async () => {
+  const t = boot({ peers: ['10.0.0.7'] });
+  t.db.upsertMachine({ id: 'host-10.0.0.7', hostname: 'stale-name', ip: '10.0.0.7', port: 9875, model: 'Old' });
+  t.db.upsertMachine({ id: 'sleeper', hostname: 'sleeper', ip: '10.0.0.9', port: 9875, model: 'MacBook Air' });
+  await t.startupSync();
+  const fresh = t.db.machines.get('host-10.0.0.7'); assert.equal(fresh.hostname, 'host-10.0.0.7'); assert.equal(fresh.model, 'MacBook', 'refreshed from the peer');
+  assert.deepEqual(t.db.machines.get('sleeper'), { id: 'sleeper', hostname: 'sleeper', ip: '10.0.0.9', port: 9875, model: 'MacBook Air' }, 'unreachable: untouched, not deleted');
+  // A peer whose hostname does not validate keeps the name we already had.
+  t.ctx.fetchJson = async (url) => (url.endsWith('/api/machine') ? { hostname: 'bad name!', model: 'MacBook', appCount: 1 } : {});
+  await t.startupSync();
+  assert.equal(t.db.machines.get('host-10.0.0.7').hostname, 'host-10.0.0.7', 'invalid hostname falls back to the stored one');
 });
