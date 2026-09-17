@@ -47,8 +47,10 @@ function boot({ status, machines = [], peerStatus = null, failMutations = false 
   const routes = { '/api/status': status, '/api/favicons': {}, '/api/machines': machines, '/api/log/alpha': { lines: ['ready on 4000'] }, '/api/qr': { url: 'http://10.0.0.5:9875', dataUrl: 'data:image/png;base64,AA==' } };
   if (peerStatus) for (const m of machines) routes[`/api/machines/${m.id}/status`] = peerStatus;
   const requests = [];   // every non-GET call the dashboard makes: { method, path }
+  const gets = [];       // every GET path, so polls can be counted
   w.fetch = (p, opts) => {
     const method = (opts && opts.method) || 'GET';
+    if (method === 'GET') gets.push(p);
     if (method !== 'GET') { requests.push({ method, path: p }); if (failMutations) return Promise.resolve({ ok: false, status: 500, headers: { get: () => 'application/json' }, json: () => Promise.resolve({ error: 'nope' }) }); return Promise.resolve({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: () => Promise.resolve(p.endsWith('/toggle') ? { id: 'alpha', disabled: true } : { ok: true }) }); }
     return Promise.resolve({ ok: p in routes, status: p in routes ? 200 : 404, headers: { get: () => 'application/json' }, json: () => Promise.resolve(routes[p]) });
   };
@@ -58,7 +60,7 @@ function boot({ status, machines = [], peerStatus = null, failMutations = false 
   new vm.Script(APP_JS, { filename: path.join(ROOT, 'public', 'app.js') }).runInContext(dom.getInternalVMContext());
   // Bounded wait on the microtask/IO queue for the fetch chains, not a fixed sleep: a loaded runner must not flake.
   const settle = async (pred = () => true) => { for (let i = 0; i < 200; i++) { await new Promise((r) => setImmediate(r)); if (i >= 5 && pred()) return; } throw new Error('settle timeout'); };
-  return { w, clock, sources, requests, routes, settle, root: () => w.document.getElementById('root'), close: () => w.close() };
+  return { w, clock, sources, requests, gets, routes, settle, root: () => w.document.getElementById('root'), close: () => w.close() };
 }
 
 test('an off-box viewer gets no toggle, start/stop or delete controls; on the box they render', async () => {
@@ -230,8 +232,10 @@ test('start posts, shows the startup phase from the 2s log poll, and gives up af
   t.clock.tick(2000); await t.settle(() => /Error - check log/.test(t.root().textContent));
   t.clock.tick(60000); await t.settle();
   assert.equal(polls(), 0, 'after 60s the startup row is gone and the poll is cleared');
-  const before = t.requests.length; t.clock.tick(10000); await t.settle();
-  assert.equal(t.requests.length, before, 'no further requests after the give-up');
+  const logPolls = () => t.gets.filter(p => p === '/api/log/alpha').length;
+  assert.ok(logPolls() >= 2, 'the poll fetched the log while starting');
+  const before = logPolls(); t.clock.tick(10000); await t.settle();
+  assert.equal(logPolls(), before, 'the log poll is cleared after the give-up');
   t.close();
   const f = boot({ status: { ...ON, apps: [{ ...APPS[0], status: 'down' }] }, failMutations: true });
   await f.settle();
