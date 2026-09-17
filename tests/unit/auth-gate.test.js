@@ -56,3 +56,20 @@ test('tokenOk is false unless both are set and equal', () => {
   assert.ok(!tokenOk('abcx', 'abcy'));
   assert.ok(tokenOk('match-me', 'match-me'));
 });
+
+test('loopback trust needs a known Host: DNS rebinding gets 421', () => {
+  const base = { remoteAddress: '127.0.0.1', method: 'GET', path: '/api/status', token: null, configuredToken: '' };
+  assert.deepEqual(decide({ ...base, host: 'localhost:9875' }), { allow: true });
+  assert.deepEqual(decide({ ...base, host: 'local-apps.localhost' }), { allow: true });
+  assert.deepEqual(decide({ ...base, host: '1.2.3.4:9875', allowedHosts: ['1.2.3.4'] }), { allow: true });
+  assert.equal(decide({ ...base, host: 'attacker.example' }).status, 421);
+  assert.equal(decide({ ...base, host: '' }).status, 421);
+});
+
+test('cross-site Origin on a mutation is refused even from loopback (CSRF)', () => {
+  const base = { remoteAddress: '127.0.0.1', method: 'POST', path: '/api/start/x', token: null, configuredToken: '', host: 'localhost:9875' };
+  assert.equal(decide({ ...base, origin: 'https://evil.example' }).status, 403);
+  assert.deepEqual(decide({ ...base, origin: 'http://localhost:9875' }), { allow: true });
+  assert.deepEqual(decide({ ...base, origin: undefined }), { allow: true }, 'CLI callers send no Origin');
+  assert.deepEqual(decide({ ...base, method: 'GET', path: '/api/status', origin: 'https://evil.example' }), { allow: true }, 'reads are not CSRF-able');
+});
