@@ -51,6 +51,10 @@ test('L4 spawns the agent with argv (no shell) and an allowlist, only when opted
   assert.equal(spawned[0].args[0], '-p');
   assert.match(spawned[0].args[1], /down for 5 minutes/);
   assert.ok(!spawned[0].args.includes('--dangerously-skip-permissions'));
+  const allowed = spawned[0].args[spawned[0].args.indexOf('--allowedTools') + 1];
+  assert.ok(!/:\*/.test(allowed), 'no prefix wildcards: ' + allowed);
+  assert.ok(allowed.includes('Bash(tail -50 /tmp/x.log)') && allowed.includes('Bash(curl -s http://localhost:4000*)'));
+  assert.equal(spawned[0].args[spawned[0].args.indexOf('--max-turns') + 1], '25');
   assert.equal(spawned[0].opts.cwd, '/tmp/x');
   assert.deepEqual(spawned[0].opts.stdio, ['ignore', 7, 7]);
   const off = { ...l4, agent: false };
