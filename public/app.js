@@ -207,13 +207,16 @@
   function scrollLog() { setTimeout(function () { var el = document.getElementById("logBody"); if (el) el.scrollTop = el.scrollHeight; }, 50); }
 
   // ---- actions ----------------------------------------------------------
+  var modalInvoker = null;   // the element that opened the dialog, focused again on close
   function openModal(id) {
     var app = S.apps.filter(function (a) { return a.id === id; })[0]; if (!app) return;
+    // Remember the opener by its data attributes: render() replaces the node, so the element itself dies.
+    var inv = document.activeElement; modalInvoker = inv && inv.getAttribute ? '[data-act="' + (inv.getAttribute('data-act') || '') + '"]' + (inv.getAttribute('data-id') ? '[data-id="' + inv.getAttribute('data-id') + '"]' : '') : null;
     S.modalApp = app; S.modalTab = "info"; S.logLines = [];
     render();
     if (app.status === "down" && app.logPath) loadLog(id);
   }
-  function closeModal() { S.modalApp = null; render(); }
+  function closeModal() { S.modalApp = null; render(); var back = modalInvoker && document.querySelector(modalInvoker); if (back) back.focus(); modalInvoker = null; }
 
   function startApp(id) {
     S.startingApps[id] = true; S.logLines = []; S.logLoading = true; S.startTimes[id] = Date.now();
@@ -483,8 +486,8 @@
 
   function helpHTML() {
     if (!S.helpOpen) return "";
-    return '<div class="overlay" data-act="overlay-help"><div class="modal">' +
-      '<button class="modal-close" data-act="help-close">✕</button>' +
+    return '<div class="overlay" data-act="overlay-help"><div class="modal" role="dialog" aria-modal="true" aria-label="AI Instruction">' +
+      '<button class="modal-close" data-act="help-close" aria-label="Close">✕</button>' +
       '<div class="help-head"><h2>AI Instruction</h2><button class="help-copy" data-act="copy" data-copy="' + esc(HELP_TEXT) + '">Copy</button></div>' +
       '<div class="help-block">' + esc(HELP_TEXT) + "</div></div></div>";
   }
@@ -636,6 +639,16 @@
     if (e.key === "Escape") {
       if (S.helpOpen) { S.helpOpen = false; render(); }
       else if (S.modalApp) closeModal();
+    }
+    if (e.key === "Tab") {
+      var dlg = document.querySelector('[role="dialog"]');
+      if (dlg) {
+        var f = dlg.querySelectorAll('button, [href], input, [tabindex]:not([tabindex="-1"])');
+        if (f.length) { var first = f[0], last = f[f.length - 1];
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+          else if (!dlg.contains(document.activeElement)) { e.preventDefault(); first.focus(); } }
+      }
     }
     // Enter or Space on any data-act control that is not a real button activates it, the same as a click.
     var ae = document.activeElement;
