@@ -21,3 +21,4 @@ machine-role.json
 *.bak
 *.bak.*
 scripts/favicon-sources.json
+data/auto-restart.json
