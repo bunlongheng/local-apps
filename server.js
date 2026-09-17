@@ -3,6 +3,10 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const { execSync, spawn } = require('child_process');
+// Async exec for the auto-restart chain. Those commands run inside the health loop and
+// block every request, the SSE stream, and the next health tick while they run - L3's
+// `npm install` alone is a 60s ceiling. Awaiting instead keeps the loop responsive.
+const execAsync = require('util').promisify(require('child_process').exec);
 const QRCode = require('qrcode');
 const db = require('./db');
 const { startCmd } = require('./launchctl-cmds');
@@ -63,7 +67,7 @@ const CADDY_ERROR_ROOT = path.dirname(CADDYFILE);
 const { addCaddyEntry, removeCaddyEntry, renameCaddyEntry } =
   makeCaddy({ caddyfile: CADDYFILE, errorRoot: CADDY_ERROR_ROOT, getLanIp, exec: execSync });
 const NPM_PATH = (() => {
-  try { return execSync('which npm').toString().trim(); }
+  try { return execSync('which npm', { timeout: 5000 }).toString().trim(); }
   catch { return '/opt/homebrew/bin/npm'; }
 })();
 
@@ -182,7 +186,7 @@ function teardownInfra(id) {
     const app = db.getApp ? db.getApp(id) : null;
     if (app && app.localUrl) {
       const port = new URL(app.localUrl).port;
-      if (port) execSync(`lsof -ti :${port} | xargs kill -9 2>/dev/null`);
+      if (port) execSync(`lsof -ti :${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
     }
   } catch {}
 
@@ -210,7 +214,7 @@ setInterval(() => { LAN_IP = getLanIp(); }, 60000).unref();
 
 // --- Tailscale IP detection (cached; refreshed on an interval, not per request) ---
 function getTailscaleIp() {
-  try { return execSync('/usr/local/bin/tailscale ip -4 2>/dev/null').toString().trim(); }
+  try { return execSync('/usr/local/bin/tailscale ip -4 2>/dev/null', { timeout: 5000 }).toString().trim(); }
   catch { return null; }
 }
 let TAILSCALE_IP = getTailscaleIp();
@@ -221,13 +225,13 @@ setInterval(() => { TAILSCALE_IP = getTailscaleIp(); }, 60000).unref();
 // --- Machine model detection ---
 const MACHINE_MODEL = (() => {
   try {
-    const name = execSync('system_profiler SPHardwareDataType 2>/dev/null').toString();
+    const name = execSync('system_profiler SPHardwareDataType 2>/dev/null', { timeout: 10000 }).toString();
     const match = name.match(/Model Name:\s*(.+)/);
     if (match) return match[1].trim();
   } catch {}
   // Fallback: sysctl hw.model (works in sandboxed envs where system_profiler fails)
   try {
-    const hw = execSync('/usr/sbin/sysctl -n hw.model 2>/dev/null').toString().trim();
+    const hw = execSync('/usr/sbin/sysctl -n hw.model 2>/dev/null', { timeout: 5000 }).toString().trim();
     if (hw.includes('Macmini') || hw.includes('Mac16,')) return 'Mac mini';
     if (hw.includes('MacBookPro') || hw.includes('Mac15,') || hw.includes('Mac14,')) return 'MacBook Pro';
     if (hw.includes('MacBookAir')) return 'MacBook Air';
@@ -259,17 +263,22 @@ async function checkAll() {
   checkAllRunning = true;
   try {
   const apps = db.getApps();
-  for (const appCfg of apps) {
+  // Probe every app concurrently. The checks are independent reads with no shared state,
+  // and serially they cost ~555ms across 64 apps when the down ones refuse instantly -
+  // but a *hung* app burns the full 3s timeout, so ~10 of those used to push a tick past
+  // its own 30s interval. The escalation loop below stays sequential on purpose: it shells
+  // out, and 65 concurrent `npm install`s would be worse than a slow tick.
+  const probes = await Promise.all(apps.map((appCfg) => {
+    if (appCfg.healthUrl) return tcpCheck(appCfg.healthUrl);
+    if (appCfg.processCheck) return processCheck(appCfg.processCheck);
+    return false;
+  }));
+
+  for (const [index, appCfg] of apps.entries()) {
     const s = getState(appCfg.id);
     s.lastChecked = new Date().toISOString();
 
-    let up = false;
-    if (appCfg.healthUrl) {
-      up = await tcpCheck(appCfg.healthUrl);
-    } else if (appCfg.processCheck) {
-      up = await processCheck(appCfg.processCheck);
-    }
-
+    const up = probes[index];
     const newStatus = up ? 'up' : 'down';
     if (s.status !== newStatus) {
       // Flap detection: going down shortly after a restart means it crashed on us.
@@ -317,8 +326,8 @@ async function checkAll() {
       // outer !disabled guard skips future ticks until the re-arm above fires.
       if (shouldTrip(s, Date.now())) {
         try {
-          if (port) execSync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
-          if (label) execSync(`launchctl bootout gui/${uid}/${label} 2>/dev/null`, { timeout: 10000 });
+          if (port) await execAsync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
+          if (label) await execAsync(`launchctl bootout gui/${uid}/${label} 2>/dev/null`, { timeout: 10000 });
         } catch {}
         db.setAppDisabled(appCfg.id, true, 'breaker');
         appCfg.disabled = true;
@@ -333,7 +342,7 @@ async function checkAll() {
       // kickstart fails if the service was booted out (LaunchAgent purge) - bootstrap the plist as fallback
       if (attempts === 0 || (attempts === 1 && Date.now() - lastRestart > 60000)) {
         try {
-          execSync(startCmd(uid, label, plistPath), { timeout: 15000 });
+          await execAsync(startCmd(uid, label, plistPath), { timeout: 15000 });
           s.lastRestart = Date.now();
           s.restartAttempts = (s.restartAttempts || 0) + 1;
           console.log(`  [L1] kickstart: ${appCfg.id}`);
@@ -343,8 +352,8 @@ async function checkAll() {
       // Level 2: Kill port + full reload (90s+ down, attempt 2)
       else if (attempts <= 2 && downDuration > 90000 && Date.now() - lastRestart > 60000) {
         try {
-          if (port) execSync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
-          execSync(`launchctl bootout gui/${uid}/${label} 2>/dev/null; sleep 1; launchctl bootstrap gui/${uid} "${plistPath}" 2>/dev/null`, { timeout: 15000 });
+          if (port) await execAsync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
+          await execAsync(`launchctl bootout gui/${uid}/${label} 2>/dev/null; sleep 1; launchctl bootstrap gui/${uid} "${plistPath}" 2>/dev/null`, { timeout: 15000 });
           s.lastRestart = Date.now();
           s.restartAttempts = (s.restartAttempts || 0) + 1;
           console.log(`  [L2] port-kill + reload: ${appCfg.id}`);
@@ -359,24 +368,24 @@ async function checkAll() {
             // Check logs for common errors
             const logPath = appCfg.logPath || `/tmp/${appCfg.id}.log`;
             let logTail = '';
-            try { logTail = execSync(`tail -30 "${logPath}" 2>/dev/null`).toString(); } catch {}
+            try { logTail = (await execAsync(`tail -30 "${logPath}" 2>/dev/null`, { timeout: 5000 })).stdout; } catch {}
             // Module not found -> npm install
             if (logTail.includes('Cannot find module') || logTail.includes('MODULE_NOT_FOUND')) {
               console.log(`  [L3] npm install: ${appCfg.id}`);
               // --ignore-scripts: a registered app dir is attacker-influencable, so never
               // run its package lifecycle scripts (preinstall/postinstall) during auto-heal.
-              try { execSync(`cd "${dir}" && npm install --ignore-scripts 2>/dev/null`, { timeout: 60000 }); } catch (e) { console.warn(`  [L3] npm install failed: ${appCfg.id}: ${e.message}`); }
+              try { await execAsync(`cd "${dir}" && npm install --ignore-scripts 2>/dev/null`, { timeout: 60000 }); } catch (e) { console.warn(`  [L3] npm install failed: ${appCfg.id}: ${e.message}`); }
             }
             // Build cache corrupt -> clear .next
             if (logTail.includes('.next') || logTail.includes('ENOENT') || logTail.includes('Build error')) {
               console.log(`  [L3] clear .next cache: ${appCfg.id}`);
-              try { execSync(`rm -rf "${dir}/.next" 2>/dev/null`, { timeout: 5000 }); } catch {}
+              try { await execAsync(`rm -rf "${dir}/.next" 2>/dev/null`, { timeout: 5000 }); } catch {}
             }
             // Port still stuck
-            if (port) execSync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
+            if (port) await execAsync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
           }
           // Restart after fixes
-          execSync(startCmd(uid, label, plistPath), { timeout: 15000 });
+          await execAsync(startCmd(uid, label, plistPath), { timeout: 15000 });
           s.lastRestart = Date.now();
           s.restartAttempts = (s.restartAttempts || 0) + 1;
           console.log(`  [L3] fix + restart: ${appCfg.id}`);
