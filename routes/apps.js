@@ -75,6 +75,7 @@ module.exports = function register(app, ctx) {
     if (newState && a.launchAgent) {
       const uid = process.getuid();
       try { await execAsync(bootoutCmd(uid, a.launchAgent), { timeout: 10000 }); } catch (e) { dbg('toggle/bootout', e); }
+      { const port = a.localUrl ? (() => { try { return new URL(a.localUrl).port; } catch { return null; } })() : null; if (port) await killPort(port); }   // OFF means off: free the port like /api/stop does
       const s = getState(a.id);
       s.status = 'down';
       s.downSince = null;
@@ -106,7 +107,7 @@ module.exports = function register(app, ctx) {
       db.setAppDisabled(a.id, shouldDisable);
       // Stop newly disabled apps
       if (shouldDisable && !wasDisabled && a.launchAgent) {
-        jobs.push(execAsync(bootoutCmd(uid, a.launchAgent), { timeout: 10000 }).catch((e) => dbg('bulk-toggle/bootout', e)));
+        jobs.push(execAsync(bootoutCmd(uid, a.launchAgent), { timeout: 10000 }).catch((e) => dbg('bulk-toggle/bootout', e)).then(() => { const port = a.localUrl ? (() => { try { return new URL(a.localUrl).port; } catch { return null; } })() : null; return port ? killPort(port) : null; }));
         const s = getState(a.id);
         s.status = 'down';
         s.downSince = null;
