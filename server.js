@@ -80,14 +80,18 @@ app.use(jsonBody());
 
 // --- Optional shared-secret gate ---------------------------------------------
 // When LOCAL_APPS_TOKEN is set, every mutating request (POST/PUT/DELETE) and every
-// sensitive read route requires a matching `x-local-apps-token` header. Unset -> fully
+// sensitive read route requires a matching `x-local-apps-token` header. Unset -> off-box callers
+// may still VIEW non-sensitive status (without paths), but every action and sensitive read is denied. Historically:
 // open (unchanged default), so this never breaks an existing single-machine setup; set
 // it to lock the LAN/tailnet surface. Sensitive GETs = any log reader (/api/log/*, /api/*/log).
 // NOTE: enabling the token currently requires the caller to send the header; wiring the
 // dashboard fetches to forward it from localStorage is a tracked follow-up, so today the
 // gate is meant for API/CLI clients.
 // Trust-loopback auth policy lives in lib/auth-gate.js (pure + unit-tested). See it for the rule.
-const { decide: authDecide } = require('./lib/auth-gate');
+const { decide: authDecide, isLoopback } = require('./lib/auth-gate');
+// Off-box viewers (the LAN/tailnet dashboard) get status without filesystem paths or launchd internals.
+const OFFBOX_STRIP = ['localPath', 'logPath', 'launchAgentPath', 'launchAgent', 'startCommand', 'processCheck'];
+const forViewer = (req, a) => { if (isLoopback(req.socket.remoteAddress || '')) return a; const o = { ...a }; for (const k of OFFBOX_STRIP) delete o[k]; return o; };
 const AUTH_TOKEN = process.env.LOCAL_APPS_TOKEN || '';
 app.use((req, res, next) => {
   const d = authDecide({
@@ -458,7 +462,7 @@ app.get('/api/status', (req, res) => {
       tabIcon: a.tabIcon || null,
     };
   });
-  res.json({ apps, lanIp: LAN_IP, tailscaleIp: TAILSCALE_IP, machineModel: MACHINE_MODEL, machineRole: MACHINE_ROLE, monitorUrl: `http://${LAN_IP}:${PORT}` });
+  res.json({ apps: apps.map(a => forViewer(req, a)), lanIp: LAN_IP, tailscaleIp: TAILSCALE_IP, machineModel: MACHINE_MODEL, machineRole: MACHINE_ROLE, monitorUrl: `http://${LAN_IP}:${PORT}` });
 });
 
 // --- Tab Colors ---
@@ -491,13 +495,13 @@ app.get('/api/tab-colors', (req, res) => {
 
 // --- CRUD: Apps ---
 app.get('/api/apps', (req, res) => {
-  res.json(db.getApps());
+  res.json(db.getApps().map(a => forViewer(req, a)));
 });
 
 app.get('/api/apps/:id', (req, res) => {
   const a = db.getApp(req.params.id);
   if (!a) return res.status(404).json({ error: 'not found' });
-  res.json(a);
+  res.json(forViewer(req, a));
 });
 
 // Consistency police: the same artifact matrix /onboard enforces (favicon, stickies
