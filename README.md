@@ -76,11 +76,13 @@ Optional integration: if `~/.claude/tab-colors.json` exists, the dashboard reads
 ## Layout and tests
 
 ```
-server.js   API, SSE, provisioning, health and restart loop
-db.js       SQLite data layer
-public/     vanilla-JS dashboard
-lib/        tested modules: http-app, validate, auth-gate, caddy, launchd, health, breaker
-tests/      npm run test:unit, npm test (e2e needs the app on :9875), npm run lint
+server.js       wiring, health loop, provisioning; ctx for the routes
+routes/         apps.js (registry, start/stop, events, log), meta.js (hub extras), machines.js (peers)
+lib/            tested modules: http-app, auth-gate, validate, escalation, breaker, peers, caddy, launchd, health
+db.js           SQLite data layer
+public/         vanilla-JS dashboard, service worker, offline page
+scripts/        generate-favicons, consistency, onboard-app.sh, storage-guard.sh (the owner's own tooling, kept for reference)
+tests/          npm run test:unit, npm test (e2e needs the app on :9875), npm run lint
 ```
 
 ## License

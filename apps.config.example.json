@@ -13,10 +13,7 @@
     "launchAgent": "com.example.my-app",
     "launchAgentPath": "/Users/YOU/Library/LaunchAgents/com.example.my-app.plist",
     "startCommand": "npm run dev",
-    "icon": null,
-    "disabled": false,
-    "tabColor": "#3B82F6",
-    "sortOrder": 0
+    "icon": null
   },
   {
     "id": "api-service",
@@ -32,9 +29,6 @@
     "launchAgent": "com.example.api-service",
     "launchAgentPath": "/Users/YOU/Library/LaunchAgents/com.example.api-service.plist",
     "startCommand": "npm start",
-    "icon": null,
-    "disabled": false,
-    "tabColor": "#10B981",
-    "sortOrder": 1
+    "icon": null
   }
 ]
