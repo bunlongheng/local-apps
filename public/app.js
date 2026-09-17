@@ -498,7 +498,7 @@
     // innerHTML replaces every node: remember the log scroll and the focused control so a
     // status tick does not yank the reader back to the top or drop keyboard focus.
     var logEl = document.getElementById("logBody"), logTop = logEl ? logEl.scrollTop : null;
-    var ae = document.activeElement, focusKey = ae && ae.getAttribute ? (ae.getAttribute("data-act") || "") + "|" + (ae.getAttribute("data-id") || "") : null;
+    var ae = document.activeElement, focusKey = ae && ae.getAttribute ? ["data-act", "data-id", "data-tab", "data-machine", "data-copy"].map(function (k) { return ae.getAttribute(k) || ""; }).join("|") : null;
     root.innerHTML = headerHTML(access) + machineTabsHTML() + tableHTML(access) +
       modalHTML() + helpHTML() + toastHTML();
     fixIconImgs(root);
@@ -506,7 +506,11 @@
     if (logTop !== null) { var l2 = document.getElementById("logBody"); if (l2) l2.scrollTop = logTop; }
     var modalId = S.modalApp ? S.modalApp.id : null;
     if (modalId && modalId !== lastModalId) { var close = root.querySelector(".modal .modal-close"); if (close) close.focus(); }
-    else if (focusKey && focusKey !== "|") { var parts = focusKey.split("|"); var sel = '[data-act="' + parts[0] + '"]' + (parts[1] ? '[data-id="' + parts[1] + '"]' : ""); var again = root.querySelector(sel); if (again) again.focus(); }
+    else if (focusKey && focusKey.replace(/\|/g, "")) {
+      var parts = focusKey.split("|"), keys = ["data-act", "data-id", "data-tab", "data-machine", "data-copy"], sel = "";
+      for (var q = 0; q < keys.length; q++) if (parts[q]) sel += "[" + keys[q] + '="' + parts[q].replace(/"/g, "") + '"]';
+      var again = sel && root.querySelector(sel); if (again) again.focus();
+    }
     lastModalId = modalId;
   }
   // Rows and chips are clickable via data-act; make them reachable by keyboard too.
