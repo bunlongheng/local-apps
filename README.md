@@ -36,9 +36,9 @@ A self-healing dashboard for a fleet of local dev apps. Register an app and it a
 
 ## Running in the wild
 
-This is not a toy. It runs a real fleet: **56 apps provisioned on a single base M4 Mac Mini**, each with its own port, a `*.localhost` Caddy proxy, and a macOS LaunchAgent - wired automatically the moment the app is registered. At any given time only the few I am actively working on stay awake. A typical day sits around 6 running and 50 parked, so the machine stays cool and idle apps cost nothing until I open one.
+This is not a toy. It runs a real fleet: **65 apps registered on a single base M4 Mac Mini**, each with its own port, a `*.localhost` Caddy proxy, and a macOS LaunchAgent - wired automatically the moment the app is registered. At any given time only the few I am actively working on stay awake. A typical day sits around 6 running and 50 parked, so the machine stays cool and idle apps cost nothing until I open one.
 
-The real win is what it removes. No wall of terminal windows, no `npm run dev` to babysit per project, no "which port was that on again". One page starts what I need and cleans up what I do not, so I can stay focused on building instead of tracking 50 dev servers in my head. Register an app once and it is reachable by name over LAN and Tailscale from then on. 56 apps, one small Mac Mini, and the cognitive overhead of running them drops to a single dashboard and a green dot.
+The real win is what it removes. No wall of terminal windows, no `npm run dev` to babysit per project, no "which port was that on again". One page starts what I need and cleans up what I do not, so I can stay focused on building instead of tracking 50 dev servers in my head. Register an app once and it is reachable by name over LAN and Tailscale from then on. 65 apps, one small Mac Mini, and the cognitive overhead of running them drops to a single dashboard and a green dot.
 
 ## Features
 
@@ -47,7 +47,7 @@ The real win is what it removes. No wall of terminal windows, no `npm run dev` t
 - **Self-healing** - a 30s health loop marks apps up/down and walks a 4-level restart escalation (kickstart -> port-kill + reload -> log-driven fixes -> optional AI agent).
 - **AI auto-fix (optional)** - as the last escalation level, when deterministic restarts do not stick it can hand the failure to a local Claude Code CLI agent to diagnose and fix. Off by default; gated by `data/auto-restart.json` and the hub role.
 - **Multi-machine** - a hub runs the bots; agent machines report status only. Sync app lists across machines on the LAN.
-- **REST + SSE control API** - ~30 documented routes for apps, machines, status, logs, and events.
+- **REST + SSE control API** - 26 routes for apps, machines, status, logs, and events.
 
 ## Architecture
 
@@ -67,7 +67,7 @@ flowchart LR
 | `public/` (vanilla JS) | Dashboard - a same-origin client over the API |
 | `server.js` | Control plane + static UI host: REST + SSE, provisioning, health loop |
 | `db.js` (SQLite) | Data layer - apps, machines, profiles; fully parameterized |
-| `lib/` | Focused, tested modules: `validate`, `auth-gate`, `caddy`, `launchd`, `health` |
+| `lib/` | Focused, tested modules: `http-app`, `validate`, `auth-gate`, `caddy`, `launchd`, `health`, `breaker`, `chrome-ext` |
 | `scripts/` | Icon generation, onboarding, consistency + storage checks |
 
 ## How self-healing works
@@ -80,6 +80,7 @@ Every 30s the health loop checks each app and, when one is down, walks an escala
 | L2 | 90s | Kill the port, full `bootout` + `bootstrap` reload |
 | L3 | 180s | Read the log tail, apply common fixes (`npm install`, clear stale build cache, free the port), restart |
 | L4 | 300s | Optional: hand the failure to a local Claude Code CLI agent to diagnose and fix (last resort) |
+| L5 | 3 flaps in 2 min, or chain exhausted | Circuit breaker: kill it and park it OFF instead of flapping forever; re-arms when the port is seen up or after a cooldown |
 
 ```mermaid
 sequenceDiagram
@@ -105,7 +106,7 @@ Counters reset the moment an app comes back up.
 - **gzip** - built into `lib/http-app.js` for JSON and static text over 1 KB (the SSE stream is deliberately never wrapped)
 - **Vanilla JS** (`public/app.js`) - the dashboard is a same-origin client; no framework, no build step
 - **better-sqlite3** - embedded, synchronous SQLite via `db.js`
-- **Sharp** + **resvg** - app icon / favicon processing
+- **Sharp** + **resvg** - dev-only, used by `scripts/generate-favicons.js` (`npm run icons`); the server never loads them
 - **qrcode** - generates the phone-access QR shown in the dashboard
 - **Caddy** - per-app `*.localhost` reverse proxies (host tool)
 - **Tailscale** - optional remote access (host tool)
@@ -142,7 +143,7 @@ No environment variables are required. All are optional (see `.env.example`):
 |---------|---------|---------|
 | `MACHINE_ROLE` | `hub` | `hub` runs bots + auto-fix + nightly jobs; `agent` reports status only |
 | `CADDYFILE` | `/opt/homebrew/etc/Caddyfile` | Caddyfile the monitor edits when provisioning proxies |
-| `API_BIND` | `127.0.0.1` | Interface the control API binds to (keep localhost unless you run trusted peer sync) |
+| `API_BIND` | `0.0.0.0` | Interface the control API binds to. Set `127.0.0.1` to keep it off the LAN entirely; off-box callers are denied mutations anyway (see below) |
 | `LOCAL_APPS_TOKEN` | unset | Shared secret to grant a trusted LAN/tailnet machine control (see below) |
 
 Role can also be set in `machine-role.json`.
@@ -158,11 +159,14 @@ server.js       Control API + static UI host: REST + SSE, provisioning, health/r
 db.js           SQLite data layer (better-sqlite3)
 public/         Vanilla-JS dashboard (app.js, app.css, index.html), icons, manifest
 lib/
+  http-app.js   node:http router, JSON bodies, static files, gzip (the express replacement)
   validate.js   Input validation + shell-safety escaping
   auth-gate.js  Trust-loopback auth policy (fail-closed off-box, token-gated)
   caddy.js      Caddyfile reverse-proxy management
   launchd.js    macOS LaunchAgent create/remove
   health.js     Health-check primitives (state, tcp/process check)
+  breaker.js    Circuit-breaker policy (L5): trip on flapping, re-arm when healthy
+  chrome-ext.js Refuses to onboard Chrome extensions (no port to health-check)
 launchctl-cmds.js, launchd-parse.js   launchctl command builders + plist parsing
 scripts/
   consistency.js        Per-app artifact-matrix checker (/api/consistency)
