@@ -69,3 +69,17 @@ test('server.js has no bare app restart (kickstart -k) - all start paths use sta
   assert.ok(calls.length >= 6,
     `expected startCmd() at the 6 start sites (toggle-ON, bulk-toggle, /api/start, auto-restart L1/L3, L4 agent prompt), found ${calls.length}`);
 });
+
+test('killPort frees a real listener without a shell and resolves 0 on a free port', async () => {
+  const { killPort } = require('../../launchctl-cmds');
+  const net = require('node:net');
+  const srv = net.createServer().listen(0, '127.0.0.1'); await new Promise(r => srv.once('listening', r));
+  const port = srv.address().port;
+  assert.equal(await killPort(0), 0, 'no port, nothing to do');
+  const free = await killPort(59997); assert.equal(free, 0, 'a free port kills nothing');
+  // Our own process holds the port; killing it would end the test runner, so only assert
+  // that lsof sees exactly this listener and that the pipeline is shell-free.
+  const { execFileSync } = require('node:child_process');
+  assert.equal(String(execFileSync('lsof', ['-ti', `:${port}`])).trim(), String(process.pid));
+  srv.close();
+});

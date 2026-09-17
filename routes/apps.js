@@ -4,7 +4,7 @@
 const fs = require('fs');
 
 module.exports = function register(app, ctx) {
-  const { getNextAvailablePort, db, dbg, broadcast, sseClients, getState, clearState, checkSingle, setupInfra, teardownInfra, updateTabColors, forViewer, startCmd, execAsync, execSync, spawn, validateAppFields, isValidId, isChromeExtensionRepo, CHROME_EXT_ERROR, addCaddyEntry, renameCaddyEntry } = ctx;
+  const { getNextAvailablePort, killPort, db, dbg, broadcast, sseClients, getState, clearState, checkSingle, setupInfra, teardownInfra, updateTabColors, forViewer, startCmd, execAsync, execSync, spawn, validateAppFields, isValidId, isChromeExtensionRepo, CHROME_EXT_ERROR, addCaddyEntry, renameCaddyEntry } = ctx;
 
 
   // --- CRUD: Apps ---
@@ -244,7 +244,7 @@ module.exports = function register(app, ctx) {
       const label = appCfg.launchAgent;
       const port = appCfg.localUrl ? (() => { try { return new URL(appCfg.localUrl).port; } catch { return null; } })() : null;
       // Kill port first (instant), then bootout in background
-      if (port) try { execSync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 3000 }); } catch (e) { dbg('line833', e); }
+      if (port) killPort(port);
       spawn('bash', ['-c', `launchctl bootout gui/${uid}/${label} 2>/dev/null`], { detached: true, stdio: 'ignore' }).unref();
       // Update status immediately
       const s = getState(appCfg.id);
