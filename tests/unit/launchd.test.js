@@ -2,7 +2,9 @@
 // writes to whatever `launchAgentsDir` the factory is given, so every test here
 // points at a throwaway temp dir (never ~/Library/LaunchAgents) and injects a
 // fake `exec` so `launchctl unload` never actually runs.
-const { test } = require('node:test');
+const { test, after } = require('node:test');
+const TMP_DIRS = [];
+after(() => { for (const d of TMP_DIRS) fs.rmSync(d, { recursive: true, force: true }); });
 const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -11,7 +13,7 @@ const makeLaunchd = require('../../lib/launchd');
 const { xmlEscape } = require('../../lib/validate');
 
 function fresh() {
-  const launchAgentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'launchd-test-'));
+  const launchAgentsDir = TMP_DIRS[TMP_DIRS.push(fs.mkdtempSync(path.join(os.tmpdir(), 'launchd-test-'))) - 1];
   const execCalls = [];
   const launchd = makeLaunchd({
     username: 'tester',
@@ -87,7 +89,7 @@ test('removeLaunchAgent unloads via the injected exec and deletes the plist file
 
 test('createLaunchAgent is an upsert: a changed start command rewrites the plist', () => {
   const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'la-up-')); const calls = [];
+  const dir = TMP_DIRS[TMP_DIRS.push(fs.mkdtempSync(path.join(os.tmpdir(), 'la-up-'))) - 1]; const calls = [];
   const ld = require('../../lib/launchd')({ username: 'you', launchAgentsDir: dir, npmPath: '/usr/bin/npm', xmlEscape: (s) => String(s), exec: (c) => calls.push(c) });
   ld.createLaunchAgent('zzz-up', '/tmp/zzz-up', '/tmp/zzz-up.log', 'npm run dev');
   ld.createLaunchAgent('zzz-up', '/tmp/zzz-up', '/tmp/zzz-up.log', 'npm start');
