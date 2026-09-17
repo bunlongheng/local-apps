@@ -15,8 +15,8 @@ A self-healing dashboard for a fleet of local dev apps. Register an app and it a
 ![Local Apps dashboard](docs/screenshots/dashboard.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Node.js](https://img.shields.io/badge/Node.js-Express-339933?logo=node.js&logoColor=white)
-![Express](https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-22-339933?logo=node.js&logoColor=white)
+![Dependencies](https://img.shields.io/badge/runtime%20deps-2-000000)
 ![SQLite](https://img.shields.io/badge/SQLite-better--sqlite3-003b57?logo=sqlite)
 ![Tests](https://img.shields.io/badge/tests-node%3Atest-6da55f?logo=node.js)
 
@@ -51,11 +51,11 @@ The real win is what it removes. No wall of terminal windows, no `npm run dev` t
 
 ## Architecture
 
-One Node.js service: an Express server (`server.js`) that serves the static vanilla-JS dashboard and owns the control API and all OS orchestration, backed by SQLite. There is no separate frontend and no build step - the browser loads `public/` and talks to the same-origin `/api/*` routes on `:9875`.
+One Node.js service: a `node:http` server (`server.js`) that serves the static vanilla-JS dashboard and owns the control API and all OS orchestration, backed by SQLite. There is no separate frontend and no build step - the browser loads `public/` and talks to the same-origin `/api/*` routes on `:9875`.
 
 ```mermaid
 flowchart LR
-    Browser["Browser / phone (LAN, Tailscale)"] -->|http| API["Express :9875 - dashboard UI + control API"]
+    Browser["Browser / phone (LAN, Tailscale)"] -->|http| API[":9875 - dashboard UI + control API"]
     API --> DB[("SQLite (better-sqlite3)")]
     API --> Caddy["Caddyfile - reverse proxy"]
     API --> Launchd["macOS LaunchAgents"]
@@ -65,7 +65,7 @@ flowchart LR
 | Layer | Role |
 |-------|------|
 | `public/` (vanilla JS) | Dashboard - a same-origin client over the API |
-| `server.js` (Express) | Control plane + static UI host: REST + SSE, provisioning, health loop |
+| `server.js` | Control plane + static UI host: REST + SSE, provisioning, health loop |
 | `db.js` (SQLite) | Data layer - apps, machines, profiles; fully parameterized |
 | `lib/` | Focused, tested modules: `validate`, `auth-gate`, `caddy`, `launchd`, `health` |
 | `scripts/` | Icon generation, onboarding, consistency + storage checks |
@@ -101,8 +101,8 @@ Counters reset the moment an app comes back up.
 
 ## Tech stack
 
-- **Node.js + Express 4** - one service (`server.js`) that serves the dashboard UI and the REST + SSE control API on `:9875`
-- **compression** - gzip on API + UI responses
+- **Node.js 22, no framework** - one service (`server.js`) on `node:http` that serves the dashboard UI and the REST + SSE control API on `:9875`
+- **gzip** - built into `lib/http-app.js` for JSON and static text over 1 KB (the SSE stream is deliberately never wrapped)
 - **Vanilla JS** (`public/app.js`) - the dashboard is a same-origin client; no framework, no build step
 - **better-sqlite3** - embedded, synchronous SQLite via `db.js`
 - **Sharp** + **resvg** - app icon / favicon processing
@@ -154,7 +154,7 @@ The control API **fails closed off-box**. Loopback callers (the localhost dashbo
 ## Project layout
 
 ```
-server.js       Express control API + static UI host: REST + SSE, provisioning, health/restart loop
+server.js       Control API + static UI host: REST + SSE, provisioning, health/restart loop
 db.js           SQLite data layer (better-sqlite3)
 public/         Vanilla-JS dashboard (app.js, app.css, index.html), icons, manifest
 lib/

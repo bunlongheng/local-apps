@@ -1,4 +1,4 @@
-const express = require('express');
+const { createApp, jsonBody, serveStatic } = require('./lib/http-app');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
@@ -13,14 +13,12 @@ const makeCaddy = require('./lib/caddy');
 const makeLaunchd = require('./lib/launchd');
 const makeHealth = require('./lib/health');
 
-const compression = require('compression');
-const app = express();
+const app = createApp();
 // True only when run directly (node server.js), false when require()d by a test - lets the
-// test import the configured Express app without starting the health loops, peer probes, or listener.
+// test import the configured app without starting the health loops, peer probes, or listener.
 const IS_MAIN = require.main === module;
-app.use(compression());
 // Baseline security headers, ported from the former next.config so collapsing to a
-// single Express service (UI + API on :9875) keeps the same posture. HSTS is omitted:
+// single service (UI + API on :9875) keeps the same posture. HSTS is omitted:
 // this is served over plain http on the LAN/tailnet, and forcing HTTPS would break access.
 app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
@@ -69,7 +67,7 @@ const NPM_PATH = (() => {
   catch { return '/opt/homebrew/bin/npm'; }
 })();
 
-app.use(express.json());
+app.use(jsonBody());
 
 // --- Optional shared-secret gate ---------------------------------------------
 // When LOCAL_APPS_TOKEN is set, every mutating request (POST/PUT/DELETE) and every
@@ -94,7 +92,7 @@ app.use((req, res, next) => {
   return res.status(d.status).json({ error: 'unauthorized - control actions and sensitive reads require LOCAL_APPS_TOKEN off localhost' });
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(serveStatic(path.join(__dirname, 'public')));
 
 // --- Caddy reverse-proxy management -> lib/caddy.js ---
 
@@ -1097,7 +1095,7 @@ app.use((err, req, res, _next) => {
   res.status(status).json({ error: status < 500 ? err.message : 'Internal error' });
 });
 
-// This one Express process serves BOTH the dashboard UI (public/index.html) and the
+// This one process serves BOTH the dashboard UI (public/index.html) and the
 // control API, so it must be reachable on the LAN/tailnet for iPad access, the LAN QR,
 // and peer-machine sync. Bind 0.0.0.0 by default; set API_BIND=127.0.0.1 to lock it to
 // localhost-only (and front it with Caddy). The mutating API was already LAN-reachable

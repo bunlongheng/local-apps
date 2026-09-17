@@ -1,4 +1,4 @@
-// Route-level security tests: import the real Express app (IS_MAIN=false, so no listener /
+// Route-level security tests: import the real app (IS_MAIN=false, so no listener /
 // health loops / peer probes start) against an isolated temp DB, listen on an ephemeral port,
 // and assert the input-validation guards reject the audit's injection/traversal vectors.
 // Requests originate from 127.0.0.1 (loopback = trusted by the auth gate), so these isolate the
