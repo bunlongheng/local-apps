@@ -3,7 +3,7 @@
 // from ctx, so this file has no module-level state beyond what it declares itself.
 const os = require('os');
 
-const REQUIRED = ['appRecord', 'db', 'dbg', 'fetchJson', 'sweepSubnet', 'peerRecord', 'IS_HUB', 'IS_MAIN', 'MACHINE_ROLE', 'PORT'];
+const REQUIRED = ['LAN_IP', 'MACHINE_MODEL', 'appRecord', 'db', 'dbg', 'fetchJson', 'sweepSubnet', 'peerRecord', 'IS_HUB', 'IS_MAIN', 'MACHINE_ROLE', 'PORT'];
 
 module.exports = function register(app, ctx) {
   // Fail at boot, not at request time, when server.js forgets to pass a dependency.

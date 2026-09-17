@@ -10,7 +10,7 @@ const path = require('path');
 // Repo root: moved handlers keep resolving files from the project, not from routes/.
 const ROOT = path.join(__dirname, '..');
 
-const REQUIRED = ['IS_HUB', 'db', 'dbg', 'QRCode', 'PORT'];
+const REQUIRED = ['LAN_IP', 'IS_HUB', 'db', 'dbg', 'QRCode', 'PORT'];
 
 module.exports = function register(app, ctx) {
   // Fail at boot, not at request time, when server.js forgets to pass a dependency.
