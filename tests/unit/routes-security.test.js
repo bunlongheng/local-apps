@@ -120,3 +120,17 @@ test('/api/status says whether the viewer is on the box; the SSE stream pings ev
     assert.equal(frame, ': ping\n\n');
   } finally { mock.timers.reset(); }
 });
+
+test('/api/log/:id returns exactly the last 30 lines of a log larger than the 64KB tail, and [] for a missing file', async () => {
+  const db = require('../../db');
+  const logPath = path.join(os.tmpdir(), `zzz-log-${process.pid}.log`);
+  const lines = []; for (let i = 1; i <= 200; i++) lines.push(`line ${String(i).padStart(4, '0')} ` + 'x'.repeat(1000));
+  fs.writeFileSync(logPath, lines.join('\n') + '\n');
+  db.upsertApp({ id: 'zzz-log', localPath: '/tmp/zzz-log', logPath });
+  const got = (await (await fetch(base + '/api/log/zzz-log')).json()).lines;
+  assert.equal(got.length, 30); assert.deepEqual(got, lines.slice(-30));
+  fs.unlinkSync(logPath);
+  assert.deepEqual(await (await fetch(base + '/api/log/zzz-log')).json(), { lines: [] });
+  db.upsertApp({ id: 'zzz-nolog', localPath: '/tmp/zzz-nolog' });
+  assert.deepEqual(await (await fetch(base + '/api/log/zzz-nolog')).json(), { lines: [] }, 'no logPath configured');
+});
