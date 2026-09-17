@@ -38,3 +38,14 @@ test('POST /api/apps rejects a launchAgent injection payload (the RCE vector)', 
   assert.equal(await req('POST', '/api/apps', { id: 'zzz-evil', launchAgent: 'x; touch /tmp/pwned; #' }), 400);
   assert.equal(await req('POST', '/api/apps', { id: 'zzz-evil', launchAgentPath: '/tmp/a";evil.plist' }), 400);
 });
+
+test('PUT /api/app-profiles/:id cannot rewrite exec-bound fields', async () => {
+  // Seed through db.js: POST /api/apps provisions a LaunchAgent + Caddy entry, which is
+  // macOS-only and not what this test is about.
+  require('../../db').upsertApp({ id: 'zzz-prof', localPath: '/tmp/zzz-prof', launchAgent: 'com.example.zzz-prof', startCommand: 'npm run dev' });
+  assert.equal(await req('PUT', '/api/app-profiles/zzz-prof', { about: 'x', launchAgent: 'evil; touch /tmp/pwned', startCommand: 'rm -rf /' }), 200);
+  const r = await fetch(base + '/api/apps/zzz-prof'); const a = await r.json();
+  assert.equal(a.about, 'x');
+  assert.notEqual(a.launchAgent, 'evil; touch /tmp/pwned');
+  assert.notEqual(a.startCommand, 'rm -rf /');
+});
