@@ -1,8 +1,6 @@
-<div align="center">
-  <img src="docs/icon.png" alt="Local Apps" width="96" height="96" />
-  <h1>Local Apps</h1>
-  <p><em>Self-healing dashboard for a fleet of local dev apps</em></p>
-</div>
+# Local Apps
+
+Self-healing dashboard for a fleet of local dev apps.
 
 Register an app once. Local Apps assigns it a port, writes its Caddy reverse proxy and macOS LaunchAgent, health-checks it every 30 seconds, restarts it when it crashes, and exposes it by name over LAN and Tailscale. One page instead of a wall of `npm run dev` tabs. It runs 65 apps on a base M4 Mac Mini, about 6 awake at a time, the rest parked at zero cost.
 
