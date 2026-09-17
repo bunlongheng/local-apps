@@ -53,7 +53,8 @@ function boot({ status, machines = [], peerStatus = null }) {
   };
   w.confirm = () => true;
   w.eval(APP_JS);
-  const settle = () => new Promise((r) => setTimeout(r, 10));   // real timer: let the fetch promises resolve
+  // Bounded wait on the microtask/IO queue for the fetch chains, not a fixed sleep: a loaded runner must not flake.
+  const settle = async (pred = () => true) => { for (let i = 0; i < 200; i++) { await new Promise((r) => setImmediate(r)); if (i >= 5 && pred()) return; } throw new Error('settle timeout'); };
   return { w, clock, sources, requests, settle, root: () => w.document.getElementById('root'), close: () => w.close() };
 }
 
