@@ -27,6 +27,9 @@ const IS_MAIN = require.main === module;
 // Failures the chain deliberately tolerates (a bootout on a service that is not loaded,
 // a kill on a free port) are logged, never swallowed: LOCAL_APPS_DEBUG=1 prints them.
 const dbg = (where, e) => { if (process.env.LOCAL_APPS_DEBUG) console.warn(`  [debug] ${where}: ${e && e.message ? e.message : e}`); };
+// App logs live in a per-user directory, never in world-shared /tmp with a guessable name.
+const LOG_DIR = process.platform === 'darwin' ? path.join(os.homedir(), 'Library', 'Logs', 'local-apps') : path.join(os.tmpdir(), `local-apps-${process.getuid ? process.getuid() : 'user'}`);
+try { fs.mkdirSync(LOG_DIR, { recursive: true }); } catch (e) { dbg('logdir', e); }
 // Baseline security headers, ported from the former next.config so collapsing to a
 // single service (UI + API on :9875) keeps the same posture. HSTS is omitted:
 // this is served over plain http on the LAN/tailnet, and forcing HTTPS would break access.
@@ -209,7 +212,7 @@ function setupInfra(id, data) {
 
   // LaunchAgent
   if (data.localPath) {
-    const logPath = data.logPath || `/tmp/${id}.log`;
+    const logPath = data.logPath || path.join(LOG_DIR, `${id}.log`);
     const la = createLaunchAgent(id, data.localPath, logPath, data.startCommand);
     result.launchAgent = la.launchAgent;
     result.launchAgentPath = la.launchAgentPath;
@@ -390,14 +393,14 @@ async function checkAll() {
       if (level >= 1 && level <= 3) {
         recordAttempt(s, Date.now());
         try {
-          await runLevel(level, { id: appCfg.id, uid, label, plistPath, port, dir: appCfg.localPath, logPath: appCfg.logPath || `/tmp/${appCfg.id}.log` },
+          await runLevel(level, { id: appCfg.id, uid, label, plistPath, port, dir: appCfg.localPath, logPath: appCfg.logPath || path.join(LOG_DIR, `${appCfg.id}.log`) },
             { exec: execAsync, killPort, exists: fs.existsSync, log: console.log, warn: console.warn, startCmd, bootoutCmd });
         } catch (e) { dbg(`L${level}`, e); }
       }
       // Level 4: hand the failure to the local agent (last resort, opt-in)
       else if (level === 4) {
         const dir = appCfg.localPath;
-        const logPath = appCfg.logPath || `/tmp/${appCfg.id}.log`;
+        const logPath = appCfg.logPath || path.join(LOG_DIR, `${appCfg.id}.log`);
         if (dir && fs.existsSync(dir)) {
           console.log(`  [L4] deploying Claude agent: ${appCfg.id}`);
           const prompt = `The app "${appCfg.id}" at ${dir} has been down for ${Math.round(downDuration/60000)} minutes. `
@@ -447,7 +450,7 @@ if (IS_MAIN) fs.watch(path.join(__dirname, 'public'), { recursive: true }, () =>
 
 // --- Routes live in routes/*.js, registered against a small ctx. LAN_IP, TAILSCALE_IP and
 // MACHINE_MODEL are getters because they refresh on timers. ---
-const ctx = { appRecord, bootoutCmd, getNextAvailablePort, isPortTaken, killPort, AUTH_TOKEN, CHROME_EXT_ERROR, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT, QRCode, addCaddyEntry, broadcast, checkSingle, clearState, db, dbg, execAsync, execSync, fetchJson, forViewer, getState, isChromeExtensionRepo, isValidId, peerRecord, renameCaddyEntry, setupInfra, spawn, sseClients, startCmd, sweepSubnet, teardownInfra, updateTabColors, validateAppFields,
+const ctx = { LOG_DIR, appRecord, bootoutCmd, getNextAvailablePort, isPortTaken, killPort, AUTH_TOKEN, CHROME_EXT_ERROR, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT, QRCode, addCaddyEntry, broadcast, checkSingle, clearState, db, dbg, execAsync, execSync, fetchJson, forViewer, getState, isChromeExtensionRepo, isValidId, peerRecord, renameCaddyEntry, setupInfra, spawn, sseClients, startCmd, sweepSubnet, teardownInfra, updateTabColors, validateAppFields,
   LAN_IP: () => LAN_IP, TAILSCALE_IP: () => TAILSCALE_IP, MACHINE_MODEL: () => MACHINE_MODEL };
 require('./routes/apps')(app, ctx);
 require('./routes/meta')(app, ctx);
