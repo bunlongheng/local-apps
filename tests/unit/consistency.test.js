@@ -28,3 +28,43 @@ test('launch-agent passes when the row plist exists, whatever its label prefix',
   assert.equal(checks.find(([k]) => k === 'launch-agent')[1], true);
   fs.unlinkSync(plist);
 });
+
+test('all 9 artifact rules pass on a fully wired fixture and each fails alone when its artifact is missing', () => {
+  const { P } = require('../../scripts/consistency');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cons-'));
+  const id = 'zzz-wired';
+  const mk = (rel, body) => { const f = path.join(home, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, body); return f; };
+  const plist = mk('LaunchAgents/com.t.zzz-wired.plist', '<plist/>');
+  Object.assign(P, {
+    favDir: path.dirname(mk('favicons/zzz-wired.png', 'png')), saiDir: path.dirname(mk('app-icons/zzz-wired.png', 'png')),
+    reg: mk('app-icons.ts', `export const ICONS = { "${id}": "zzz-wired.png" };`),
+    colors: mk('tab-colors.json', JSON.stringify({ [id]: { label: 'W', r: 1, g: 2, b: 3 } })),
+    tabsh: mk('claude-tabs.sh', '_tab_defs() { :; }\n'),
+    caddy: mk('Caddyfile', `${id}.localhost {\n  reverse_proxy localhost:4000\n}\n`),
+  });
+  db.upsertApp({ id, localPath: path.join(home, 'repo'), launchAgentPath: plist, about: 'About', features: ['f1'], repo: 'https://github.com/x/y', prodUrl: 'https://y.example.com' });
+  const ok = checkApp(id);
+  assert.deepEqual(ok.checks.map(([k]) => k), ['favicon', 'stickies-icon', 'stickies-reg', 'tab-color', 'tab-alias', 'caddy-host', 'launch-agent', 'profile', 'repo', 'prod-url']);
+  assert.deepEqual(ok.checks.filter(([, v]) => !v), [], 'fully wired: no misses');
+  assert.equal(audit(id)[0].ok, true);
+  // Knock each artifact out in turn and expect exactly that rule to miss.
+  const knock = {
+    'favicon': () => fs.unlinkSync(path.join(P.favDir, 'zzz-wired.png')), 'stickies-icon': () => fs.unlinkSync(path.join(P.saiDir, 'zzz-wired.png')),
+    'stickies-reg': () => fs.writeFileSync(P.reg, 'export const ICONS = {};'), 'tab-color': () => fs.writeFileSync(P.colors, '{}'),
+    'caddy-host': () => fs.writeFileSync(P.caddy, ''), 'launch-agent': () => fs.unlinkSync(plist),
+    'profile': () => db.upsertApp({ id, about: '' }), 'repo': () => db.upsertApp({ id, repo: '' }),
+  };
+  for (const [rule, fn] of Object.entries(knock)) {
+    fn();
+    const misses = audit(id)[0].misses;
+    assert.ok(misses.includes(rule), `${rule} reported after removal (got ${misses})`);
+  }
+  // tab-alias: a hand-written shortcut alias is drift even when the generator exists.
+  fs.writeFileSync(P.colors, JSON.stringify({ [id]: { r: 1, g: 2, b: 3 } })); fs.writeFileSync(P.tabsh, `_tab_defs() { :; }\n_zw() { _tab "${id}"; }\n`);
+  const r = audit(id)[0]; assert.ok(r.misses.includes('tab-alias')); assert.match(r.note, /shortcut alias _zw/);
+  // prod-url: only a Vercel app must carry one.
+  fs.mkdirSync(path.join(home, 'repo', '.vercel'), { recursive: true }); fs.writeFileSync(path.join(home, 'repo', '.vercel', 'project.json'), '{}');
+  db.upsertApp({ id, prodUrl: '' });
+  assert.ok(audit(id)[0].misses.includes('prod-url'));
+  fs.rmSync(home, { recursive: true, force: true });
+});

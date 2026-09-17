@@ -117,5 +117,6 @@ function main() {
   process.exit(id && dirty.length ? 1 : 0);
 }
 
-module.exports = { checkApp, audit };
+// P is exported so tests can point every rule at fixture paths instead of the owner's home.
+module.exports = { checkApp, audit, P };
 if (require.main === module) main();
