@@ -22,7 +22,8 @@ module.exports = function register(app, ctx) {
 
   async function discoverPeers() {
     // Hub-only: an agent machine has no business sweeping the LAN every 30s.
-    if (!IS_HUB || ctx.LAN_IP() === 'N/A') return;
+    // LOCAL_APPS_NO_SWEEP=1: a hub-role scratch instance (CI) must not probe 253 hosts.
+    if (!IS_HUB || ctx.LAN_IP() === 'N/A' || process.env.LOCAL_APPS_NO_SWEEP === '1') return;
     discoveredPeers = await sweepSubnet(ctx.LAN_IP(), probeHost, { concurrency: 32 });
     // Sync to DB
     for (const p of discoveredPeers) {

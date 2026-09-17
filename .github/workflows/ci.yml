@@ -33,9 +33,9 @@ jobs:
         run: npm run test:coverage
       - name: Dashboard per-file coverage floor (public/app.js)
         run: npm run test:coverage:dashboard
-      - name: E2E against a booted instance (agent role, loopback only)
+      - name: E2E against a booted instance (hub role so the hub-only routes get a pass; no LAN sweep, loopback only)
         run: |
-          MACHINE_ROLE=agent API_BIND=127.0.0.1 LOCAL_APPS_DB=/tmp/ci-local.db node server.js > /tmp/ci-server.log 2>&1 &
+          MACHINE_ROLE=hub LOCAL_APPS_NO_SWEEP=1 LOCAL_APPS_HOME=$RUNNER_TEMP/home API_BIND=127.0.0.1 LOCAL_APPS_DB=/tmp/ci-local.db node server.js > /tmp/ci-server.log 2>&1 &
           for i in $(seq 1 20); do curl -sf http://127.0.0.1:9875/api/status > /dev/null && break; sleep 1; done
           E2E_MUTATE=1 npm run test:e2e || { echo '--- server log ---'; cat /tmp/ci-server.log; exit 1; }
           kill %1
