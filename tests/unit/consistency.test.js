@@ -22,12 +22,12 @@ test('audit lists every app in the db with a misses array', () => {
 });
 
 test('launch-agent passes when the row plist exists, whatever its label prefix', () => {
-  const plist = path.join(os.tmpdir(), `com.someone.zzz-cons2-${process.pid}.plist`);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cons2-')); TMP_DIRS.push(dir);
+  const plist = path.join(dir, 'com.someone.zzz-cons2.plist');
   fs.writeFileSync(plist, '<plist/>');
   db.upsertApp({ id: 'zzz-cons2', localPath: '/tmp/zzz-cons2', launchAgentPath: plist });
   const { checks } = checkApp('zzz-cons2');
   assert.equal(checks.find(([k]) => k === 'launch-agent')[1], true);
-  fs.unlinkSync(plist);
 });
 
 test('all 10 artifact rules pass on a fully wired fixture and removing artifacts one by one grows the miss set by exactly that rule', () => {
