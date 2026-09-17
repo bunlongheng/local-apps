@@ -458,7 +458,7 @@
       var fav = app.icon || faviconCache[app.id];
       var chipLogo = fav
         ? '<img class="tab-chip-logo" src="' + esc(fav) + '" alt="">'
-        : (tc.icon ? '<span class="tab-chip-icon">' + tc.icon + "</span>" : "");
+        : (tc.icon ? '<span class="tab-chip-icon">' + esc(tc.icon) + "</span>" : "");
       h += '<span class="tab-chip" data-act="copy" data-copy="' + esc(cmd) + '" title="' + esc(cmd) + '" style="background:' + esc(tc.color || "#333") + '">' +
         chipLogo + '<span class="tab-chip-alias">' + esc(tc.alias) + "</span></span>";
     }
