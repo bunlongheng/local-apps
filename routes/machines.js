@@ -49,7 +49,7 @@ module.exports = function register(app, ctx) {
   // Discover on boot + every 30s
   if (IS_MAIN) {
     discoverPeers();
-    setInterval(discoverPeers, 30000);
+    setInterval(discoverPeers, 120000);   // peers appear rarely; 253 probes every 30s was the cost of nothing
   }
 
   app.get('/api/machines', (req, res) => {
