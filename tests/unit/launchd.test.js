@@ -58,14 +58,16 @@ test('createLaunchAgent applies xmlEscape to values containing XML metacharacter
   assert.ok(!plist.includes('/tmp/a & b"'), 'raw unescaped value must not appear');
 });
 
-test('createLaunchAgent is idempotent - a second call with an existing plist returns the same result and does not overwrite it', () => {
+test('createLaunchAgent is idempotent for identical arguments and rewrites for changed ones', () => {
   const { launchd } = fresh();
   const first = launchd.createLaunchAgent('my-app', '/tmp/first', '/tmp/first.log', 'npm run dev');
   const before = fs.readFileSync(first.launchAgentPath, 'utf8');
-  const second = launchd.createLaunchAgent('my-app', '/tmp/second', '/tmp/second.log', 'npm start');
-  assert.deepEqual(second, first);
-  const after = fs.readFileSync(first.launchAgentPath, 'utf8');
-  assert.equal(after, before, 'plist must not be rewritten for an id that already has one');
+  const same = launchd.createLaunchAgent('my-app', '/tmp/first', '/tmp/first.log', 'npm run dev');
+  assert.deepEqual(same, first);
+  assert.equal(fs.readFileSync(first.launchAgentPath, 'utf8'), before, 'identical arguments leave the plist untouched');
+  const changed = launchd.createLaunchAgent('my-app', '/tmp/second', '/tmp/second.log', 'npm start');
+  assert.deepEqual(changed, first, 'same label and path');
+  assert.notEqual(fs.readFileSync(first.launchAgentPath, 'utf8'), before, 'changed arguments rewrite the plist (a PUT must take effect)');
 });
 
 test('createLaunchAgent returns nulls when localPath is missing', () => {
@@ -81,4 +83,16 @@ test('removeLaunchAgent unloads via the injected exec and deletes the plist file
   launchd.removeLaunchAgent('gone-app');
   assert.ok(!fs.existsSync(res.launchAgentPath), 'plist must be deleted');
   assert.ok(execCalls.some(c => c.includes('launchctl unload') && c.includes(res.launchAgentPath)));
+});
+
+test('createLaunchAgent is an upsert: a changed start command rewrites the plist', () => {
+  const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'la-up-')); const calls = [];
+  const ld = require('../../lib/launchd')({ username: 'you', launchAgentsDir: dir, npmPath: '/usr/bin/npm', xmlEscape: (s) => String(s), exec: (c) => calls.push(c) });
+  ld.createLaunchAgent('zzz-up', '/tmp/zzz-up', '/tmp/zzz-up.log', 'npm run dev');
+  ld.createLaunchAgent('zzz-up', '/tmp/zzz-up', '/tmp/zzz-up.log', 'npm start');
+  const plist = fs.readFileSync(path.join(dir, 'com.you.zzz-up.plist'), 'utf8');
+  assert.match(plist, /start/); assert.doesNotMatch(plist, /run dev/);
+  assert.ok(calls.some(c => /bootout/.test(c)), 'old service booted out before the rewrite');
+  fs.rmSync(dir, { recursive: true, force: true });
 });
