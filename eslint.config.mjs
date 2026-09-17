@@ -4,7 +4,7 @@ import js from '@eslint/js';
 export default [
   { ignores: ['node_modules/**'] },
   {
-    files: ['server.js', 'db.js', 'launchctl-cmds.js', 'lib/**/*.js', 'scripts/**/*.js', 'tests/**/*.js'],
+    files: ['server.js', 'db.js', 'launchctl-cmds.js', 'lib/**/*.js', 'routes/**/*.js', 'scripts/**/*.js', 'tests/**/*.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'commonjs',

@@ -3,7 +3,11 @@
 // from ctx, so this file has no module-level state beyond what it declares itself.
 const fs = require('fs');
 
+const REQUIRED = ['getNextAvailablePort', 'killPort', 'db', 'dbg', 'broadcast', 'sseClients', 'getState', 'clearState', 'checkSingle', 'setupInfra', 'teardownInfra', 'updateTabColors', 'forViewer', 'startCmd', 'execAsync', 'execSync', 'spawn', 'validateAppFields', 'isValidId', 'isChromeExtensionRepo', 'CHROME_EXT_ERROR', 'addCaddyEntry', 'renameCaddyEntry'];
+
 module.exports = function register(app, ctx) {
+  // Fail at boot, not at request time, when server.js forgets to pass a dependency.
+  for (const k of REQUIRED) if (!(k in ctx)) throw new Error(`routes/apps.js: ctx is missing ${k}`);
   const { getNextAvailablePort, killPort, db, dbg, broadcast, sseClients, getState, clearState, checkSingle, setupInfra, teardownInfra, updateTabColors, forViewer, startCmd, execAsync, execSync, spawn, validateAppFields, isValidId, isChromeExtensionRepo, CHROME_EXT_ERROR, addCaddyEntry, renameCaddyEntry } = ctx;
 
 
