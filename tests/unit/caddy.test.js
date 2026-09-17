@@ -34,7 +34,7 @@ test('addCaddyEntry writes a block with the hostname and reverse_proxy target', 
   assert.equal(domain, 'http://myapp.localhost');
   const content = fs.readFileSync(caddyfile, 'utf8');
   assert.ok(content.includes('http://myapp.localhost {'), 'block header present');
-  assert.ok(content.includes('reverse_proxy 1.2.3.4:4000'), 'reverse_proxy target present');
+  assert.ok(content.includes('reverse_proxy 127.0.0.1:4000'), 'reverse_proxy target present');
 });
 
 test('addCaddyEntry validates then reloads caddy via the injected exec', () => {
@@ -65,7 +65,7 @@ test('removeCaddyEntry removes only the matching block, leaving other entries in
   const content = fs.readFileSync(caddyfile, 'utf8');
   assert.ok(!content.includes('one.localhost'), 'removed id must be gone');
   assert.ok(content.includes('two.localhost'), 'other id must survive');
-  assert.ok(content.includes('reverse_proxy 1.2.3.4:4002'), 'other id target must survive');
+  assert.ok(content.includes('reverse_proxy 127.0.0.1:4002'), 'other id target must survive');
 });
 
 test('renameCaddyEntry removes the old id and adds the new id at the new port', () => {
@@ -76,5 +76,5 @@ test('renameCaddyEntry removes the old id and adds the new id at the new port', 
   const content = fs.readFileSync(caddyfile, 'utf8');
   assert.ok(!content.includes('old-name.localhost'), 'old id must be gone');
   assert.ok(content.includes('new-name.localhost'), 'new id must be present');
-  assert.ok(content.includes('reverse_proxy 1.2.3.4:4005'), 'new port must be used');
+  assert.ok(content.includes('reverse_proxy 127.0.0.1:4005'), 'new port must be used');
 });
