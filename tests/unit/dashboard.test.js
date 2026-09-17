@@ -38,7 +38,7 @@ function fakeClock(w) {
   };
 }
 
-function boot({ status, machines = [], peerStatus = null }) {
+function boot({ status, machines = [], peerStatus = null, failMutations = false }) {
   const dom = new JSDOM(INDEX, { url: 'http://localhost:9875/', runScripts: 'outside-only', pretendToBeVisual: true });
   const w = dom.window;
   const clock = fakeClock(w);
@@ -49,7 +49,7 @@ function boot({ status, machines = [], peerStatus = null }) {
   const requests = [];   // every non-GET call the dashboard makes: { method, path }
   w.fetch = (p, opts) => {
     const method = (opts && opts.method) || 'GET';
-    if (method !== 'GET') { requests.push({ method, path: p }); return Promise.resolve({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: () => Promise.resolve(p.endsWith('/toggle') ? { id: 'alpha', disabled: true } : { ok: true }) }); }
+    if (method !== 'GET') { requests.push({ method, path: p }); if (failMutations) return Promise.resolve({ ok: false, status: 500, headers: { get: () => 'application/json' }, json: () => Promise.resolve({ error: 'nope' }) }); return Promise.resolve({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: () => Promise.resolve(p.endsWith('/toggle') ? { id: 'alpha', disabled: true } : { ok: true }) }); }
     return Promise.resolve({ ok: p in routes, status: p in routes ? 200 : 404, headers: { get: () => 'application/json' }, json: () => Promise.resolve(routes[p]) });
   };
   w.confirm = () => true;
@@ -58,7 +58,7 @@ function boot({ status, machines = [], peerStatus = null }) {
   new vm.Script(APP_JS, { filename: path.join(ROOT, 'public', 'app.js') }).runInContext(dom.getInternalVMContext());
   // Bounded wait on the microtask/IO queue for the fetch chains, not a fixed sleep: a loaded runner must not flake.
   const settle = async (pred = () => true) => { for (let i = 0; i < 200; i++) { await new Promise((r) => setImmediate(r)); if (i >= 5 && pred()) return; } throw new Error('settle timeout'); };
-  return { w, clock, sources, requests, settle, root: () => w.document.getElementById('root'), close: () => w.close() };
+  return { w, clock, sources, requests, routes, settle, root: () => w.document.getElementById('root'), close: () => w.close() };
 }
 
 test('an off-box viewer gets no toggle, start/stop or delete controls; on the box they render', async () => {
@@ -194,4 +194,49 @@ test('QR overlay, help dialog, copy buttons and the log tail of a down app', asy
   t.root().querySelector('.copy-btn[data-act="copy"]').click(); await t.settle();
   assert.equal(copied.at(-1), 'http://alpha.localhost', 'first info row is the Caddy host');
   t.close();
+});
+
+test('a failed stop, toggle or delete leaves the row as it was and says so; a cancelled confirm sends no DELETE', async () => {
+  const t = boot({ status: ON, failMutations: true });
+  await t.settle();
+  t.root().querySelector('tr[data-act="open"]').click(); await t.settle();
+  t.root().querySelector('[data-act="stop"]').click(); await t.settle(() => /Stop failed/.test(t.root().textContent));
+  assert.ok(t.root().querySelector('tr[data-act="open"] .dot').classList.contains('up'), 'no optimistic flip on a failed stop');
+  t.root().querySelector('[data-act="toggle"]').click(); await t.settle(() => /Toggle failed/.test(t.root().textContent));
+  assert.equal(t.root().querySelector('[data-act="toggle"]').getAttribute('aria-checked'), 'true', 'switch unchanged on a failed toggle');
+  t.w.confirm = () => false;
+  t.root().querySelector('[data-act="delete"]').click(); await t.settle();
+  assert.ok(!t.requests.some(r => r.method === 'DELETE'), 'a cancelled confirm sends nothing');
+  t.w.confirm = () => true;
+  t.root().querySelector('[data-act="delete"]').click(); await t.settle(() => /Delete failed/.test(t.root().textContent));
+  assert.deepEqual(t.requests.at(-1), { method: 'DELETE', path: '/api/apps/alpha' });
+  assert.ok(t.root().querySelector('tr[data-act="open"]'), 'row still present after a failed delete');
+  t.close();
+});
+
+test('start posts, shows the startup phase from the 2s log poll, and gives up after 60s; a failed start says so', async () => {
+  const t = boot({ status: { ...ON, apps: [{ ...APPS[0], status: 'down', logPath: '/tmp/alpha.log' }] } });
+  await t.settle();
+  t.root().querySelector('tr[data-act="open"]').click(); await t.settle();
+  t.routes['/api/log/alpha'] = { lines: [] };
+  t.root().querySelector('[data-act="start"]').click(); await t.settle();
+  assert.deepEqual(t.requests.at(-1), { method: 'POST', path: '/api/start/alpha' });
+  assert.match(t.root().querySelector('.phase-chip').textContent, /Starting/);
+  t.routes['/api/log/alpha'] = { lines: ['> next dev', '- Local: http://localhost:4000', '✓ Ready in 900ms'] };
+  const polls = () => t.w.document.querySelectorAll('.phase-chip').length;
+  t.clock.tick(2000); await t.settle(() => /Server ready/.test(t.root().textContent));
+  assert.equal(t.root().querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '70');
+  t.routes['/api/log/alpha'] = { lines: ['Error: listen EADDRINUSE'] };
+  t.clock.tick(2000); await t.settle(() => /Error - check log/.test(t.root().textContent));
+  t.clock.tick(60000); await t.settle();
+  assert.equal(polls(), 0, 'after 60s the startup row is gone and the poll is cleared');
+  const before = t.requests.length; t.clock.tick(10000); await t.settle();
+  assert.equal(t.requests.length, before, 'no further requests after the give-up');
+  t.close();
+  const f = boot({ status: { ...ON, apps: [{ ...APPS[0], status: 'down' }] }, failMutations: true });
+  await f.settle();
+  f.root().querySelector('tr[data-act="open"]').click(); await f.settle();
+  f.root().querySelector('[data-act="start"]').click(); await f.settle(() => /Start failed/.test(f.root().textContent));
+  assert.equal(f.w.document.querySelector('.phase-chip'), null, 'no startup row after a failed start');
+  f.close();
 });
