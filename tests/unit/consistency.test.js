@@ -9,7 +9,8 @@ const TMP_DB = path.join(os.tmpdir(), `local-apps-consistency-${process.pid}.db`
 process.env.LOCAL_APPS_DB = TMP_DB;
 const db = require('../../db');
 const { audit, checkApp } = require('../../scripts/consistency');
-after(() => { for (const s of ['', '-shm', '-wal']) { try { fs.unlinkSync(TMP_DB + s); } catch { /* not created */ } } });
+const TMP_DIRS = [];
+after(() => { for (const s of ['', '-shm', '-wal']) { try { fs.unlinkSync(TMP_DB + s); } catch { /* not created */ } } for (const d of TMP_DIRS) fs.rmSync(d, { recursive: true, force: true }); });
 
 test('audit lists every app in the db with a misses array', () => {
   db.upsertApp({ id: 'zzz-cons', localPath: '/tmp/zzz-cons', launchAgentPath: '/tmp/definitely-missing.plist' });
@@ -31,7 +32,7 @@ test('launch-agent passes when the row plist exists, whatever its label prefix',
 
 test('all 10 artifact rules pass on a fully wired fixture and removing artifacts one by one grows the miss set by exactly that rule', () => {
   const { P } = require('../../scripts/consistency');
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cons-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cons-')); TMP_DIRS.push(home);
   const id = 'zzz-wired';
   const mk = (rel, body) => { const f = path.join(home, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, body); return f; };
   const plist = mk('LaunchAgents/com.t.zzz-wired.plist', '<plist/>');
@@ -67,5 +68,4 @@ test('all 10 artifact rules pass on a fully wired fixture and removing artifacts
   fs.mkdirSync(path.join(home, 'repo', '.vercel'), { recursive: true }); fs.writeFileSync(path.join(home, 'repo', '.vercel', 'project.json'), '{}');
   db.upsertApp({ id, prodUrl: '' });
   assert.ok(audit(id)[0].misses.includes('prod-url'));
-  fs.rmSync(home, { recursive: true, force: true });
 });
