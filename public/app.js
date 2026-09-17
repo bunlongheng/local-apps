@@ -466,7 +466,7 @@
     var tabLabel = (PROFILE_TABS.filter(function (t) { return t.key === S.modalTab; })[0] || { label: "" }).label;
     h += '<div class="toggle-row"><span class="modal-tab-title">' + esc(tabLabel) + "</span>" +
       '<div class="toggle-group"><span class="toggle-label ' + (app.disabled ? "off" : "on") + '">' + (app.disabled ? "OFF" : "ON") + "</span>" +
-      (S.activeMachine ? '<span class="muted">read-only on a peer</span>' : '<button class="toggle ' + (app.disabled ? "off" : "on") + '" data-act="toggle" data-id="' + esc(app.id) + '" data-name="' + esc(app.name) + '"><span class="toggle-knob" style="left:' + (app.disabled ? 2 : 18) + 'px"></span></button>') + '</div></div>';
+      (S.activeMachine ? '<span class="muted">read-only on a peer</span>' : '<button class="toggle ' + (app.disabled ? "off" : "on") + '" role="switch" aria-checked="' + (app.disabled ? "false" : "true") + '" aria-label="' + esc(app.name) + ' enabled" data-act="toggle" data-id="' + esc(app.id) + '" data-name="' + esc(app.name) + '"><span class="toggle-knob" style="left:' + (app.disabled ? 2 : 18) + 'px"></span></button>') + '</div></div>';
     // tabs
     h += '<div class="tabs">' + PROFILE_TABS.map(function (t) {
       var active = S.modalTab === t.key;
