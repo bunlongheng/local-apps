@@ -606,7 +606,7 @@
     if (!cmdk.matches.length) return;
     cmdk.i = (cmdk.i + d + cmdk.matches.length) % cmdk.matches.length;
     renderCmdkResults();
-    var el = document.querySelector(".cmdk-item.active"); if (el) el.scrollIntoView({ block: "nearest" });
+    var el = document.querySelector(".cmdk-item.active"); if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest" });
   }
 
   // ---- events -----------------------------------------------------------
