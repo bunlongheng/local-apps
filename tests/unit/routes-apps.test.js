@@ -24,12 +24,12 @@ function call(fn, { params = {}, body = {} } = {}) {
     if (out && out.catch) out.catch((e) => resolve({ status: 500, body: { error: e.message } }));
   });
 }
-function boot(apps) {
+function boot(apps, { taken = null, nextPort = 3999, tailscale = null } = {}) {
   const calls = [], db = fakeDb(apps), states = {}; const { app, routes } = fakeApp();
   const ctx = {
-    LAN_IP: () => '10.0.0.5', TAILSCALE_IP: () => null, MACHINE_MODEL: () => 'Mac', isLoopback: () => true, clientAddress: () => '127.0.0.1',
+    LAN_IP: () => '10.0.0.5', TAILSCALE_IP: () => tailscale, MACHINE_MODEL: () => 'Mac', isLoopback: () => true, clientAddress: () => '127.0.0.1',
     bootoutCmd: (u, l) => `bootout ${l}`, startCmd: (u, l) => `start ${l}`, PORT: 9875, MACHINE_ROLE: 'hub',
-    getNextAvailablePort: () => 3999, isPortTaken: () => null, killPort: async (p) => calls.push(`killPort:${p}`), db, dbg: () => {},
+    getNextAvailablePort: () => nextPort, isPortTaken: (p, ex) => (taken && taken.port === p && taken.id !== ex ? taken.id : null), killPort: async (p) => calls.push(`killPort:${p}`), db, dbg: () => {},
     broadcast: (e) => calls.push(`sse:${e.type}:${e.id || ''}:${e.status || ''}`), sseClients: new Set(),
     getState: (id) => (states[id] ||= { status: 'up' }), clearState: (id) => calls.push(`clearState:${id}`), checkSingle: (a) => calls.push(`recheck:${a.id}`),
     setupInfra: (id, data) => { calls.push(`setupInfra:${id}:${data.localUrl || ''}`); return { caddyUrl: `http://${id}.localhost`, launchAgent: `com.t.${id}` }; },
@@ -112,4 +112,28 @@ test('PUT renames the Caddy block when caddyUrl changes, adds one when there was
   calls.length = 0;
   await call(routes['PUT /api/apps/:id'], { params: { id: 'a' }, body: { name: 'Renamed' } });
   assert.ok(calls.includes('tabs:a:Renamed'), calls.join()); assert.ok(!calls.some(x => x.startsWith('caddy:')), 'a rename alone touches no Caddy block');
+});
+
+test('PUT and POST answer 409 with a suggestion when the port belongs to another app; an app may keep its own port; no suggestion when the range is full', async () => {
+  const { routes, db } = boot([A, B], { taken: { port: 4001, id: 'b' } });
+  const r = await call(routes['PUT /api/apps/:id'], { params: { id: 'a' }, body: { localUrl: 'http://localhost:4001' } });
+  assert.equal(r.status, 409); assert.match(r.body.error, /already used by "b"/); assert.equal(r.body.suggestedPort, 3999); assert.equal(r.body.suggestedUrl, 'http://localhost:3999');
+  assert.equal(db.getApp('a').localUrl, 'http://localhost:4000', 'nothing written on a conflict');
+  assert.equal((await call(routes['PUT /api/apps/:id'], { params: { id: 'b' }, body: { localUrl: 'http://localhost:4001' } })).status, 200, 'an app is not in conflict with itself');
+  assert.equal((await call(routes['POST /api/apps'], { body: { id: 'new', localUrl: 'http://localhost:4001' } })).status, 409);
+  const full = boot([A, B], { taken: { port: 4001, id: 'b' }, nextPort: null });
+  const f = await call(full.routes['POST /api/apps'], { body: { id: 'new', localUrl: 'http://localhost:4001' } });
+  assert.equal(f.status, 409); assert.equal(f.body.suggestedPort, null); assert.equal(f.body.suggestedUrl, null);
+});
+
+test('GET /api/status derives mode from the start command and rewrites LAN and Tailscale urls', async () => {
+  const apps = [{ id: 'p', name: 'P', localUrl: 'http://localhost:4000', startCommand: 'npm start' }, { id: 'd', name: 'D', localUrl: 'http://localhost:4001', startCommand: 'npm run dev' }, { id: 'x', name: 'X', localUrl: 'http://localhost:4002', startCommand: 'next start --dev' }, { id: 'n', name: 'N' }];
+  const t = boot(apps, { tailscale: '100.64.0.9' });
+  const r = await call(t.routes['GET /api/status']);
+  const by = Object.fromEntries(r.body.apps.map(a => [a.id, a]));
+  assert.equal(by.p.mode, 'prod'); assert.equal(by.d.mode, 'dev'); assert.equal(by.x.mode, 'dev', 'a dev flag wins'); assert.equal(by.n.mode, 'dev');
+  assert.equal(by.p.lanUrl, 'http://10.0.0.5:4000'); assert.equal(by.p.tailscaleUrl, 'http://100.64.0.9:4000'); assert.equal(by.n.lanUrl, null); assert.equal(by.n.tailscaleUrl, null);
+  assert.equal(r.body.tailscaleIp, '100.64.0.9'); assert.equal(r.body.monitorUrl, 'http://10.0.0.5:9875');
+  const off = await call(boot(apps).routes['GET /api/status']);
+  assert.equal(off.body.apps[0].tailscaleUrl, null, 'no tailnet, no tailscale url');
 });
