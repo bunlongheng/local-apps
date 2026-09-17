@@ -4,6 +4,7 @@ const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const net = require('node:net');
 const fs = require('node:fs');
+const http = require('node:http');
 const { api, serverUp } = require('./helpers');
 
 const ID = 'zzz-e2e-lifecycle';
@@ -13,13 +14,15 @@ const opts = { skip: MUTATE ? false : 'set E2E_MUTATE=1 against a scratch instan
 // What caddy answers for the app's hostname on :80: 'offline' when the block is live (the upstream
 // port is dead, so handle_errors serves public/offline.html), 'proxied' for anything else the block
 // returns, 'none' when nothing serves that host.
-async function viaCaddy() {
-  try {
-    const r = await fetch('http://127.0.0.1:80/', { headers: { host: `${ID}.localhost` }, redirect: 'manual', signal: AbortSignal.timeout(3000) });
-    const body = await r.text();
-    if (r.status === 502 || body.includes('<title>App is off</title>')) return 'offline';
-    return `proxied ${r.status} ${JSON.stringify(Object.fromEntries(r.headers))} ${body.slice(0, 200)}`;
-  } catch { return 'none'; }
+// node:http, not fetch(): fetch drops a caller-set Host header, and Host is how caddy picks the site.
+function viaCaddy() {
+  return new Promise((resolve) => {
+    const req = http.get({ host: '127.0.0.1', port: 80, path: '/', headers: { host: `${ID}.localhost` }, timeout: 3000 }, (r) => {
+      let body = ''; r.on('data', (c) => { body += c; });
+      r.on('end', () => resolve(r.statusCode === 502 || body.includes('<title>App is off</title>') ? 'offline' : `proxied ${r.statusCode} ${body.slice(0, 200)}`));
+    });
+    req.on('error', () => resolve('none')); req.on('timeout', () => { req.destroy(); resolve('none'); });
+  });
 }
 function freePort() { return new Promise((r) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); }); }
 
