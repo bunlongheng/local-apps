@@ -34,9 +34,10 @@ test('processCheck finds a running process by its command line and not after it 
   const marker = `zzz-marker-${process.pid}`;
   // The marker rides in the script text so it is part of the command line pgrep -f sees.
   const child = spawn(process.execPath, ['-e', `setInterval(() => {}, 1000) // ${marker}`], { stdio: 'ignore' });
-  await new Promise(r => setTimeout(r, 300));
   const h = makeHealth({ broadcast: () => {} });
-  assert.equal(await h.processCheck(marker), true);
-  child.kill('SIGKILL'); await new Promise(r => child.on('exit', r)); await new Promise(r => setTimeout(r, 200));
-  assert.equal(await h.processCheck(marker), false);
+  // Bounded poll, not a fixed sleep: a loaded runner must not flake the only real-process test.
+  const until = async (want) => { for (let i = 0; i < 100; i++) { if (await h.processCheck(marker) === want) return true; await new Promise(r => setTimeout(r, 50)); } return false; };
+  assert.ok(await until(true), 'seen while running');
+  child.kill('SIGKILL'); await new Promise(r => child.on('exit', r));
+  assert.ok(await until(false), 'gone after exit');
 });
