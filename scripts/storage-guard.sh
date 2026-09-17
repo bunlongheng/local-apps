@@ -131,7 +131,7 @@ case "$MODE" in
     [ -f "$STATE" ] && IFS='|' read -r LAST_LEVEL LAST_TS < "$STATE"
     if [ "$label" != "$LAST_LEVEL" ] || [ $((NOW - LAST_TS)) -ge "$POST_COOLDOWN" ]; then
       TARGETS_HTML=$(print_targets | sed '1d' | awk 'NF && !/^Heavy|^  find/{printf "<tr><td style=\"padding:4px 10px;border-bottom:1px solid #2a2a2a;\">%s</td><td style=\"padding:4px 10px;border-bottom:1px solid #2a2a2a;text-align:right;color:#facc15;font-weight:600;\">%s</td></tr>", $1" "$2, $3}' 2>/dev/null)
-      TOKEN=$(grep -oE 'sk_ext_[0-9a-f]+' ~/.claude/skills/stickies/SKILL.md 2>/dev/null | head -1)
+      TOKEN="${STICKIES_API_TOKEN:-${STICKIES_TOKEN:-}}"   # from the environment, never scraped from a document
       ACCENT="#f59e0b"; [ "$level" -eq 2 ] && ACCENT="#ef4444"
       BODY=$(cat <<HTML
 <div style="font-family:-apple-system,Segoe UI,sans-serif;max-width:100%;color:#e4e4e7;">
