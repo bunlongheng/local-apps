@@ -1,4 +1,4 @@
-/* Local Apps dashboard - vanilla, served by the Express control plane (:9875).
+/* Local Apps dashboard - vanilla, served by the control plane (:9875).
    All data comes from the same-origin /api/* routes. No framework, no build. */
 (function () {
   "use strict";

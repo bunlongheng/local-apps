@@ -4,7 +4,7 @@
 Self-healing, multi-machine orchestrator that monitors and auto-fixes local web apps. Hub + Agent architecture: the hub (a Mac Mini) runs the bots; agent machines only report status.
 
 ## Run
-- One service: Express (`node server.js`) serves the dashboard UI (static `public/`) AND the control API on port 9875. No framework, no build step.
+- One service: `node server.js` serves the dashboard UI (static `public/`) AND the control API on port 9875. No framework, no build step - HTTP is `node:http` via `lib/http-app.js`, a small express-shaped router (routes, JSON bodies, static files, gzip).
 - Dev (watch mode): `npm run dev` (= `node --watch server.js`); prod: `npm run start`
 - launchd runs `start.sh` (`exec node server.js`); KeepAlive is the watchdog.
 
