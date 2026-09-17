@@ -38,7 +38,7 @@ function fakeClock(w) {
   };
 }
 
-function boot({ status, machines = [], peerStatus = null, failMutations = false }) {
+function boot({ status, machines = [], peerStatus = null, failMutations = false, hub = {}, token = null }) {
   const dom = new JSDOM(INDEX, { url: 'http://localhost:9875/', runScripts: 'outside-only', pretendToBeVisual: true });
   const w = dom.window;
   const clock = fakeClock(w);
@@ -46,21 +46,24 @@ function boot({ status, machines = [], peerStatus = null, failMutations = false 
   w.EventSource = class { constructor(url) { this.url = url; this.closed = false; sources.push(this); } close() { this.closed = true; } };
   const routes = { '/api/status': status, '/api/favicons': {}, '/api/machines': machines, '/api/log/alpha': { lines: ['ready on 4000'] }, '/api/qr': { url: 'http://10.0.0.5:9875', dataUrl: 'data:image/png;base64,AA==' } };
   if (peerStatus) for (const m of machines) routes[`/api/machines/${m.id}/status`] = peerStatus;
+  for (const [k, v] of Object.entries(hub)) routes[`/api/${k}`] = v;   // hub-only extras: app-profiles, capabilities, icon-sync, tab-colors
   const requests = [];   // every non-GET call the dashboard makes: { method, path }
   const gets = [];       // every GET path, so polls can be counted
+  const sentHeaders = []; // headers of every non-GET call, in order
   w.fetch = (p, opts) => {
     const method = (opts && opts.method) || 'GET';
     if (method === 'GET') gets.push(p);
-    if (method !== 'GET') { requests.push({ method, path: p }); if (failMutations) return Promise.resolve({ ok: false, status: 500, headers: { get: () => 'application/json' }, json: () => Promise.resolve({ error: 'nope' }) }); return Promise.resolve({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: () => Promise.resolve(p.endsWith('/toggle') ? { id: 'alpha', disabled: true } : { ok: true }) }); }
+    if (method !== 'GET') { requests.push({ method, path: p }); sentHeaders.push((opts && opts.headers) || {}); if (failMutations) return Promise.resolve({ ok: false, status: 500, headers: { get: () => 'application/json' }, json: () => Promise.resolve({ error: 'nope' }) }); return Promise.resolve({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: () => Promise.resolve(p.endsWith('/toggle') ? { id: 'alpha', disabled: true } : { ok: true }) }); }
     return Promise.resolve({ ok: p in routes, status: p in routes ? 200 : 404, headers: { get: () => 'application/json' }, json: () => Promise.resolve(routes[p]) });
   };
   w.confirm = () => true;
+  if (token) w.localStorage.setItem('localAppsToken', token);
   // A vm.Script with the real filename, not eval: V8 then attributes app.js to its file, so the
   // dashboard counts toward the coverage gate like every other source file.
   new vm.Script(APP_JS, { filename: path.join(ROOT, 'public', 'app.js') }).runInContext(dom.getInternalVMContext());
   // Bounded wait on the microtask/IO queue for the fetch chains, not a fixed sleep: a loaded runner must not flake.
   const settle = async (pred = () => true) => { for (let i = 0; i < 200; i++) { await new Promise((r) => setImmediate(r)); if (i >= 5 && pred()) return; } throw new Error('settle timeout'); };
-  return { w, clock, sources, requests, gets, routes, settle, root: () => w.document.getElementById('root'), close: () => w.close() };
+  return { w, clock, sources, requests, gets, sentHeaders, routes, settle, root: () => w.document.getElementById('root'), close: () => w.close() };
 }
 
 test('an off-box viewer gets no toggle, start/stop or delete controls; on the box they render', async () => {
@@ -243,4 +246,29 @@ test('start posts, shows the startup phase from the 2s log poll, and gives up af
   f.root().querySelector('[data-act="start"]').click(); await f.settle(() => /Start failed/.test(f.root().textContent));
   assert.equal(f.w.document.querySelector('.phase-chip'), null, 'no startup row after a failed start');
   f.close();
+});
+
+test('on a hub the modal renders the profile panel, capability badges and the tab chip; the stored token is forwarded on control calls', async () => {
+  const hub = { 'app-profiles': { alpha: { about: 'Alpha is the reference app', architect: 'One process' } }, capabilities: { alpha: { mcp: true, mcpName: 'alpha-mcp', api: true } }, 'icon-sync': { alpha: { hasFavicon: true, hasAppIcon: true, synced: true } }, 'tab-colors': { alpha: { label: 'ALPHA', color: '#123456', alias: '_alpha' } } };
+  const t = boot({ status: { ...ON, machineRole: 'hub' }, hub, token: 'tok-123' });
+  await t.settle(() => t.gets.includes('/api/tab-colors'));
+  await t.settle();
+  t.root().querySelector('tr[data-act="open"]').click(); await t.settle();
+  const chip = t.root().querySelector('.tab-chip'); assert.ok(chip, 'tab chip from tab-colors'); assert.equal(chip.getAttribute('data-copy'), '_alpha');
+  assert.match(t.root().querySelector('.modal').textContent, /MCP/); assert.match(t.root().querySelector('.modal').innerHTML, /alpha-mcp/);
+  t.root().querySelector('[data-act="tab"][data-tab="about"]').click(); await t.settle();
+  assert.match(t.root().querySelector('.panel').textContent, /Alpha is the reference app/, 'profile panel from app-profiles');
+  t.root().querySelector('[data-act="tab"][data-tab="info"]').click(); await t.settle();
+  t.root().querySelector('[data-act="stop"]').click(); await t.settle();
+  assert.equal(t.sentHeaders.at(-1)['x-local-apps-token'], 'tok-123', 'stored token rides on control calls');
+  t.close();
+  const plain = boot({ status: ON });
+  await plain.settle();
+  plain.root().querySelector('tr[data-act="open"]').click(); await plain.settle();
+  plain.root().querySelector('[data-act="stop"]').click(); await plain.settle();
+  assert.equal(plain.sentHeaders.at(-1)['x-local-apps-token'], undefined, 'no header without a stored token');
+  assert.ok(!plain.gets.includes('/api/app-profiles'), 'an agent-role dashboard never asks for hub extras');
+  plain.root().querySelector('[data-act="search"]').click(); await plain.settle();
+  assert.ok(plain.w.document.getElementById('cmdk-input'), 'the header search icon opens the palette');
+  plain.close();
 });
