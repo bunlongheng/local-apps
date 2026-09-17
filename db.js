@@ -158,7 +158,7 @@ db.exec(`
 // --- Seed from JSON if DB is empty ---
 const count = db.prepare('SELECT COUNT(*) as n FROM apps').get().n;
 if (count === 0 && fs.existsSync(CONFIG_FILE)) {
-  const apps = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+  const apps = readJsonOrNull(CONFIG_FILE) || [];   // a bad config must not crash-loop the boot
   const insert = db.prepare(`
     INSERT OR IGNORE INTO apps (id, name, health_url, local_url, process_check, caddy_url, prod_url, local_path, log_path, repo, launch_agent, launch_agent_path, start_command, icon)
     VALUES (@id, @name, @healthUrl, @localUrl, @processCheck, @caddyUrl, @prodUrl, @localPath, @logPath, @repo, @launchAgent, @launchAgentPath, @startCommand, @icon)
