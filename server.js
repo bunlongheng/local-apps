@@ -78,7 +78,10 @@ const CADDYFILE = process.env.CADDYFILE || '/opt/homebrew/etc/Caddyfile';
 const CADDY_ERROR_ROOT = path.dirname(CADDYFILE);
 const { addCaddyEntry, removeCaddyEntry, renameCaddyEntry } =
   makeCaddy({ caddyfile: CADDYFILE, errorRoot: CADDY_ERROR_ROOT, getLanIp, exec: execSync });
+// Host probes (npm path, Tailscale ip, machine model) run only when this file is the entry point:
+// a test that require()s the app must never shell out to the host.
 const NPM_PATH = (() => {
+  if (!IS_MAIN) return '/opt/homebrew/bin/npm';
   try { return execSync('which npm', { timeout: 5000 }).toString().trim(); }
   catch { return '/opt/homebrew/bin/npm'; }
 })();
@@ -163,7 +166,7 @@ function getLanIp() {
 let LAN_IP = getLanIp();
 // Boot can happen (via launchd KeepAlive) before the LAN interface is up, freezing
 // LAN_IP at 'N/A'. Refresh on an interval like TAILSCALE_IP so it self-heals.
-setInterval(() => { LAN_IP = getLanIp(); }, 60000).unref();
+if (IS_MAIN) setInterval(() => { LAN_IP = getLanIp(); }, 60000).unref();
 
 // --- Tailscale IP detection (cached; refreshed on an interval, not per request) ---
 function getTailscaleIp() {
@@ -175,11 +178,11 @@ function getTailscaleIp() {
   }
   return null;
 }
-let TAILSCALE_IP = getTailscaleIp();
+let TAILSCALE_IP = IS_MAIN ? getTailscaleIp() : null;
 // Refresh out-of-band so the hot /api/status path never shells out (execSync would
 // block the single-threaded event loop on every poll from every open tab).
 // The 60s refresh is async: a slow tailscale binary must never block the event loop.
-setInterval(() => {
+if (IS_MAIN) setInterval(() => {
   const bins = ['tailscale', '/opt/homebrew/bin/tailscale', '/usr/local/bin/tailscale', '/Applications/Tailscale.app/Contents/MacOS/Tailscale'];
   (function tryNext(i) {
     if (i >= bins.length) { TAILSCALE_IP = null; return; }
@@ -191,10 +194,11 @@ setInterval(() => {
 // sysctl answers in ~20 ms; system_profiler can take seconds, so it refines the label after boot
 // instead of blocking the listener.
 let MACHINE_MODEL = (() => {
+  if (!IS_MAIN) return process.platform === 'darwin' ? 'Mac' : os.type();
   try { const hw = execSync('/usr/sbin/sysctl -n hw.model 2>/dev/null', { timeout: 5000 }).toString().trim(); return hw.includes('Macmini') || hw.startsWith('Mac16,') ? 'Mac mini' : (hw || 'Mac'); }
   catch { return process.platform === 'darwin' ? 'Mac' : os.type(); }
 })();
-setTimeout(() => {
+if (IS_MAIN) setTimeout(() => {
   require('child_process').exec('system_profiler SPHardwareDataType 2>/dev/null', { timeout: 10000 }, (err, out) => {
     if (err) return dbg('system_profiler', err);
     const m = String(out).match(/Model Name: (.+)/); if (m) MACHINE_MODEL = m[1].trim();
@@ -271,6 +275,7 @@ app.use((err, req, res, _next) => {
 const API_BIND = process.env.API_BIND || '0.0.0.0';
 
 module.exports = app;
+app.OFFBOX_STRIP = OFFBOX_STRIP;   // for the route tests: every key an off-box viewer must never see
 
 // --- Listen ---
 if (IS_MAIN) app.listen(PORT, API_BIND, () => {
