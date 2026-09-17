@@ -23,27 +23,13 @@ const SITES_DIR = path.join(os.homedir(), 'Sites');
 const SIZES = { ico16: 16, ico32: 32, apple: 180, full: 512 };
 
 // --- Source resolution map ---
-const APP_SOURCES = {
-  bheng:                { paths: ['app/icon.png'] },
-  tools:                { fallbackSvg: 'tools.svg' },
-  diagrams:             { paths: ['public/icon.svg'] },
-  claude:               { paths: ['public/favicon.svg'] },
-  '3pi':                { fallbackSvg: '3pi.svg' },
-  '3pi-poc':            { paths: ['app/icon.png'] },
-  stickies:             { paths: ['app/icon.svg'] },
-  mindmaps:             { skip: true },
-  safe:                 { letter: 'S', gradient: ['#16a34a', '#15803d'] },
-  // Additional Sites/* repos
-  'flash-cards':        { paths: ['public/logo512.png'] },
-  'score-card':         { paths: ['app/icon.svg'] },
-  'norden-study':       { paths: ['public/icon.png'] },
-  'pixy':               { paths: ['app/icon.png'] },
-  'local-apps':         { skip: true },
-  'pm2026':             { letter: 'P', gradient: ['#0891b2', '#22d3ee'] },
-  'notes':              { letter: 'N', gradient: ['#ca8a04', '#facc15'] },
-  'portfolio-2026':     { letter: 'P', gradient: ['#059669', '#34d399'] },
-  '3pi-tools':          { letter: '3', gradient: ['#1e3a5f', '#38bdf8'] },
-};
+// Per-app overrides (an unusual icon path, or a fallback SVG) live in an optional, gitignored
+// scripts/favicon-sources.json: { "<id>": { "paths": ["app/icon.png"] } | { "fallbackSvg": "x.svg" } }.
+// Without the file every app resolves through the default candidate list below.
+const APP_SOURCES = (() => {
+  const f = path.join(__dirname, 'favicon-sources.json');
+  try { return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : {}; } catch (e) { console.warn(`  favicon-sources.json unreadable: ${e.message}`); return {}; }
+})();
 
 // Auto-detect paths
 const AUTO_DETECT = [
