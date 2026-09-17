@@ -159,3 +159,16 @@ test('every response carries the security headers: frame denial, nosniff, a CSP 
     assert.ok(!/script-src[^;]*unsafe-inline/.test(csp), 'no inline scripts');
   }
 });
+
+test('POST and PUT /api/apps refuse a localPath whose repo root holds a Chrome extension manifest', async () => {
+  const { CHROME_EXT_ERROR } = require('../../lib/chrome-ext');
+  const ext = fs.mkdtempSync(path.join(os.tmpdir(), 'zzz-ext-'));
+  fs.writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify({ manifest_version: 3, name: 'x' }));
+  const post = await fetch(base + '/api/apps', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: 'zzz-ext', localPath: ext }) });
+  assert.equal(post.status, 400); assert.equal((await post.json()).error, CHROME_EXT_ERROR);
+  assert.equal((await fetch(base + '/api/apps/zzz-ext')).status, 404, 'nothing registered');
+  const put = await fetch(base + '/api/apps/zzz-prof', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ localPath: ext }) });
+  assert.equal(put.status, 400); assert.equal((await put.json()).error, CHROME_EXT_ERROR);
+  assert.equal((await (await fetch(base + '/api/apps/zzz-prof')).json()).localPath, '/tmp/zzz-prof', 'row unchanged');
+  fs.rmSync(ext, { recursive: true, force: true });
+});
