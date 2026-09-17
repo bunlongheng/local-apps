@@ -349,7 +349,7 @@
         var tone = s.phase === "error" ? "error" : s.stalled ? "stalled" : s.percent >= 100 ? "done" : "active";
         h += '<div class="startup-row"><span class="phase-chip ' + tone + '">' + (tone === "active" ? '<span class="spin-dot"></span>' : "") +
           esc(s.label + (s.stalled && s.phase !== "error" ? " · taking longer than usual" : "")) + "</span>" +
-          '<span class="progress-bar ' + tone + '"><span class="progress-fill" style="width:' + s.percent + '%"></span></span></div>';
+          '<span class="progress-bar ' + tone + '" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + s.percent + '" aria-label="' + esc(s.label) + '"><span class="progress-fill" style="width:' + s.percent + '%"></span></span></div>';
       }
       h += "</div></div></td>";
       h += '<td class="col-hostname"><a class="link-sm' + (app.disabled ? " disabled" : "") + '" ' + linkAttrs(hostU) + '>' + esc(stripProto(hostU)) + "</a></td>";
