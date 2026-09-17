@@ -49,3 +49,13 @@ test('PUT /api/app-profiles/:id cannot rewrite exec-bound fields', async () => {
   assert.notEqual(a.launchAgent, 'evil; touch /tmp/pwned');
   assert.notEqual(a.startCommand, 'rm -rf /');
 });
+
+test('log, start, stop and events routes: 404 on unknown ids, SSE headers on events', async () => {
+  assert.equal(await req('GET', '/api/log/zzz-missing'), 404);
+  assert.equal(await req('POST', '/api/start/zzz-missing'), 404);
+  assert.equal(await req('POST', '/api/stop/zzz-missing'), 404);
+  const ctrl = new AbortController();
+  const r = await fetch(base + '/api/events', { signal: ctrl.signal });
+  assert.equal(r.status, 200); assert.match(r.headers.get('content-type'), /text\/event-stream/);
+  ctrl.abort();
+});
