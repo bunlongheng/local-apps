@@ -268,7 +268,14 @@ function getTailscaleIp() {
 let TAILSCALE_IP = getTailscaleIp();
 // Refresh out-of-band so the hot /api/status path never shells out (execSync would
 // block the single-threaded event loop on every poll from every open tab).
-setInterval(() => { TAILSCALE_IP = getTailscaleIp(); }, 60000).unref();
+// The 60s refresh is async: a slow tailscale binary must never block the event loop.
+setInterval(() => {
+  const bins = ['tailscale', '/opt/homebrew/bin/tailscale', '/usr/local/bin/tailscale', '/Applications/Tailscale.app/Contents/MacOS/Tailscale'];
+  (function tryNext(i) {
+    if (i >= bins.length) { TAILSCALE_IP = null; return; }
+    require('child_process').exec(`${bins[i]} ip -4 2>/dev/null`, { timeout: 5000 }, (err, out) => { const ip = String(out || '').trim(); if (!err && ip) TAILSCALE_IP = ip; else tryNext(i + 1); });
+  })(0);
+}, 60000).unref();
 
 // --- Machine model detection ---
 // sysctl answers in ~20 ms; system_profiler can take seconds, so it refines the label after boot
