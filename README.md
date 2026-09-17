@@ -1,4 +1,4 @@
-# Local Apps
+# <img src="docs/icon.png" width="36" height="36" align="top" alt=""> Local Apps
 
 Self-healing dashboard for a fleet of local dev apps.
 
