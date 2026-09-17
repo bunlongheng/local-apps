@@ -11,6 +11,7 @@ const path = require('node:path');
 
 const TMP_DB = path.join(os.tmpdir(), `local-apps-routes-${process.pid}.db`);
 process.env.LOCAL_APPS_DB = TMP_DB;
+process.env.MACHINE_ROLE = 'hub';   // the hub registers every route; do not depend on machine-role.json
 const app = require('../../server');
 
 let server, base;
@@ -67,4 +68,12 @@ test('HTTP layer: X-Forwarded-For from a loopback socket demotes the caller (the
   assert.equal(a.localPath, undefined, 'proxied LAN viewer must not see paths');
   const w = await fetch(base + '/api/stop/zzz-prof', { method: 'POST', headers: { 'x-forwarded-for': '1.2.3.4' } });
   assert.equal(w.status, 401, 'proxied LAN mutation is denied');
+});
+
+test('start and stop on a registered app return ok and update state (launchctl failures are tolerated)', async () => {
+  require('../../db').upsertApp({ id: 'zzz-run', localPath: '/tmp/zzz-run', launchAgent: 'com.example.zzz-run', launchAgentPath: '/tmp/zzz-run.plist', localUrl: 'http://localhost:59996' });
+  assert.equal(await req('POST', '/api/start/zzz-run'), 200);
+  assert.equal(await req('POST', '/api/stop/zzz-run'), 200);
+  const s = await (await fetch(base + '/api/status')).json();
+  assert.equal(s.apps.find(a => a.id === 'zzz-run').status, 'down', 'stop marks it down immediately');
 });
