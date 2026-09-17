@@ -631,8 +631,10 @@
       if (S.helpOpen) { S.helpOpen = false; render(); }
       else if (S.modalApp) closeModal();
     }
-    if ((e.key === "Enter" || e.key === " ") && document.activeElement && document.activeElement.matches("tr[data-act=open]")) {
-      e.preventDefault(); openModal(document.activeElement.getAttribute("data-id"));
+    // Enter or Space on any data-act control that is not a real button activates it, the same as a click.
+    var ae = document.activeElement;
+    if ((e.key === "Enter" || e.key === " ") && ae && ae.matches && ae.matches('[data-act][role="button"]')) {
+      e.preventDefault(); ae.click();
     }
   });
 
