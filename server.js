@@ -23,6 +23,9 @@ const app = createApp();
 // True only when run directly (node server.js), false when require()d by a test - lets the
 // test import the configured app without starting the health loops, peer probes, or listener.
 const IS_MAIN = require.main === module;
+// Failures the chain deliberately tolerates (a bootout on a service that is not loaded,
+// a kill on a free port) are logged, never swallowed: LOCAL_APPS_DEBUG=1 prints them.
+const dbg = (where, e) => { if (process.env.LOCAL_APPS_DEBUG) console.warn(`  [debug] ${where}: ${e && e.message ? e.message : e}`); };
 // Baseline security headers, ported from the former next.config so collapsing to a
 // single service (UI + API on :9875) keeps the same posture. HSTS is omitted:
 // this is served over plain http on the LAN/tailnet, and forcing HTTPS would break access.
@@ -59,7 +62,7 @@ const MACHINE_ROLE = (() => {
   if (process.env.MACHINE_ROLE) return process.env.MACHINE_ROLE;
   const roleFile = path.join(__dirname, 'machine-role.json');
   if (fs.existsSync(roleFile)) {
-    try { return JSON.parse(fs.readFileSync(roleFile, 'utf8')).role || 'hub'; } catch {}
+    try { return JSON.parse(fs.readFileSync(roleFile, 'utf8')).role || 'hub'; } catch (e) { dbg('line65', e); }
   }
   return 'hub';
 })();
@@ -116,7 +119,7 @@ function updateTabColors(id, label, caddyUrl) {
       colors[key].label = label.toUpperCase();
       fs.writeFileSync(colorsPath, JSON.stringify(colors, null, 2));
     }
-  } catch {}
+  } catch (e) { dbg('line122', e); }
 }
 
 
@@ -136,7 +139,7 @@ function getNextAvailablePort() {
   const usedPorts = new Set();
   for (const a of db.getApps()) {
     if (a.localUrl) {
-      try { usedPorts.add(parseInt(new URL(a.localUrl).port)); } catch {}
+      try { usedPorts.add(parseInt(new URL(a.localUrl).port)); } catch (e) { dbg('line142', e); }
     }
   }
   for (let p = PORT_RANGE_START; p <= PORT_RANGE_END; p++) {
@@ -152,10 +155,10 @@ function setupInfra(id, data) {
   // Port: use provided localUrl, healthUrl, or auto-assign
   let port = null;
   if (data.localUrl) {
-    try { port = new URL(data.localUrl).port; } catch {}
+    try { port = new URL(data.localUrl).port; } catch (e) { dbg('line158', e); }
   }
   if (!port && data.healthUrl) {
-    try { port = new URL(data.healthUrl).port; } catch {}
+    try { port = new URL(data.healthUrl).port; } catch (e) { dbg('line161', e); }
   }
   if (!port) {
     port = getNextAvailablePort();
@@ -193,7 +196,7 @@ function teardownInfra(id) {
       const port = new URL(app.localUrl).port;
       if (port) execSync(`lsof -ti :${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
     }
-  } catch {}
+  } catch (e) { dbg('line199', e); }
 
   console.log(`  ✅ full cleanup: ${id}`);
 }
@@ -233,7 +236,7 @@ const MACHINE_MODEL = (() => {
     const name = execSync('system_profiler SPHardwareDataType 2>/dev/null', { timeout: 10000 }).toString();
     const match = name.match(/Model Name:\s*(.+)/);
     if (match) return match[1].trim();
-  } catch {}
+  } catch (e) { dbg('line239', e); }
   // Fallback: sysctl hw.model (works in sandboxed envs where system_profiler fails)
   try {
     const hw = execSync('/usr/sbin/sysctl -n hw.model 2>/dev/null', { timeout: 5000 }).toString().trim();
@@ -241,7 +244,7 @@ const MACHINE_MODEL = (() => {
     if (hw.includes('MacBookPro') || hw.includes('Mac15,') || hw.includes('Mac14,')) return 'MacBook Pro';
     if (hw.includes('MacBookAir')) return 'MacBook Air';
     if (hw.startsWith('Mac')) return 'Mac mini';
-  } catch {}
+  } catch (e) { dbg('line247', e); }
   return null;
 })();
 
@@ -334,7 +337,7 @@ async function checkAll() {
         try {
           if (port) await execAsync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
           if (label) await execAsync(`launchctl bootout gui/${uid}/${label} 2>/dev/null`, { timeout: 10000 });
-        } catch {}
+        } catch (e) { dbg('line340', e); }
         db.setAppDisabled(appCfg.id, true, 'breaker');
         appCfg.disabled = true;
         console.log(`  [L5] circuit breaker -> disabled ${appCfg.id} (${s.flapWindow.length} flaps, ${attempts} attempts)`);
@@ -352,7 +355,7 @@ async function checkAll() {
         try {
           await execAsync(startCmd(uid, label, plistPath), { timeout: 15000 });
           console.log(`  [L1] kickstart: ${appCfg.id}`);
-        } catch {}
+        } catch (e) { dbg('L1', e); }
       }
       else if (level === 2) {
         recordAttempt(s, Date.now());
@@ -360,7 +363,7 @@ async function checkAll() {
           if (port) await execAsync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
           await execAsync(`launchctl bootout gui/${uid}/${label} 2>/dev/null; sleep 1; launchctl bootstrap gui/${uid} "${plistPath}" 2>/dev/null`, { timeout: 15000 });
           console.log(`  [L2] port-kill + reload: ${appCfg.id}`);
-        } catch {}
+        } catch (e) { dbg('L2', e); }
       }
       else if (level === 3) {
         recordAttempt(s, Date.now());
@@ -369,7 +372,7 @@ async function checkAll() {
           if (dir && fs.existsSync(dir)) {
             const logPath = appCfg.logPath || `/tmp/${appCfg.id}.log`;
             let logTail = '';
-            try { logTail = (await execAsync(`tail -30 "${logPath}" 2>/dev/null`, { timeout: 5000 })).stdout; } catch {}
+            try { logTail = (await execAsync(`tail -30 "${logPath}" 2>/dev/null`, { timeout: 5000 })).stdout; } catch (e) { dbg('line375', e); }
             const fixes = l3Fixes(logTail);
             if (fixes.npmInstall) {
               console.log(`  [L3] npm install: ${appCfg.id}`);
@@ -379,13 +382,13 @@ async function checkAll() {
             }
             if (fixes.clearNext) {
               console.log(`  [L3] clear .next cache: ${appCfg.id}`);
-              try { await execAsync(`rm -rf "${dir}/.next" 2>/dev/null`, { timeout: 5000 }); } catch {}
+              try { await execAsync(`rm -rf "${dir}/.next" 2>/dev/null`, { timeout: 5000 }); } catch (e) { dbg('L3', e); }
             }
             if (port) await execAsync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
           }
           await execAsync(startCmd(uid, label, plistPath), { timeout: 15000 });
           console.log(`  [L3] fix + restart: ${appCfg.id}`);
-        } catch {}
+        } catch (e) { dbg('L3', e); }
       }
       // Level 4: hand the failure to the local agent (last resort, opt-in)
       else if (level === 4) {
@@ -470,19 +473,19 @@ app.get('/api/tab-colors', (req, res) => {
       const e = json[k];
       if (e && typeof e.r === 'number') out[k] = { label: e.label || k.toUpperCase(), color: toHex(e.r, e.g, e.b), icon: e.icon || '' };
     }
-  } catch {}
+  } catch (e) { dbg('line476', e); }
   // Fallback: DB tab colors for anything not defined in the json.
   try {
     const dbc = db.getTabColors() || {};
     for (const k of Object.keys(dbc)) if (!out[k]) out[k] = dbc[k];
-  } catch {}
+  } catch (e) { dbg('line481', e); }
   // Merge the shell alias (e.g. _bheng) per key from ~/.claude-tabs.sh.
   try {
     const sh = fs.readFileSync(path.join(os.homedir(), '.claude-tabs.sh'), 'utf8');
     const re = /(_[A-Za-z0-9]+)\(\)\s*\{\s*_tab\s+"([^"]+)"/g;
     let m;
     while ((m = re.exec(sh))) if (out[m[2]] && !out[m[2]].alias) out[m[2]].alias = m[1];
-  } catch {}
+  } catch (e) { dbg('line488', e); }
   res.json(out);
 });
 
@@ -520,7 +523,7 @@ app.post('/api/apps/:id/toggle', (req, res) => {
   // If disabling, also stop the app
   if (newState && a.launchAgent) {
     const uid = process.getuid();
-    try { execSync(`launchctl bootout gui/${uid}/${a.launchAgent} 2>/dev/null`, { timeout: 10000 }); } catch {}
+    try { execSync(`launchctl bootout gui/${uid}/${a.launchAgent} 2>/dev/null`, { timeout: 10000 }); } catch (e) { dbg('line526', e); }
     const s = getState(a.id);
     s.status = 'down';
     s.downSince = null;
@@ -530,7 +533,7 @@ app.post('/api/apps/:id/toggle', (req, res) => {
   // If enabling, kick it back to life (bootstrap if the service isn't loaded in launchd)
   if (!newState && a.launchAgent) {
     const uid = process.getuid();
-    try { execSync(startCmd(uid, a.launchAgent, a.launchAgentPath), { timeout: 15000 }); } catch {}
+    try { execSync(startCmd(uid, a.launchAgent, a.launchAgentPath), { timeout: 15000 }); } catch (e) { dbg('line536', e); }
     setTimeout(() => checkSingle(a), 3000);
     setTimeout(() => checkSingle(a), 8000);
     setTimeout(() => checkSingle(a), 15000);
@@ -579,10 +582,10 @@ function isPortTaken(port, excludeId) {
   for (const a of db.getApps()) {
     if (excludeId && a.id === excludeId) continue;
     if (a.localUrl) {
-      try { if (parseInt(new URL(a.localUrl).port) === port) return a.id; } catch {}
+      try { if (parseInt(new URL(a.localUrl).port) === port) return a.id; } catch (e) { dbg('line585', e); }
     }
     if (a.healthUrl) {
-      try { if (parseInt(new URL(a.healthUrl).port) === port) return a.id; } catch {}
+      try { if (parseInt(new URL(a.healthUrl).port) === port) return a.id; } catch (e) { dbg('line588', e); }
     }
   }
   return null;
@@ -611,7 +614,7 @@ app.post('/api/apps', (req, res) => {
           suggestedUrl: suggested ? `http://localhost:${suggested}` : null
         });
       }
-    } catch {}
+    } catch (e) { dbg('line617', e); }
   }
 
   // Auto-setup infra (caddy, hosts, launch agent)
@@ -624,7 +627,7 @@ app.post('/api/apps', (req, res) => {
   const result = db.upsertApp(merged);
   // Extract assigned port for clear response
   let assignedPort = null;
-  try { assignedPort = parseInt(new URL(result.localUrl).port); } catch {}
+  try { assignedPort = parseInt(new URL(result.localUrl).port); } catch (e) { dbg('line630', e); }
   broadcast({ type: 'reload' });
   res.status(201).json({ ...result, assignedPort });
 });
@@ -651,7 +654,7 @@ app.put('/api/apps/:id', (req, res) => {
           suggestedUrl: suggested ? `http://localhost:${suggested}` : null
         });
       }
-    } catch {}
+    } catch (e) { dbg('line657', e); }
   }
 
   // Re-setup infra if localUrl or localPath changed
@@ -712,7 +715,7 @@ app.get('/api/favicons', (req, res) => {
         map[id] = '/favicons/' + f + '?v=' + Math.floor(mtime);
       }
     }
-  } catch {}
+  } catch (e) { dbg('line718', e); }
   res.setHeader('Cache-Control', 'no-cache');
   res.json(map);
 });
@@ -827,7 +830,7 @@ app.post('/api/stop/:id', (req, res) => {
     const label = appCfg.launchAgent;
     const port = appCfg.localUrl ? (() => { try { return new URL(appCfg.localUrl).port; } catch { return null; } })() : null;
     // Kill port first (instant), then bootout in background
-    if (port) try { execSync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 3000 }); } catch {}
+    if (port) try { execSync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 3000 }); } catch (e) { dbg('line833', e); }
     spawn('bash', ['-c', `launchctl bootout gui/${uid}/${label} 2>/dev/null`], { detached: true, stdio: 'ignore' }).unref();
     // Update status immediately
     const s = getState(appCfg.id);
@@ -871,7 +874,7 @@ async function discoverPeers() {
       if (data.apps && Array.isArray(data.apps)) {
         db.syncRemoteApps(p.id, data.apps);
       }
-    } catch {}
+    } catch (e) { dbg('line877', e); }
   }
 }
 
@@ -986,7 +989,7 @@ app.get('/api/icon-sync', (req, res) => {
             const favSize = fs.statSync(fav).size;
             const appSize = fs.statSync(full).size;
             synced = favSize === appSize;
-          } catch {}
+          } catch (e) { dbg('line992', e); }
           break;
         }
       }
@@ -1021,19 +1024,19 @@ app.get('/api/capabilities', (req, res) => {
         return args.some(arg => typeof arg === 'string' && arg.includes(a.id));
       });
       let hasMcpFile = false;
-      try { hasMcpFile = fs.readdirSync(dir).some(f => f.includes('mcp') && (f.endsWith('.js') || f.endsWith('.ts'))); } catch {}
+      try { hasMcpFile = fs.readdirSync(dir).some(f => f.includes('mcp') && (f.endsWith('.js') || f.endsWith('.ts'))); } catch (e) { dbg('line1027', e); }
       // Also check ~/.claude/mcp-servers/ for files matching this app
       const mcpServersDir = path.join(os.homedir(), '.claude', 'mcp-servers');
       let hasMcpServerFile = false;
       if (fs.existsSync(mcpServersDir)) {
-        try { hasMcpServerFile = fs.readdirSync(mcpServersDir).some(f => f.includes(a.id)); } catch {}
+        try { hasMcpServerFile = fs.readdirSync(mcpServersDir).some(f => f.includes(a.id)); } catch (e) { dbg('line1032', e); }
       }
       if (hasProjMcp || globalRef || hasMcpFile || hasMcpServerFile) {
         flags.mcp = true;
         if (globalRef) flags.mcpName = globalRef[0];
         if (hasProjMcp) flags.mcpPath = path.join(dir, '.mcp.json');
       }
-    } catch {}
+    } catch (e) { dbg('line1039', e); }
 
     // API: Next.js app/api, Express server, pages/api
     try {
@@ -1043,7 +1046,7 @@ app.get('/api/capabilities', (req, res) => {
           fs.existsSync(path.join(dir, 'src', 'server.ts'))) {
         flags.api = true;
       }
-    } catch {}
+    } catch (e) { dbg('line1049', e); }
 
     // CLI: bin field in package.json or cli files or script in ~/.local/bin
     try {
@@ -1058,9 +1061,9 @@ app.get('/api/capabilities', (req, res) => {
         try {
           const content = fs.readFileSync(path.join(localBinDir, b), 'utf8');
           if (content.includes(a.id) || content.includes(dir)) { flags.cli = true; flags.cliBin = b; break; }
-        } catch {}
+        } catch (e) { dbg('line1064', e); }
       }
-    } catch {}
+    } catch (e) { dbg('line1066', e); }
 
     if (Object.keys(flags).length > 0) result[a.id] = flags;
   }

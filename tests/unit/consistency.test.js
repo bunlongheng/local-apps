@@ -9,7 +9,7 @@ const TMP_DB = path.join(os.tmpdir(), `local-apps-consistency-${process.pid}.db`
 process.env.LOCAL_APPS_DB = TMP_DB;
 const db = require('../../db');
 const { audit, checkApp } = require('../../scripts/consistency');
-after(() => { for (const s of ['', '-shm', '-wal']) { try { fs.unlinkSync(TMP_DB + s); } catch {} } });
+after(() => { for (const s of ['', '-shm', '-wal']) { try { fs.unlinkSync(TMP_DB + s); } catch { /* not created */ } } });
 
 test('audit lists every app in the db with a misses array', () => {
   db.upsertApp({ id: 'zzz-cons', localPath: '/tmp/zzz-cons', launchAgentPath: '/tmp/definitely-missing.plist' });

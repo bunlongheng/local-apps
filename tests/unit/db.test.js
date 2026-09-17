@@ -14,7 +14,7 @@ const db = require('../../db');
 
 after(() => {
   for (const suffix of ['', '-shm', '-wal']) {
-    try { fs.unlinkSync(TMP_DB + suffix); } catch {}
+    try { fs.unlinkSync(TMP_DB + suffix); } catch { /* not created */ }
   }
 });
 

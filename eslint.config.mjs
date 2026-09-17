@@ -20,7 +20,7 @@ export default [
     rules: {
       ...js.configs.recommended.rules,
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-      'no-empty': ['warn', { allowEmptyCatch: true }],
+      'no-empty': 'error',
     },
   },
 ];

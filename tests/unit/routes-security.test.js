@@ -20,7 +20,7 @@ before(async () => {
 });
 after(() => {
   if (server) server.close();
-  for (const s of ['', '-shm', '-wal']) { try { fs.unlinkSync(TMP_DB + s); } catch {} }
+  for (const s of ['', '-shm', '-wal']) { try { fs.unlinkSync(TMP_DB + s); } catch { /* not created */ } }
 });
 
 async function req(method, p, body) {
