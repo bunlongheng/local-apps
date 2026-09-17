@@ -12,7 +12,7 @@
     "lint": "eslint . --max-warnings 0",
     "test": "node --test 'tests/unit/**/*.test.js'",
     "test:unit": "node --test 'tests/unit/**/*.test.js'",
-    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=91 --test-coverage-branches=75 --test-coverage-functions=82 --test-coverage-include='{server.js,db.js,launchctl-cmds.js,lib/**,routes/**,scripts/consistency.js,public/app.js}' 'tests/unit/**/*.test.js'",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=91 --test-coverage-branches=75 --test-coverage-functions=82 --test-coverage-include='{server.js,db.js,launchctl-cmds.js,lib/**,routes/**,scripts/consistency.js,scripts/coverage-floor.js,public/app.js}' 'tests/unit/**/*.test.js'",
     "test:e2e": "node --test 'tests/e2e/**/*.test.js'",
     "test:all": "node --test 'tests/unit/**/*.test.js' 'tests/e2e/**/*.test.js'",
     "test:coverage:dashboard": "node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=/tmp/local-apps-lcov.info --test-coverage-include=public/app.js 'tests/unit/dashboard.test.js' && node scripts/coverage-floor.js /tmp/local-apps-lcov.info public/app.js 80 60"
