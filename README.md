@@ -52,6 +52,10 @@ One Node 22 process on `node:http`, no framework, no build step. `server.js` ser
 | L4 | 300s | optional: hand it to a local Claude Code CLI agent |
 | L5 | 3 flaps in 2 min | circuit breaker: park it OFF, re-arm when healthy |
 
+## Hub extras
+
+On the `hub` role only, 5 routes serve the owner's own workflow rather than the product: `/api/tab-colors`, `/api/consistency`, `/api/app-profiles`, `/api/icon-sync`, `/api/capabilities`. They read optional local files and repos; on an `agent` machine they are not registered.
+
 ## Configuration
 
 No environment variables are required.
