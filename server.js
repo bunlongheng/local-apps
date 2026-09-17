@@ -91,6 +91,9 @@ app.use((req, res, next) => {
     path: req.path,
     token: req.get('x-local-apps-token'),
     configuredToken: AUTH_TOKEN,
+    host: req.headers.host,
+    origin: req.get('origin'),
+    allowedHosts: [LAN_IP, TAILSCALE_IP, os.hostname(), `${os.hostname()}.local`],
   });
   if (d.allow) return next();
   return res.status(d.status).json({ error: 'unauthorized - control actions and sensitive reads require LOCAL_APPS_TOKEN off localhost' });
