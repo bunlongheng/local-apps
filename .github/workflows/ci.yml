@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests + coverage gate
+        run: npm run test:coverage
+      - name: Audit (fail on high/critical)
+        run: npm audit --audit-level=high
+# Note: the live e2e suite (tests/e2e) requires a running instance on :9875, so it stays a
+# local step (npm run server, then npm run test:e2e). The self-hosting route-security tests
+# live in tests/unit and DO run in CI (they spin up the app on an ephemeral port, no :9875 needed).
