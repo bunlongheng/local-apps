@@ -235,7 +235,7 @@
       }, 2000);
       startPolls[id] = poll;
       setTimeout(function () { clearInterval(poll); delete startPolls[id]; delete S.startingApps[id]; delete S.startTimes[id]; render(); }, 60000);
-    }, function () { delete S.startingApps[id]; S.logLoading = false; render(); });
+    }, function () { delete S.startingApps[id]; S.logLoading = false; toast("Start failed", 3000, "error"); render(); });
   }
   function stopApp(id) {
     api("/api/stop/" + id, { method: "POST" }).then(function () {
@@ -249,13 +249,13 @@
       S.apps = S.apps.map(function (a) { return a.id === id ? Object.assign({}, a, { disabled: d.disabled }) : a; });
       if (S.modalApp && S.modalApp.id === id) S.modalApp = Object.assign({}, S.modalApp, { disabled: d.disabled });
       toast(d.disabled ? name + " disabled" : name + " enabled"); render();
-    }).catch(function () {});
+    }).catch(function () { toast("Toggle failed", 3000, "error"); render(); });
   }
   function deleteApp(id, name) {
     if (!confirm('Delete "' + name + '" and all its data? This removes:\n- Database entry\n- LaunchAgent\n- Caddy proxy\n- Kills running process\n\nThis cannot be undone.')) return;
     api("/api/apps/" + id, { method: "DELETE" }).then(function () {
       S.apps = S.apps.filter(function (a) { return a.id !== id; }); S.modalApp = null; toast(name + " deleted", 3000); render();
-    }, function () { toast("Delete failed", 3000); });
+    }, function () { toast("Delete failed", 3000, "error"); });
   }
   function toggleQR() {
     if (S.qrOpen) { S.qrOpen = false; render(); return; }
