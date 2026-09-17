@@ -8,4 +8,4 @@ nvm use 22 >/dev/null 2>&1 || true
 # Single service: node:http serves the dashboard UI (public/) AND the control API on :9875.
 # No framework, no build step. launchd KeepAlive is the watchdog - if node exits, it respawns.
 export API_BIND="${API_BIND:-0.0.0.0}"
-exec node server.js
+exec node --env-file-if-exists=.env server.js
