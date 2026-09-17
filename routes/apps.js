@@ -14,6 +14,17 @@ module.exports = function register(app, ctx) {
 
   // --- CRUD: Apps ---
   // Same-origin only: the dashboard is served by this process and peers read it server-side.
+  // 409 payload when the requested localUrl/healthUrl port belongs to another app, else null.
+  function portConflict(body, excludeId) {
+    const requestedUrl = body.localUrl || body.healthUrl;
+    if (!requestedUrl) return null;
+    let requestedPort; try { requestedPort = parseInt(new URL(requestedUrl).port); } catch (e) { dbg('portConflict', e); return null; }
+    const conflictApp = isPortTaken(requestedPort, excludeId);
+    if (!conflictApp) return null;
+    const suggested = getNextAvailablePort();
+    return { error: `Port ${requestedPort} is already used by "${conflictApp}"`, suggestedPort: suggested, suggestedUrl: suggested ? `http://localhost:${suggested}` : null };
+  }
+
   app.get('/api/status', (req, res) => {
     const apps = db.getApps().map(a => {
       const s = getState(a.id);
@@ -125,21 +136,8 @@ module.exports = function register(app, ctx) {
     if (isChromeExtensionRepo(req.body.localPath)) return res.status(400).json({ error: CHROME_EXT_ERROR });
 
     // Check for port conflict if a port is specified
-    const requestedUrl = req.body.localUrl || req.body.healthUrl;
-    if (requestedUrl) {
-      try {
-        const requestedPort = parseInt(new URL(requestedUrl).port);
-        const conflictApp = isPortTaken(requestedPort, id);
-        if (conflictApp) {
-          const suggested = getNextAvailablePort();
-          return res.status(409).json({
-            error: `Port ${requestedPort} is already used by "${conflictApp}"`,
-            suggestedPort: suggested,
-            suggestedUrl: suggested ? `http://localhost:${suggested}` : null
-          });
-        }
-      } catch (e) { dbg('/api/apps', e); }
-    }
+    const conflict = portConflict(req.body, id);
+    if (conflict) return res.status(409).json(conflict);
 
     // Auto-setup infra (caddy, hosts, launch agent)
     const infra = setupInfra(id, req.body);
@@ -164,21 +162,8 @@ module.exports = function register(app, ctx) {
     if (isChromeExtensionRepo(req.body.localPath)) return res.status(400).json({ error: CHROME_EXT_ERROR });
 
     // Check for port conflict on update
-    const requestedUrl = req.body.localUrl || req.body.healthUrl;
-    if (requestedUrl) {
-      try {
-        const requestedPort = parseInt(new URL(requestedUrl).port);
-        const conflictApp = isPortTaken(requestedPort, req.params.id);
-        if (conflictApp) {
-          const suggested = getNextAvailablePort();
-          return res.status(409).json({
-            error: `Port ${requestedPort} is already used by "${conflictApp}"`,
-            suggestedPort: suggested,
-            suggestedUrl: suggested ? `http://localhost:${suggested}` : null
-          });
-        }
-      } catch (e) { dbg('/api/apps/:id', e); }
-    }
+    const conflict = portConflict(req.body, req.params.id);
+    if (conflict) return res.status(409).json(conflict);
 
     // Re-setup infra if localUrl or localPath changed
     const data = { ...req.body, id: req.params.id };
