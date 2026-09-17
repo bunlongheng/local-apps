@@ -140,6 +140,10 @@ test('an SSE update frame re-renders the row; a removed frame drops it; an alert
   assert.match(t.root().textContent, /Alpha went down/);
   es.onmessage({ data: JSON.stringify({ type: 'update', id: 'alpha', status: 'removed' }) });
   assert.equal(t.root().querySelector('tr[data-act="open"]'), null, 'row gone');
+  const statusFetches = () => t.gets.filter(p => p === '/api/status').length;
+  const before = statusFetches();
+  es.onmessage({ data: JSON.stringify({ type: 'reload' }) }); await t.settle(() => statusFetches() > before);
+  assert.equal(statusFetches(), before + 1, 'a reload frame re-fetches the registry');
 });
 
 test('the palette opens on Cmd+K, filters as you type, arrows move the active option and Enter opens the modal', async () => {
@@ -157,6 +161,9 @@ test('the palette opens on Cmd+K, filters as you type, arrows move the active op
   assert.equal(t.w.document.getElementById('cmdk-input'), null, 'palette closed');
   assert.equal(t.root().querySelector('[role="dialog"]').getAttribute('aria-label'), 'Beta', 'modal opened on the highlighted app');
   key(t.w, 'Escape'); assert.equal(t.root().querySelector('[role="dialog"]'), null, 'Escape closes the modal');
+  t.root().querySelector('tr[data-act="open"]').click(); await t.settle();
+  t.root().querySelector('[data-act="close"]').click(); await t.settle();
+  assert.equal(t.root().querySelector('[role="dialog"]'), null, 'the X button closes the modal');
 });
 
 test('modal tabs switch the active pane; a discovered peer renders a machine tab whose apps are read-only', async () => {
@@ -188,6 +195,9 @@ test('QR overlay, help dialog, copy buttons and the log tail of a down app', asy
   assert.equal(copied.length, 1); assert.match(copied[0], /local-apps|api/i); assert.match(t.root().textContent, /Copied/);
   t.root().querySelector('[data-act="help-close"]').click(); await t.settle();
   assert.equal(t.root().querySelector('[aria-label="AI Instruction"]'), null);
+  t.root().querySelector('[data-act="help"]').click(); await t.settle();
+  t.root().querySelector('[data-act="overlay-help"]').click(); await t.settle();
+  assert.equal(t.root().querySelector('[aria-label="AI Instruction"]'), null, 'clicking the backdrop closes help');
   t.root().querySelector('tr[data-act="open"]').click(); await t.settle();
   assert.match(t.w.document.getElementById('logBody').textContent, /ready on 4000/, 'a down app opens with its log tail');
   t.root().querySelector('.copy-btn[data-act="copy"]').click(); await t.settle();
