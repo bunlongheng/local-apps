@@ -19,6 +19,7 @@ test('tcpCheck is true for 2xx, false for 5xx, refused and timeout; checkSingle 
   const n = events.length; await h.checkSingle({ id: 'a', healthUrl: base + '/ok' });
   assert.equal(events.length, n, 'no transition, no SSE frame');
   assert.equal(await h.tcpCheck('not a url'), false, 'an unparsable url is simply down');
+  assert.equal(await h.tcpCheck('https://127.0.0.1:1/'), false, 'https probes take the tls module and are down when refused');
   srv.closeAllConnections?.(); srv.close();
 });
 
