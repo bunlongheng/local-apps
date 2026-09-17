@@ -16,6 +16,7 @@ const { isChromeExtensionRepo, CHROME_EXT_ERROR } = require('./lib/chrome-ext');
 const makeCaddy = require('./lib/caddy');
 const makeLaunchd = require('./lib/launchd');
 const makeHealth = require('./lib/health');
+const { buildLauncher } = require('./lib/launcher');
 
 const app = createApp();
 // True only when run directly (node server.js), false when require()d by a test - lets the
@@ -428,6 +429,12 @@ async function checkAll() {
 }
 
 // --- Status route (dashboard) ---
+
+// Launcher feed for the companion Chrome extension: hosted apps only, see lib/launcher.js.
+app.get('/api/launcher', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.json(buildLauncher(db.getApps(), { tailscaleIp: TAILSCALE_IP, stateOf: getState }));
+});
 
 app.get('/api/status', (req, res) => {
   res.header('Access-Control-Allow-Origin', '*');

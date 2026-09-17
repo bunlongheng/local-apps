@@ -49,6 +49,10 @@ The real win is what it removes. No wall of terminal windows, no `npm run dev` t
 - **Multi-machine** - a hub runs the bots; agent machines report status only. Sync app lists across machines on the LAN.
 - **REST + SSE control API** - ~30 documented routes for apps, machines, status, logs, and events.
 
+## Companion: Local Apps Launcher (Chrome extension)
+
+[local-apps-launcher](https://github.com/bunlongheng/local-apps-launcher) turns the registry into an omnibox launcher: type `la sti` and Enter opens Stickies in production. It syncs `GET /api/launcher` (hosted apps only, ~12 KB) into `chrome.storage.sync` every 30 minutes, so it keeps working when the hub is off and follows you to every Chrome you are signed into.
+
 ## Architecture
 
 One Node.js service: a `node:http` server (`server.js`) that serves the static vanilla-JS dashboard and owns the control API and all OS orchestration, backed by SQLite. There is no separate frontend and no build step - the browser loads `public/` and talks to the same-origin `/api/*` routes on `:9875`.
