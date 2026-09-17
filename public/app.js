@@ -112,7 +112,7 @@
     // actions and sensitive reads work from the iPad/LAN. Localhost needs no token.
     opts = opts || {};
     var token = null;
-    try { token = localStorage.getItem("localAppsToken"); } catch (e) {}
+    try { token = localStorage.getItem("localAppsToken"); } catch (_e) { /* best effort: UI stays usable */ }
     if (token) {
       opts.headers = Object.assign({}, opts.headers, { "x-local-apps-token": token });
     }
@@ -136,7 +136,7 @@
     var ta = document.createElement("textarea");
     ta.value = text; ta.style.cssText = "position:fixed;opacity:0";
     document.body.appendChild(ta); ta.select();
-    try { document.execCommand("copy"); } catch (e) {}
+    try { document.execCommand("copy"); } catch (_e) { /* best effort: UI stays usable */ }
     document.body.removeChild(ta); toast("Copied", 1500);
   }
 
@@ -248,7 +248,7 @@
     var go = S.qrData ? Promise.resolve() : api("/api/qr").then(function (d) { S.qrData = d; });
     go.then(function () { S.qrOpen = true; render(); }, function () {});
   }
-  function switchMachine(id) { S.activeMachine = id; try { localStorage.setItem("activeMachine", id || ""); } catch (e) {} S.loading = true; render(); load(); }
+  function switchMachine(id) { S.activeMachine = id; try { localStorage.setItem("activeMachine", id || ""); } catch (_e) { /* best effort: UI stays usable */ } S.loading = true; render(); load(); }
 
   // ---- render -----------------------------------------------------------
   function vercelSvg() { return '<svg width="14" height="14" viewBox="0 0 76 65" fill="white"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z"/></svg>'; }
@@ -605,7 +605,7 @@
   });
 
   // ---- boot -------------------------------------------------------------
-  try { var saved = localStorage.getItem("activeMachine"); if (saved) S.activeMachine = saved; } catch (e) {}
+  try { var saved = localStorage.getItem("activeMachine"); if (saved) S.activeMachine = saved; } catch (_e) { /* best effort: UI stays usable */ }
   var um = new URLSearchParams(location.search).get("machine"); if (um) S.activeMachine = um;
 
   render();
