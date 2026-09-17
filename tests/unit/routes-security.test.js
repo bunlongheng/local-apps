@@ -101,3 +101,22 @@ test('meta: /api/consistency?id= is sanitised to [a-z0-9-] and audits that app o
   assert.ok(Array.isArray(body) && body.length === 1, '1 app audited, not the whole registry');
   assert.equal(body[0].id, 'zzz-profrm', 'shell metacharacters are stripped from the id before any file check');
 });
+
+test('/api/status says whether the viewer is on the box; the SSE stream pings every 25s', async () => {
+  const { mock } = require('node:test');
+  assert.equal((await (await fetch(base + '/api/status')).json()).viewer, 'loopback');
+  assert.equal((await (await fetch(base + '/api/status', { headers: { 'x-forwarded-for': '1.2.3.4' } })).json()).viewer, 'offbox');
+  mock.timers.enable({ apis: ['setInterval'] });
+  try {
+    const http = require('node:http');
+    const frame = await new Promise((resolve, reject) => {
+      const rq = http.get(base + '/api/events', (r) => {
+        assert.match(r.headers['content-type'], /text\/event-stream/);
+        r.once('data', (c) => { resolve(String(c)); rq.destroy(); });
+        setImmediate(() => mock.timers.tick(25000));   // the handler's interval is registered once headers are out
+      });
+      rq.on('error', reject);
+    });
+    assert.equal(frame, ': ping\n\n');
+  } finally { mock.timers.reset(); }
+});
