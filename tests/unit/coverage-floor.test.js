@@ -25,3 +25,11 @@ test('exit 2 when the file has no record; a shorter suffix does not borrow anoth
   assert.equal(run('nope/app.js', '0', '0').status, 2);
   const r = run('lib/app.js', '0', '0'); assert.equal(r.status, 0); assert.match(r.stdout, /lib\/app\.js lines 10\.00%/);
 });
+test('--run measures the file itself into a private temp dir and applies the floor', () => {
+  // A cheap sibling suite, never this file (it would spawn --run again, forever).
+  const dirsBefore = fs.readdirSync(os.tmpdir()).filter(f => f.startsWith('coverage-floor-')).length;
+  const r = spawnSync(process.execPath, [SCRIPT, '--run', 'public/sw.js', '50', '50', path.join(__dirname, 'sw.test.js')], { encoding: 'utf8', timeout: 120000 });
+  assert.equal(r.status, 0, r.stderr); assert.match(r.stdout, /public\/sw\.js lines \d+\.\d+%/);
+  assert.equal(fs.readdirSync(os.tmpdir()).filter(f => f.startsWith('coverage-floor-')).length, dirsBefore, 'temp dir removed');
+  assert.equal(spawnSync(process.execPath, [SCRIPT, '--run', 'public/sw.js', '101', '0', path.join(__dirname, 'sw.test.js')], { encoding: 'utf8', timeout: 120000 }).status, 1, 'floor applies to --run too');
+});
