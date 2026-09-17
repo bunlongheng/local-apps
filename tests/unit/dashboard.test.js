@@ -43,7 +43,7 @@ function boot({ status, machines = [], peerStatus = null }) {
   const clock = fakeClock(w);
   const sources = [];
   w.EventSource = class { constructor(url) { this.url = url; this.closed = false; sources.push(this); } close() { this.closed = true; } };
-  const routes = { '/api/status': status, '/api/favicons': {}, '/api/machines': machines, '/api/log/alpha': { lines: ['ready on 4000'] } };
+  const routes = { '/api/status': status, '/api/favicons': {}, '/api/machines': machines, '/api/log/alpha': { lines: ['ready on 4000'] }, '/api/qr': { url: 'http://10.0.0.5:9875', dataUrl: 'data:image/png;base64,AA==' } };
   if (peerStatus) for (const m of machines) routes[`/api/machines/${m.id}/status`] = peerStatus;
   const requests = [];   // every non-GET call the dashboard makes: { method, path }
   w.fetch = (p, opts) => {
@@ -169,5 +169,25 @@ test('modal tabs switch the active pane; a discovered peer renders a machine tab
   assert.match(t.root().querySelector('tr[data-act="open"]').textContent, /Remote A/);
   t.root().querySelector('tr[data-act="open"]').click(); await t.settle();
   assert.equal(t.root().querySelector('[data-act="toggle"]'), null); assert.match(t.root().textContent, /read-only on a peer/);
+  t.close();
+});
+
+test('QR overlay, help dialog, copy buttons and the log tail of a down app', async () => {
+  const t = boot({ status: { ...ON, apps: [{ ...APPS[0], status: 'down', logPath: '/tmp/alpha.log' }] } });
+  const copied = [];
+  Object.defineProperty(t.w.navigator, 'clipboard', { value: { writeText: (x) => { copied.push(x); return Promise.resolve(); } } });
+  await t.settle();
+  t.root().querySelector('[data-act="qr"]').click(); await t.settle();
+  const qr = t.root().querySelector('.qr-pop'); assert.ok(qr, 'QR pop rendered'); assert.equal(qr.querySelector('img').getAttribute('src'), 'data:image/png;base64,AA=='); assert.match(qr.textContent, /10\.0\.0\.5:9875/);
+  t.root().querySelector('[data-act="help"]').click(); await t.settle();
+  const help = t.root().querySelector('[role="dialog"][aria-label="AI Instruction"]'); assert.ok(help, 'help dialog');
+  help.querySelector('[data-act="copy"]').click(); await t.settle();
+  assert.equal(copied.length, 1); assert.match(copied[0], /local-apps|api/i); assert.match(t.root().textContent, /Copied/);
+  t.root().querySelector('[data-act="help-close"]').click(); await t.settle();
+  assert.equal(t.root().querySelector('[aria-label="AI Instruction"]'), null);
+  t.root().querySelector('tr[data-act="open"]').click(); await t.settle();
+  assert.match(t.w.document.getElementById('logBody').textContent, /ready on 4000/, 'a down app opens with its log tail');
+  t.root().querySelector('.copy-btn[data-act="copy"]').click(); await t.settle();
+  assert.equal(copied.at(-1), 'http://alpha.localhost', 'first info row is the Caddy host');
   t.close();
 });
