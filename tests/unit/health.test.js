@@ -16,6 +16,9 @@ test('tcpCheck is true for 2xx, false for 5xx, refused and timeout; checkSingle 
   await h.checkSingle({ id: 'a', healthUrl: base + '/ok' });
   assert.equal(s.status, 'up'); assert.equal(s.downSince, null); assert.equal(s.restartAttempts, 0);
   assert.deepEqual(events.at(-1), { type: 'update', id: 'a', status: 'up' });
+  const n = events.length; await h.checkSingle({ id: 'a', healthUrl: base + '/ok' });
+  assert.equal(events.length, n, 'no transition, no SSE frame');
+  assert.equal(await h.tcpCheck('not a url'), false, 'an unparsable url is simply down');
   srv.closeAllConnections?.(); srv.close();
 });
 
@@ -38,6 +41,7 @@ test('processCheck finds a running process by its command line and not after it 
   // Bounded poll, not a fixed sleep: a loaded runner must not flake the only real-process test.
   const until = async (want) => { for (let i = 0; i < 100; i++) { if (await h.processCheck(marker) === want) return true; await new Promise(r => setTimeout(r, 50)); } return false; };
   assert.ok(await until(true), 'seen while running');
+  await h.checkSingle({ id: 'p', processCheck: marker }); assert.equal(h.getState('p').status, 'up', 'checkSingle via processCheck');
   child.kill('SIGKILL'); await new Promise(r => child.on('exit', r));
   assert.ok(await until(false), 'gone after exit');
 });
