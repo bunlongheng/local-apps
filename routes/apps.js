@@ -55,7 +55,7 @@ module.exports = function register(app, ctx) {
   });
 
   // Toggle app disabled state (excludes from auto-restart when disabled)
-  app.post('/api/apps/:id/toggle', (req, res) => {
+  app.post('/api/apps/:id/toggle', async (req, res) => {
     const a = db.getApp(req.params.id);
     if (!a) return res.status(404).json({ error: 'not found' });
     const newState = !a.disabled;
@@ -63,7 +63,7 @@ module.exports = function register(app, ctx) {
     // If disabling, also stop the app
     if (newState && a.launchAgent) {
       const uid = process.getuid();
-      try { execSync(`launchctl bootout gui/${uid}/${a.launchAgent} 2>/dev/null`, { timeout: 10000 }); } catch (e) { dbg('line526', e); }
+      try { await execAsync(`launchctl bootout gui/${uid}/${a.launchAgent} 2>/dev/null`, { timeout: 10000 }); } catch (e) { dbg('toggle/bootout', e); }
       const s = getState(a.id);
       s.status = 'down';
       s.downSince = null;
@@ -73,7 +73,7 @@ module.exports = function register(app, ctx) {
     // If enabling, kick it back to life (bootstrap if the service isn't loaded in launchd)
     if (!newState && a.launchAgent) {
       const uid = process.getuid();
-      try { execSync(startCmd(uid, a.launchAgent, a.launchAgentPath), { timeout: 15000 }); } catch (e) { dbg('line536', e); }
+      try { await execAsync(startCmd(uid, a.launchAgent, a.launchAgentPath), { timeout: 15000 }); } catch (e) { dbg('toggle/start', e); }
       setTimeout(() => checkSingle(a), 3000);
       setTimeout(() => checkSingle(a), 8000);
       setTimeout(() => checkSingle(a), 15000);
