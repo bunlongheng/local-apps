@@ -20,6 +20,7 @@ const makeLaunchd = require('./lib/launchd');
 const makeHealth = require('./lib/health');
 const makeInfra = require('./lib/infra');
 const makeMonitor = require('./lib/monitor');
+const makeTabColors = require('./lib/tab-colors');
 const { fetchJson, sweepSubnet, peerRecord, appRecord } = require('./lib/peers');
 
 const app = createApp();
@@ -126,21 +127,8 @@ app.use(serveStatic(path.join(__dirname, 'public')));
 
 // --- Caddy reverse-proxy management -> lib/caddy.js ---
 
-// Optional integration: ~/.claude/tab-colors.json is the owner's terminal-tab registry. When
-// the file exists, a rename keeps its label in sync; when it does not, this is a no-op.
-function updateTabColors(id, label, caddyUrl) {
-  const colorsPath = path.join(os.homedir(), '.claude', 'tab-colors.json');
-  try {
-    const colors = JSON.parse(fs.readFileSync(colorsPath, 'utf8'));
-    // Try app ID first, then caddy hostname
-    const caddyHost = caddyUrl ? caddyUrl.replace(/^https?:\/\//, '').replace(/\.localhost.*/, '') : null;
-    const key = colors[id] ? id : (caddyHost && colors[caddyHost]) ? caddyHost : null;
-    if (key) {
-      colors[key].label = label.toUpperCase();
-      fs.writeFileSync(colorsPath, JSON.stringify(colors, null, 2));
-    }
-  } catch (e) { dbg('updateTabColors', e); }
-}
+// Tab-registry label sync -> lib/tab-colors.js (optional integration, tested against a temp home).
+const { updateTabColors } = makeTabColors({ home: os.homedir(), dbg });
 
 // --- LaunchAgent management ---
 const LAUNCH_AGENTS_DIR = path.join(os.homedir(), 'Library', 'LaunchAgents');
