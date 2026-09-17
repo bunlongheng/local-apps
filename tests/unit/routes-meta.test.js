@@ -8,7 +8,8 @@ const path = require('node:path');
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'meta-home-'));
 const ROOT = path.join(__dirname, '..', '..');
-after(() => fs.rmSync(home, { recursive: true, force: true }));
+const FIXTURE_FAV = path.join(ROOT, 'public', 'favicons', 'zzz-meta.png');   // deterministic favicon, never a live asset
+after(() => { fs.rmSync(home, { recursive: true, force: true }); fs.rmSync(FIXTURE_FAV, { force: true }); });
 const write = (rel, body) => { const f = path.join(home, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, body); return f; };
 
 function fakeApp() {
@@ -39,10 +40,10 @@ test('tab-colors merges the json registry (hex colour, label), db fallback, and 
 });
 
 test('icon-sync reports synced only when the favicon and the app icon are the same size', async () => {
-  const favs = fs.readdirSync(path.join(ROOT, 'public', 'favicons')).filter(f => f.endsWith('.png'));
-  const favId = favs[0].replace(/\.png$/, '');
+  fs.writeFileSync(FIXTURE_FAV, Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]));
+  const favId = 'zzz-meta';
   const same = path.join(home, 'apps', favId); fs.mkdirSync(path.join(same, 'app'), { recursive: true });
-  fs.copyFileSync(path.join(ROOT, 'public', 'favicons', favs[0]), path.join(same, 'app', 'icon.png'));
+  fs.copyFileSync(FIXTURE_FAV, path.join(same, 'app', 'icon.png'));
   const diff = path.join(home, 'apps', 'zzz-diff'); fs.mkdirSync(path.join(diff, 'public'), { recursive: true }); fs.writeFileSync(path.join(diff, 'public', 'favicon.png'), 'x');
   const routes = boot([{ id: favId, localPath: same }, { id: 'zzz-diff', localPath: diff }, { id: 'zzz-none' }]);
   const r = await call(routes['GET /api/icon-sync']);
