@@ -1,4 +1,6 @@
-// e2e: app registry endpoints. Read-only smoke checks plus mutation guards that
+// e2e: app registry endpoints. A fresh instance is not empty: db.js seeds apps.config.example.json
+// when the database has no rows, and the read-only checks below rely on that seed.
+// Read-only smoke checks plus mutation guards that
 // reject bad input. The mutation cases use ids that do not exist, so nothing in
 // apps.config.json is created, changed, or deleted.
 const { test, before, after } = require('node:test');
@@ -81,6 +83,7 @@ test('create app with injected startCommand -> 400 (no command injection)', asyn
 test('POST /api/apps on a port another app owns -> 409 with a suggested port', async () => {
   const apps = (await api('GET', '/api/apps')).json;
   const taken = apps.map(a => a.localUrl && Number(new URL(a.localUrl).port)).find(Boolean);
+  assert.ok(taken, 'the seed must contain an app with a localUrl');
   const { status, json } = await api('POST', '/api/apps', { id: MISSING, localPath: '/tmp/zzz', localUrl: `http://localhost:${taken}`, healthUrl: `http://localhost:${taken}` });
   assert.equal(status, 409);
   assert.ok(json.suggestedPort || json.error, 'conflict explains itself');
