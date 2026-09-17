@@ -29,7 +29,7 @@ test('launch-agent passes when the row plist exists, whatever its label prefix',
   fs.unlinkSync(plist);
 });
 
-test('all 9 artifact rules pass on a fully wired fixture and each fails alone when its artifact is missing', () => {
+test('all 10 artifact rules pass on a fully wired fixture and removing artifacts one by one grows the miss set by exactly that rule', () => {
   const { P } = require('../../scripts/consistency');
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cons-'));
   const id = 'zzz-wired';
@@ -54,10 +54,11 @@ test('all 9 artifact rules pass on a fully wired fixture and each fails alone wh
     'caddy-host': () => fs.writeFileSync(P.caddy, ''), 'launch-agent': () => fs.unlinkSync(plist),
     'profile': () => db.upsertApp({ id, about: '' }), 'repo': () => db.upsertApp({ id, repo: '' }),
   };
+  const expected = [];
   for (const [rule, fn] of Object.entries(knock)) {
-    fn();
-    const misses = audit(id)[0].misses;
-    assert.ok(misses.includes(rule), `${rule} reported after removal (got ${misses})`);
+    fn(); expected.push(rule);
+    if (rule === 'tab-color') expected.push('tab-alias');   // by design: the alias is generated from registry membership, so losing the colour loses the alias
+    assert.deepEqual(audit(id)[0].misses.slice().sort(), expected.slice().sort(), `after removing ${rule} exactly these rules miss`);
   }
   // tab-alias: a hand-written shortcut alias is drift even when the generator exists.
   fs.writeFileSync(P.colors, JSON.stringify({ [id]: { r: 1, g: 2, b: 3 } })); fs.writeFileSync(P.tabsh, `_tab_defs() { :; }\n_zw() { _tab "${id}"; }\n`);
