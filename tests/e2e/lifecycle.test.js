@@ -3,6 +3,7 @@
 const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const net = require('node:net');
+const fs = require('node:fs');
 const { api, serverUp } = require('./helpers');
 
 const ID = 'zzz-e2e-lifecycle';
@@ -11,7 +12,7 @@ const MUTATE = process.env.E2E_MUTATE === '1';
 const opts = { skip: MUTATE ? false : 'set E2E_MUTATE=1 against a scratch instance' };
 function freePort() { return new Promise((r) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); }); }
 
-before(async () => { if (!await serverUp()) throw new Error('local-apps server not reachable - start it first'); await api('DELETE', `/api/apps/${ID}`); });
+before(async () => { if (!await serverUp()) throw new Error('local-apps server not reachable - start it first'); if (MUTATE) await api('DELETE', `/api/apps/${ID}`); });
 after(async () => { if (MUTATE) await api('DELETE', `/api/apps/${ID}`); });
 
 test('POST -> GET -> PUT -> DELETE round-trips an app', opts, async () => {
@@ -23,6 +24,15 @@ test('POST -> GET -> PUT -> DELETE round-trips an app', opts, async () => {
   const got = await api('GET', `/api/apps/${ID}`);
   assert.equal(got.status, 200); assert.equal(got.json.name, 'E2E Lifecycle'); assert.equal(got.json.tabColor, '#123456'); assert.equal(got.json.prodUrl2, 'https://two.example.com');
 
+  // On macOS the server provisions for real: the answer must carry the proxy and the agent, and
+  // when the scratch paths are known the block and the plist must exist right now.
+  if (process.platform === 'darwin') {
+    assert.equal(got.json.caddyUrl, `http://${ID}.localhost`, 'Caddy block was written and reported');
+    assert.match(String(got.json.launchAgent), new RegExp(`\\.${ID}$`), 'LaunchAgent label reported');
+    if (process.env.CADDYFILE) assert.ok(fs.readFileSync(process.env.CADDYFILE, 'utf8').includes(`${ID}.localhost`), 'block present in the Caddyfile');
+    if (process.env.LAUNCH_AGENTS_DIR) assert.ok(fs.existsSync(got.json.launchAgentPath) && got.json.launchAgentPath.startsWith(process.env.LAUNCH_AGENTS_DIR), 'plist present in the scratch dir');
+  }
+
   const status = await api('GET', '/api/status');
   assert.ok(status.json.apps.some(a => a.id === ID), 'the new app is in /api/status');
 
@@ -31,6 +41,8 @@ test('POST -> GET -> PUT -> DELETE round-trips an app', opts, async () => {
 
   const del = await api('DELETE', `/api/apps/${ID}`);
   assert.equal(del.status, 200);
+  if (process.platform === 'darwin' && process.env.CADDYFILE) assert.ok(!fs.readFileSync(process.env.CADDYFILE, 'utf8').includes(`${ID}.localhost`), 'block removed');
+  if (process.platform === 'darwin' && got.json.launchAgentPath) assert.ok(!fs.existsSync(got.json.launchAgentPath), 'plist removed');
   assert.equal((await api('GET', `/api/apps/${ID}`)).status, 404);
 });
 
