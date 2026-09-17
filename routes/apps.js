@@ -214,6 +214,10 @@ module.exports = function register(app, ctx) {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
     sseClients.add(res);
+    // Heartbeat: a comment frame every 25s keeps proxies from idling the stream out and lets the
+    // client tell a silent-but-dead stream from a quiet one.
+    const beat = setInterval(() => { try { res.write(': ping\n\n'); } catch (e) { dbg('sse/heartbeat', e); } }, 25000);
+    res.on('close', () => clearInterval(beat));
     res.on('close', () => sseClients.delete(res));
   });
 

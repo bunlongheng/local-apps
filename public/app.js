@@ -105,7 +105,7 @@
     modalApp: null, modalTab: "info", logLines: [], logLoading: false,
     qrData: null, qrOpen: false, helpOpen: false,
   };
-  var startPolls = {}, toastTimer = null;
+  var startPolls = {}, toastTimer = null, sse = null;
 
   function api(path, opts) {
     // Forward the control token (if the user set one for LAN/off-box access) so mutating
@@ -171,12 +171,16 @@
 
   // While the SSE stream is open every change arrives as an event; the 15s poll is only the
   // fallback for a dropped stream, not a second source of full re-renders.
-  var sseOk = false;
+  var sseOk = false, lastBeat = 0;
+  // Server pings every 25s (comment frames do not fire onmessage, so watch the socket via a
+  // reconnect when 60s pass with nothing at all).
+  setInterval(function () { if (sseOk && lastBeat && Date.now() - lastBeat > 60000) { sseOk = false; try { if (sse) sse.close(); } catch (x) { void x; } connectSSE(); } }, 15000);
   function connectSSE() {
     function connect() {
-      var es = new EventSource("/api/events");
-      es.onopen = function () { sseOk = true; };
+      var es = new EventSource("/api/events"); sse = es;
+      es.onopen = function () { sseOk = true; lastBeat = Date.now(); };
       es.onmessage = function (e) {
+        lastBeat = Date.now();
         var msg; try { msg = JSON.parse(e.data); } catch { return; }
         if (msg.type === "update") {
           if (msg.status === "removed") { S.apps = S.apps.filter(function (a) { return a.id !== msg.id; }); }
