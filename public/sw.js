@@ -2,7 +2,7 @@
 // it always tries the network and only falls back to cache when offline.
 // skipWaiting + clientsClaim + old-cache cleanup means updates apply at once.
 // Shared, unchanged, across every bunlongheng app.
-const CACHE = "app-cache-v2";
+const CACHE = "app-cache-v3";
 
 self.addEventListener("install", () => self.skipWaiting());
 
@@ -34,6 +34,7 @@ self.addEventListener("fetch", (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(request))
+      // Offline and not cached: a real 503, never an undefined that respondWith rejects.
+      .catch(() => caches.match(request).then((hit) => hit || new Response('offline', { status: 503, headers: { 'Content-Type': 'text/plain' } })))
   );
 });
