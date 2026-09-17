@@ -223,7 +223,8 @@ async function generateForApp(appId, localPath) {
 
   // Also copy 512px PNG to local-apps/public/favicons/{id}.png
   const dashboardCopy = path.join(FAVICONS_DIR, `${appId}.png`);
-  fs.writeFileSync(dashboardCopy, png512);
+  // The dashboard renders this at 32px and 16px: 128px, palette-quantised, instead of the 512px master.
+  fs.writeFileSync(dashboardCopy, await sharp(png512).resize(128, 128).png({ palette: true, quality: 85, compressionLevel: 9 }).toBuffer());
   files.push(dashboardCopy);
 
   console.log(`  ✅ ${appId}: ${files.length} files written to ${outDir}`);
