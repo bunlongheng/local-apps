@@ -86,5 +86,7 @@ test('POST /api/apps on a port another app owns -> 409 with a suggested port', a
   assert.ok(taken, 'the seed must contain an app with a localUrl');
   const { status, json } = await api('POST', '/api/apps', { id: MISSING, localPath: '/tmp/zzz', localUrl: `http://localhost:${taken}`, healthUrl: `http://localhost:${taken}` });
   assert.equal(status, 409);
-  assert.ok(json.suggestedPort || json.error, 'conflict explains itself');
+  assert.match(json.error, /already used by/);
+  assert.ok('suggestedPort' in json, 'conflict carries suggestedPort');
+  if (json.suggestedPort) assert.equal(json.suggestedUrl, `http://localhost:${json.suggestedPort}`);
 });
