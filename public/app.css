@@ -234,4 +234,3 @@ a.badge-link { text-decoration: none; display: inline-flex; align-items: center;
 .toast.error { background: #7f1d1d; color: #fee2e2; }
 [data-act][role="button"]:focus-visible, .modal-close:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.dot.unknown { background: var(--muted); }
