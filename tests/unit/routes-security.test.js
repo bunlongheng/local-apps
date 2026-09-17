@@ -13,7 +13,13 @@ const TMP_DB = path.join(os.tmpdir(), `local-apps-routes-${process.pid}.db`);
 process.env.LOCAL_APPS_DB = TMP_DB;
 process.env.MACHINE_ROLE = 'hub';   // the hub registers every route; do not depend on machine-role.json
 process.env.LOCAL_APPS_TOKEN = 'zzz-tok';   // exercises the header wiring; loopback callers never need it
+// The import must be hermetic: server.js captures child_process at load, so spies installed here
+// are the functions it would call. Any top-level shell-out outside an IS_MAIN guard fails this.
+const cp = require('node:child_process');
+const importSpies = ['execSync', 'exec', 'execFile', 'spawn', 'spawnSync'].map((f) => require('node:test').mock.method(cp, f));
 const app = require('../../server');
+for (const sp of importSpies) assert.equal(sp.mock.callCount(), 0, 'importing server.js must not shell out');
+importSpies.forEach((sp) => sp.mock.restore());
 
 let server, base;
 before(async () => {
