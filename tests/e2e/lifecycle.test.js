@@ -6,12 +6,15 @@ const net = require('node:net');
 const { api, serverUp } = require('./helpers');
 
 const ID = 'zzz-e2e-lifecycle';
+// Mutating: opt in explicitly so `npm run test:e2e` against the live hub never provisions anything.
+const MUTATE = process.env.E2E_MUTATE === '1';
+const opts = { skip: MUTATE ? false : 'set E2E_MUTATE=1 against a scratch instance' };
 function freePort() { return new Promise((r) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); }); }
 
-before(async () => { if (!await serverUp()) throw new Error('local-apps server not reachable - start it first'); await api('DELETE', `/api/apps/${ID}`); });
-after(async () => { await api('DELETE', `/api/apps/${ID}`); });
+before(async () => { if (!MUTATE) return; if (!await serverUp()) throw new Error('local-apps server not reachable - start it first'); await api('DELETE', `/api/apps/${ID}`); });
+after(async () => { if (MUTATE) await api('DELETE', `/api/apps/${ID}`); });
 
-test('POST -> GET -> PUT -> DELETE round-trips an app', async () => {
+test('POST -> GET -> PUT -> DELETE round-trips an app', opts, async () => {
   const port = await freePort();
   const created = await api('POST', '/api/apps', { id: ID, name: 'E2E Lifecycle', localPath: '/tmp/zzz-e2e', localUrl: `http://localhost:${port}`, healthUrl: `http://localhost:${port}`, tabColor: '#123456', prodUrl2: 'https://two.example.com' });
   assert.equal(created.status, 201, JSON.stringify(created.json));
@@ -31,7 +34,7 @@ test('POST -> GET -> PUT -> DELETE round-trips an app', async () => {
   assert.equal((await api('GET', `/api/apps/${ID}`)).status, 404);
 });
 
-test('GET /api/machine and /api/machines answer with their shapes', async () => {
+test('GET /api/machine and /api/machines answer with their shapes', opts, async () => {
   const me = await api('GET', '/api/machine');
   assert.equal(me.status, 200); assert.ok(['hub', 'agent'].includes(me.json.role)); assert.equal(typeof me.json.hostname, 'string'); assert.equal(typeof me.json.appCount, 'number');
   const list = await api('GET', '/api/machines');

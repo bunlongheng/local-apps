@@ -1,6 +1,8 @@
-// Tiny fetch helper for e2e tests against the running local-apps server.
-// Tests hit the live instance on 9875 (the always-on dashboard) and only ever
-// send inputs that trip the safety guards, so nothing real is killed or mutated.
+// Tiny fetch helper for e2e tests against a running local-apps server (LOCAL_APPS_URL, default :9875).
+// apps-guards.test.js only sends inputs that trip the safety guards, so nothing is mutated.
+// lifecycle.test.js DOES register and delete an app (on macOS that provisions a real Caddy block
+// and LaunchAgent), so it only runs with E2E_MUTATE=1 - set that against a scratch instance, never
+// the live hub. CI boots one (see .github/workflows/ci.yml); locally see CLAUDE.md.
 const BASE = process.env.LOCAL_APPS_URL || 'http://localhost:9875';
 
 async function api(method, p, body) {
