@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const makeMonitor = require('../../lib/monitor');
 
-function boot({ apps, decision, probe, getApps, killPort }) {
+function boot({ apps, decision, probe, getApps, killPort, exec }) {
   const calls = [], states = {};
   const m = makeMonitor({
     getApps: getApps || (() => apps), setAppDisabled: (id, v, why) => calls.push(`disable:${id}:${v}:${why || ''}`),
@@ -12,7 +12,7 @@ function boot({ apps, decision, probe, getApps, killPort }) {
     runLevel: async (level, target) => calls.push(`runLevel:${level}:${target.id}:${target.port}`),
     recordAttempt: (s, t) => { calls.push('recordAttempt'); s.lastRestart = t; s.restartAttempts = (s.restartAttempts || 0) + 1; },
     readAutoRestart: () => ({ enabled: true }), hub: true, uid: 501, logDir: '/tmp/logs',
-    killPort: killPort || (async (p) => calls.push(`killPort:${p}`)), exec: async (cmd) => calls.push(`exec:${cmd}`), bootoutCmd: (u, l) => `bootout ${u} ${l}`, startCmd: () => 'start',
+    killPort: killPort || (async (p) => calls.push(`killPort:${p}`)), exec: exec || (async (cmd) => calls.push(`exec:${cmd}`)), bootoutCmd: (u, l) => `bootout ${u} ${l}`, startCmd: () => 'start',
     spawn: () => {}, openLog: () => 0, exists: () => true, broadcast: (e) => calls.push(`sse:${e.type}:${e.id}:${e.status}${e.disabled === undefined ? '' : ':' + e.disabled}`),
     log: () => {}, warn: () => {}, dbg: () => {}, now: () => 1000,
   });
@@ -73,8 +73,12 @@ test('a throwing getApps or a rejecting probe rejects the tick but releases the 
   assert.equal(await b.m.checkAll(), true);
 });
 
-test('a breaker trip still disables the app when freeing the port or booting out throws', async () => {
-  const { m, calls } = boot({ apps: [{ ...APP }], decision: { trip: { flaps: 3, attempts: 2 } }, killPort: async () => { throw new Error('lsof hiccup'); } });
-  assert.equal(await m.checkAll(), true);
-  assert.ok(calls.includes('disable:a:true:breaker'), calls.join()); assert.ok(calls.includes('sse:alert:a:undefined:true'));
+test('a breaker trip still boots out and disables when freeing the port throws, and still disables when the bootout throws', async () => {
+  const a = boot({ apps: [{ ...APP }], decision: { trip: { flaps: 3, attempts: 2 } }, killPort: async () => { throw new Error('lsof hiccup'); } });
+  assert.equal(await a.m.checkAll(), true);
+  assert.ok(a.calls.includes('exec:bootout 501 com.t.a'), 'bootout still attempted: ' + a.calls.join());
+  assert.ok(a.calls.includes('disable:a:true:breaker')); assert.ok(a.calls.includes('sse:alert:a:undefined:true'));
+  const b = boot({ apps: [{ ...APP }], decision: { trip: { flaps: 3, attempts: 2 } }, exec: async () => { throw new Error('bootout failed'); } });
+  assert.equal(await b.m.checkAll(), true);
+  assert.ok(b.calls.includes('killPort:4000')); assert.ok(b.calls.includes('disable:a:true:breaker'), b.calls.join());
 });
