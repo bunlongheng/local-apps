@@ -543,7 +543,8 @@ app.post('/api/apps/:id/toggle', (req, res) => {
 });
 
 // Bulk toggle: disable all except specified IDs
-app.post('/api/apps/bulk-toggle', (req, res) => {
+app.post('/api/apps/bulk-toggle', async (req, res) => {
+  const jobs = [];
   const { keep = [] } = req.body || {};
   const apps = db.getApps();
   const uid = process.getuid();
@@ -554,7 +555,7 @@ app.post('/api/apps/bulk-toggle', (req, res) => {
     db.setAppDisabled(a.id, shouldDisable);
     // Stop newly disabled apps
     if (shouldDisable && !wasDisabled && a.launchAgent) {
-      try { execSync(`launchctl bootout gui/${uid}/${a.launchAgent} 2>/dev/null`, { timeout: 10000 }); } catch {}
+      jobs.push(execAsync(`launchctl bootout gui/${uid}/${a.launchAgent} 2>/dev/null`, { timeout: 10000 }).catch(() => {}));
       const s = getState(a.id);
       s.status = 'down';
       s.downSince = null;
@@ -563,10 +564,12 @@ app.post('/api/apps/bulk-toggle', (req, res) => {
     }
     // Start newly enabled apps
     if (!shouldDisable && wasDisabled && a.launchAgent) {
-      try { execSync(startCmd(uid, a.launchAgent, a.launchAgentPath), { timeout: 15000 }); } catch {}
+      jobs.push(execAsync(startCmd(uid, a.launchAgent, a.launchAgentPath), { timeout: 15000 }).catch(() => {}));
     }
     results.push({ id: a.id, disabled: shouldDisable });
   }
+  // launchctl calls run concurrently and awaited, never serial execSync on the event loop.
+  await Promise.all(jobs);
   console.log(`  bulk-toggle: keeping ${keep.join(', ')}, disabled ${results.filter(r => r.disabled).length} apps`);
   res.json({ ok: true, results });
 });
