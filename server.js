@@ -91,7 +91,7 @@ app.use(jsonBody());
 // Trust-loopback auth policy lives in lib/auth-gate.js (pure + unit-tested). See it for the rule.
 const { decide: authDecide, isLoopback, effectiveAddress } = require('./lib/auth-gate');
 // Off-box viewers (the LAN/tailnet dashboard) get status without filesystem paths or launchd internals.
-const OFFBOX_STRIP = ['localPath', 'logPath', 'launchAgentPath', 'launchAgent', 'startCommand', 'processCheck'];
+const OFFBOX_STRIP = ['localPath', 'logPath', 'launchAgentPath', 'launchAgent', 'startCommand', 'processCheck', 'about', 'features', 'architect', 'deploy', 'security', 'performance', 'prompt'];
 const clientAddress = (req) => effectiveAddress(req.socket.remoteAddress || '', req.get('x-forwarded-for'));
 const forViewer = (req, a) => { if (isLoopback(clientAddress(req))) return a; const o = { ...a }; for (const k of OFFBOX_STRIP) delete o[k]; return o; };
 const AUTH_TOKEN = process.env.LOCAL_APPS_TOKEN || '';
