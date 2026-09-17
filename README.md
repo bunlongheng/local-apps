@@ -83,6 +83,10 @@ No environment variables are required.
 | `LAUNCH_AGENTS_DIR` | `~/Library/LaunchAgents` | where per-app plists are written (a scratch dir for tests) |
 | `PORT` | `9875` | listen port; only for a scratch instance (launchd and Caddy expect 9875) |
 | `LOCAL_APPS_FAVICONS_DIR` | `public/favicons` | favicon directory served to the dashboard (a temp dir for tests) |
+| `LOCAL_APPS_CONFIG` | `apps.config.json` (else the example) | seed file for an empty database |
+| `LOCAL_APPS_NO_SWEEP` | unset | `1` stops a hub from probing the subnet (scratch instances) |
+| `LOCAL_APPS_HOME` | `~` | home dir read for the tab registry and hub extras (a temp dir for tests) |
+| `LOCAL_APPS_LOG_DIR` | `~/Library/Logs/local-apps` | where app logs are written (a temp dir for tests) |
 | `API_BIND` | `0.0.0.0` | `127.0.0.1` keeps the API off the LAN |
 | `LOCAL_APPS_TOKEN` | unset | grants a trusted LAN or tailnet machine control |
 | `LOCAL_APPS_DB` | `./local.db` | SQLite file; tests point it at a temp file |

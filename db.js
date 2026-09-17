@@ -6,9 +6,9 @@ const os = require('os');
 const DB_PATH = process.env.LOCAL_APPS_DB || path.join(__dirname, 'local.db');
 // Personal registry (gitignored) if present, else the checked-in example so a
 // fresh clone still seeds a working demo dashboard.
-const CONFIG_FILE = fs.existsSync(path.join(__dirname, 'apps.config.json'))
+const CONFIG_FILE = process.env.LOCAL_APPS_CONFIG || (fs.existsSync(path.join(__dirname, 'apps.config.json'))
   ? path.join(__dirname, 'apps.config.json')
-  : path.join(__dirname, 'apps.config.example.json');
+  : path.join(__dirname, 'apps.config.example.json'));   // LOCAL_APPS_CONFIG: a scratch instance seeds from its own file
 
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');

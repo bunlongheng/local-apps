@@ -31,7 +31,10 @@ const IS_MAIN = require.main === module;
 // a kill on a free port) are logged, never swallowed: LOCAL_APPS_DEBUG=1 prints them.
 const dbg = (where, e) => { if (process.env.LOCAL_APPS_DEBUG) console.warn(`  [debug] ${where}: ${e && e.message ? e.message : e}`); };
 // App logs live in a per-user directory, never in world-shared /tmp with a guessable name.
-const LOG_DIR = process.platform === 'darwin' ? path.join(os.homedir(), 'Library', 'Logs', 'local-apps') : path.join(os.tmpdir(), `local-apps-${process.getuid ? process.getuid() : 'user'}`);
+// LOCAL_APPS_HOME and LOCAL_APPS_LOG_DIR exist for scratch instances and tests, so importing this file
+// never touches the real home.
+const HOME = process.env.LOCAL_APPS_HOME || os.homedir();
+const LOG_DIR = process.env.LOCAL_APPS_LOG_DIR || (process.platform === 'darwin' ? path.join(HOME, 'Library', 'Logs', 'local-apps') : path.join(os.tmpdir(), `local-apps-${process.getuid ? process.getuid() : 'user'}`));
 try { fs.mkdirSync(LOG_DIR, { recursive: true }); } catch (e) { dbg('logdir', e); }
 // Baseline security headers, ported from the former next.config so collapsing to a
 // single service (UI + API on :9875) keeps the same posture. HSTS is omitted:
@@ -131,7 +134,7 @@ app.use(serveStatic(path.join(__dirname, 'public')));
 // --- Caddy reverse-proxy management -> lib/caddy.js ---
 
 // Tab-registry label sync -> lib/tab-colors.js (optional integration, tested against a temp home).
-const { updateTabColors } = makeTabColors({ home: os.homedir(), dbg });
+const { updateTabColors } = makeTabColors({ home: HOME, dbg });
 
 // --- LaunchAgent management ---
 const LAUNCH_AGENTS_DIR = process.env.LAUNCH_AGENTS_DIR || path.join(os.homedir(), 'Library', 'LaunchAgents');   // override for a scratch instance
@@ -242,7 +245,7 @@ if (IS_MAIN) fs.watch(path.join(__dirname, 'public'), { recursive: true }, () =>
 
 // --- Routes live in routes/*.js, registered against a small ctx. LAN_IP, TAILSCALE_IP and
 // MACHINE_MODEL are getters because they refresh on timers. ---
-const ctx = { home: os.homedir(), faviconsDir: process.env.LOCAL_APPS_FAVICONS_DIR || path.join(__dirname, 'public', 'favicons'), isLoopback, clientAddress, appRecord, bootoutCmd, getNextAvailablePort, isPortTaken, killPort, CHROME_EXT_ERROR, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT, QRCode, addCaddyEntry, broadcast, checkSingle, clearState, db, dbg, execAsync, fetchJson, forViewer, getState, isChromeExtensionRepo, isValidId, peerRecord, renameCaddyEntry, setupInfra, spawn, sseClients, startCmd, sweepSubnet, teardownInfra, updateTabColors, validateAppFields,
+const ctx = { home: HOME, faviconsDir: process.env.LOCAL_APPS_FAVICONS_DIR || path.join(__dirname, 'public', 'favicons'), isLoopback, clientAddress, appRecord, bootoutCmd, getNextAvailablePort, isPortTaken, killPort, CHROME_EXT_ERROR, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT, QRCode, addCaddyEntry, broadcast, checkSingle, clearState, db, dbg, execAsync, fetchJson, forViewer, getState, isChromeExtensionRepo, isValidId, peerRecord, renameCaddyEntry, setupInfra, spawn, sseClients, startCmd, sweepSubnet, teardownInfra, updateTabColors, validateAppFields,
   LAN_IP: () => LAN_IP, TAILSCALE_IP: () => TAILSCALE_IP, MACHINE_MODEL: () => MACHINE_MODEL };
 require('./routes/apps')(app, ctx);
 require('./routes/meta')(app, ctx);
