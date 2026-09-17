@@ -803,7 +803,8 @@ app.get('/api/events', (req, res) => {
 
 app.get('/api/log/:id', (req, res) => {
   const appCfg = db.getApp(req.params.id);
-  if (!appCfg || !appCfg.logPath) return res.json({ lines: [] });
+  if (!appCfg) return res.status(404).json({ error: 'not found' });
+  if (!appCfg.logPath) return res.json({ lines: [] });
   // Async, bounded tail (last 64KB) - no shell, does not block the event loop.
   const MAX = 64 * 1024;
   fs.open(appCfg.logPath, 'r', (err, fd) => {
