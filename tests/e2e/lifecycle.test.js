@@ -17,7 +17,8 @@ async function viaCaddy() {
   try {
     const r = await fetch('http://127.0.0.1:80/', { headers: { host: `${ID}.localhost` }, redirect: 'manual', signal: AbortSignal.timeout(3000) });
     const body = await r.text();
-    return r.status === 502 || body.includes('<title>App is off</title>') ? 'offline' : 'proxied';
+    if (r.status === 502 || body.includes('<title>App is off</title>')) return 'offline';
+    return `proxied ${r.status} ${JSON.stringify(Object.fromEntries(r.headers))} ${body.slice(0, 200)}`;
   } catch { return 'none'; }
 }
 function freePort() { return new Promise((r) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); }); }
