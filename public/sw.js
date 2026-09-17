@@ -2,7 +2,7 @@
 // it always tries the network and only falls back to cache when offline.
 // skipWaiting + clientsClaim + old-cache cleanup means updates apply at once.
 // Shared, unchanged, across every bunlongheng app.
-const CACHE = "app-cache-v1";
+const CACHE = "app-cache-v2";
 
 self.addEventListener("install", () => self.skipWaiting());
 
@@ -18,6 +18,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
+  // Never touch the API: /api/status and /api/apps are live state and must not be replayed
+  // stale, and /api/events is an infinite SSE stream that Cache.put would try to buffer.
+  if (new URL(request.url).pathname.startsWith("/api/")) return;
   event.respondWith(
     fetch(request)
       .then((response) => {
