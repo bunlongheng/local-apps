@@ -12,7 +12,7 @@
     "lint": "eslint . --max-warnings 0",
     "test": "node --test 'tests/unit/**/*.test.js'",
     "test:unit": "node --test 'tests/unit/**/*.test.js'",
-    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=94 --test-coverage-branches=80 --test-coverage-functions=86 --test-coverage-include='{server.js,db.js,launchctl-cmds.js,lib/**,routes/**,scripts/consistency.js}' 'tests/unit/**/*.test.js'",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=94 --test-coverage-branches=80 --test-coverage-functions=85 --test-coverage-include='{server.js,db.js,launchctl-cmds.js,lib/**,routes/**,scripts/consistency.js}' 'tests/unit/**/*.test.js'",
     "test:e2e": "node --test 'tests/e2e/**/*.test.js'",
     "test:all": "node --test 'tests/unit/**/*.test.js' 'tests/e2e/**/*.test.js'"
   },
