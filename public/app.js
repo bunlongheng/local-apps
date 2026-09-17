@@ -343,7 +343,7 @@
       h += '<tr data-act="open" data-id="' + esc(app.id) + '" tabindex="0">';
       h += '<td class="col-app"><div class="app-cell">' + dotHTML(app) + '' +
         appIcon(app.id, app.name, app.icon, 32, app.status !== "up") +
-        '<div class="app-meta"><a class="app-name' + (app.disabled ? " disabled" : "") + '" href="' + esc(safeUrl(best)) + '" target="_blank" rel="noopener" data-stop>' + esc(app.name) + "</a>";
+        '<div class="app-meta"><a class="app-name' + (app.disabled ? " disabled" : "") + '" ' + linkAttrs(best) + '>' + esc(app.name) + "</a>";
       if (S.startingApps[app.id]) {
         var s = S.startupState[app.id] || { phase: "wait", label: "Starting...", percent: 5 };
         var tone = s.phase === "error" ? "error" : s.stalled ? "stalled" : s.percent >= 100 ? "done" : "active";
@@ -352,11 +352,11 @@
           '<span class="progress-bar ' + tone + '"><span class="progress-fill" style="width:' + s.percent + '%"></span></span></div>';
       }
       h += "</div></div></td>";
-      h += '<td class="col-hostname"><a class="link-sm' + (app.disabled ? " disabled" : "") + '" href="' + esc(safeUrl(hostU)) + '" target="_blank" rel="noopener" data-stop>' + esc(stripProto(hostU)) + "</a></td>";
-      h += '<td class="col-lan"><a class="link-sm' + (app.disabled ? " disabled" : "") + '" href="' + esc(safeUrl(lanU)) + '" target="_blank" rel="noopener" data-stop>' + esc(stripProto(lanU)) + "</a></td>";
+      h += '<td class="col-hostname"><a class="link-sm' + (app.disabled ? " disabled" : "") + '" ' + linkAttrs(hostU) + '>' + esc(stripProto(hostU)) + "</a></td>";
+      h += '<td class="col-lan"><a class="link-sm' + (app.disabled ? " disabled" : "") + '" ' + linkAttrs(lanU) + '>' + esc(stripProto(lanU)) + "</a></td>";
       h += '<td class="col-actions"><div class="actions">';
       if (isTail) h += '<a class="action-icon' + (app.tailscaleUrl ? "" : " dim") + '" ' + linkAttrs(app.tailscaleUrl) + ' data-stop title="Tailscale"><img src="/devices/tailscale.svg" width="16" height="16" alt="Tailscale" style="opacity:.85"></a>';
-      h += '<a class="action-icon' + (app.prodUrl ? "" : " dim") + '" href="' + esc(safeUrl(app.prodUrl || "#")) + '" target="_blank" rel="noopener" data-stop title="Vercel">' + vercelSvg() + "</a>";
+      h += '<a class="action-icon' + (app.prodUrl ? "" : " dim") + '" ' + linkAttrs(app.prodUrl) + ' title="Vercel">' + vercelSvg() + "</a>";
       h += "</div></td></tr>";
     });
     return h + "</tbody></table></main>";
@@ -406,7 +406,7 @@
       var emoji = ROW_EMOJI[r.label] || "";
       h += '<div class="info-row"><span class="info-label">' + (emoji ? emoji + " " : "") + esc(r.label) + "</span>";
       h += '<span class="info-value">';
-      if (r.url) h += '<a href="' + esc(safeUrl(r.url)) + '" target="_blank" rel="noopener" data-stop>' + esc(r.value) + "</a>" + (r.extra || "");
+      if (r.url) h += '<a ' + linkAttrs(r.url) + '>' + esc(r.value) + "</a>" + (r.extra || "");
       else h += "<span>" + esc(r.value) + (r.extra || "") + "</span>";
       if (r.lock) h += ' <span class="lock-badge" title="This deployment requires login">\u{1F512}</span>';
       h += "</span>";
@@ -448,7 +448,7 @@
       '<span class="modal-title">' + esc(app.name) + "</span>";
     h += '<div class="badges">' + badges.map(function (b) {
       var span = '<span class="badge' + (b.active ? " active" : "") + '" title="' + esc(b.title) + '">' + b.label + "</span>";
-      return b.href ? '<a class="badge-link" href="' + esc(safeUrl(b.href)) + '" target="_blank" rel="noopener" data-stop>' + span + "</a>" : span;
+      return b.href ? '<a class="badge-link" ' + linkAttrs(b.href) + '>' + span + "</a>" : span;
     }).join("") + "</div>";
     h += "</div>"; // close modal-head-inner
     // claude-tab chip (top-right): the app's _alias, its color, click-to-copy the full launch command
@@ -557,7 +557,7 @@
     if (!cmdk.matches.length) return '<div class="cmdk-empty">No apps match "' + esc(cmdk.q) + '"</div>';
     return cmdk.matches.map(function (a, idx) {
       var c = avatarColor(a.id), active = idx === cmdk.i;
-      return '<div class="cmdk-item' + (active ? " active" : "") + '" data-cmdk-i="' + idx + '"' +
+      return '<div class="cmdk-item' + (active ? " active" : "") + '" role="option" aria-selected="' + (active ? "true" : "false") + '" data-cmdk-i="' + idx + '"' +
         (active ? ' style="background:' + c[0] + '26"' : "") + '>' +
         appIcon(a.id, a.name, a.icon, 40) +
         '<div class="cmdk-meta"><div class="cmdk-name">' + esc(a.name || a.id) + '</div><div class="cmdk-slug">/' + esc(a.id) + "</div></div>" +
@@ -576,9 +576,9 @@
     ov.innerHTML =
       '<div class="cmdk"><div class="cmdk-search">' +
       '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>' +
-      '<input id="cmdk-input" class="cmdk-input" placeholder="Search apps..." autocomplete="off" spellcheck="false">' +
+      '<input id="cmdk-input" class="cmdk-input" placeholder="Search apps..." autocomplete="off" spellcheck="false" role="combobox" aria-label="Search apps" aria-expanded="true" aria-controls="cmdk-results" aria-autocomplete="list">' +
       '<span class="cmdk-esc">ESC</span></div>' +
-      '<div class="cmdk-results" id="cmdk-results">' + cmdkResultsHTML() + "</div>" +
+      '<div class="cmdk-results" id="cmdk-results" role="listbox" aria-label="Apps">' + cmdkResultsHTML() + "</div>" +
       '<div class="cmdk-footer"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>⌘</kbd><kbd>K</kbd> toggle</span></div></div>';
     document.body.appendChild(ov);
     fixIconImgs(ov);
