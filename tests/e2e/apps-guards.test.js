@@ -74,3 +74,11 @@ test('create app with injected startCommand -> 400 (no command injection)', asyn
   assert.equal(status, 400);
   assert.match(json.error, /startCommand/);
 });
+
+test('POST /api/apps on a port another app owns -> 409 with a suggested port', async () => {
+  const apps = (await api('GET', '/api/apps')).json;
+  const taken = apps.map(a => a.localUrl && Number(new URL(a.localUrl).port)).find(Boolean);
+  const { status, json } = await api('POST', '/api/apps', { id: MISSING, localPath: '/tmp/zzz', localUrl: `http://localhost:${taken}`, healthUrl: `http://localhost:${taken}` });
+  assert.equal(status, 409);
+  assert.ok(json.suggestedPort || json.error, 'conflict explains itself');
+});
