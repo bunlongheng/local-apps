@@ -7,9 +7,9 @@ const os = require('node:os');
 const path = require('node:path');
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'meta-home-'));
-const ROOT = path.join(__dirname, '..', '..');
-const FIXTURE_FAV = path.join(ROOT, 'public', 'favicons', 'zzz-meta.png');   // deterministic favicon, never a live asset
-after(() => { fs.rmSync(home, { recursive: true, force: true }); fs.rmSync(FIXTURE_FAV, { force: true }); });
+const faviconsDir = path.join(home, 'favicons'); fs.mkdirSync(faviconsDir);   // the route reads favicons from ctx, never the source tree
+const FIXTURE_FAV = path.join(faviconsDir, 'zzz-meta.png');
+after(() => fs.rmSync(home, { recursive: true, force: true }));
 const write = (rel, body) => { const f = path.join(home, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, body); return f; };
 
 function fakeApp() {
@@ -25,7 +25,7 @@ function call(fn, { params = {}, query = {}, headers = {} } = {}) {
 }
 function boot(apps, tabColors = {}) {
   const { app, routes } = fakeApp();
-  require('../../routes/meta')(app, { LAN_IP: () => '10.0.0.5', IS_HUB: true, db: { getApps: () => apps, getApp: (id) => apps.find(a => a.id === id) || null, getTabColors: () => tabColors, upsertApp: () => {} }, dbg: () => {}, QRCode: require('qrcode'), PORT: 9875, home });
+  require('../../routes/meta')(app, { LAN_IP: () => '10.0.0.5', IS_HUB: true, db: { getApps: () => apps, getApp: (id) => apps.find(a => a.id === id) || null, getTabColors: () => tabColors, upsertApp: () => {} }, dbg: () => {}, QRCode: require('qrcode'), PORT: 9875, home, faviconsDir });
   return routes;
 }
 
