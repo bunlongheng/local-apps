@@ -36,3 +36,27 @@ jobs:
           kill %1
       - name: Audit (fail on high/critical)
         run: npm audit
+
+  # The darwin provisioning branch (a real Caddyfile write + caddy validate/reload, a LaunchAgent plist
+  # + launchctl) only runs on macOS; this job boots a scratch instance there and runs the same lifecycle.
+  provision-macos:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Caddy
+        run: brew install caddy
+      - name: E2E lifecycle on the darwin branch (scratch Caddyfile and LaunchAgents dir)
+        run: |
+          export CADDYFILE=$RUNNER_TEMP/Caddyfile; : > "$CADDYFILE"
+          MACHINE_ROLE=agent API_BIND=127.0.0.1 LOCAL_APPS_DB=$RUNNER_TEMP/ci-local.db node server.js > $RUNNER_TEMP/server.log 2>&1 &
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:9875/api/status > /dev/null && break; sleep 1; done
+          E2E_MUTATE=1 npm run test:e2e || { echo '--- server log ---'; cat $RUNNER_TEMP/server.log; exit 1; }
+          kill %1
+          test ! -s "$CADDYFILE" || { echo 'lifecycle left a Caddy block behind:'; cat "$CADDYFILE"; exit 1; }
