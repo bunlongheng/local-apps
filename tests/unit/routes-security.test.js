@@ -137,14 +137,15 @@ test('/api/log/:id returns exactly the last 30 lines of a log larger than the 64
 });
 
 test('off-box callers are let through by x-local-apps-token and refused without it or with a wrong one', async () => {
+  // zzz-auth has no launchAgent, so the toggle round-trip execs nothing and arms no timers on the host.
+  require('../../db').upsertApp({ id: 'zzz-auth', localPath: '/tmp/zzz-auth' });
   const off = (p, method, token) => fetch(base + p, { method, headers: { 'x-forwarded-for': '1.2.3.4', ...(token ? { 'x-local-apps-token': token } : {}) } });
   assert.equal((await off('/api/log/zzz-prof', 'GET')).status, 401);
   assert.equal((await off('/api/log/zzz-prof', 'GET', 'wrong')).status, 401);
   assert.equal((await off('/api/log/zzz-prof', 'GET', 'zzz-tok')).status, 200);
-  assert.equal((await off('/api/apps/zzz-prof/toggle', 'POST')).status, 401);
-  const r = await off('/api/apps/zzz-prof/toggle', 'POST', 'zzz-tok');
-  assert.equal(r.status, 200, 'a mutation with the token is allowed off-box');
-  await off('/api/apps/zzz-prof/toggle', 'POST', 'zzz-tok');   // flip back
+  assert.equal((await off('/api/apps/zzz-auth/toggle', 'POST')).status, 401);
+  const r = await off('/api/apps/zzz-auth/toggle', 'POST', 'zzz-tok');
+  assert.equal(r.status, 200, 'a mutation with the token is allowed off-box'); assert.equal((await r.json()).disabled, true);
 });
 
 test('every response carries the security headers: frame denial, nosniff, a CSP with no inline scripts', async () => {
