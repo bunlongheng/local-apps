@@ -505,10 +505,9 @@ app.get('/api/apps/:id', (req, res) => {
 app.get('/api/consistency', (req, res) => {
   try {
     const id = (req.query.id || '').replace(/[^a-z0-9-]/gi, '');
-    const args = [`${__dirname}/scripts/consistency.js`, '--json'];
-    if (id) args.push(id);
-    const out = execSync(`node ${args.map((a) => `'${a}'`).join(' ')}`, { encoding: 'utf8', timeout: 15000 });
-    res.json(JSON.parse(out));
+    // In-process: the script reads the same db.js and does synchronous file checks only,
+    // a few ms per app, instead of a child node that shelled out to sqlite3 per app.
+    res.json(require('./scripts/consistency').audit(id || undefined));
   } catch (e) {
     res.status(500).json({ error: 'consistency check failed', detail: String(e.message || e) });
   }
