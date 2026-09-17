@@ -60,7 +60,7 @@ test('POST -> GET -> PUT -> DELETE round-trips an app', opts, async () => {
   assert.equal(del.status, 200);
   if (process.platform === 'darwin' && process.env.CADDYFILE) assert.ok(!fs.readFileSync(process.env.CADDYFILE, 'utf8').includes(`${ID}.localhost`), 'block removed');
   if (process.platform === 'darwin' && got.json.launchAgentPath) assert.ok(!fs.existsSync(got.json.launchAgentPath), 'plist removed');
-  if (process.platform === 'darwin' && process.env.CADDY_LIVE === '1') assert.notEqual(await viaCaddy(), 'offline', 'caddy dropped the block');
+  if (process.platform === 'darwin' && process.env.CADDY_LIVE === '1') { const gone = await viaCaddy(); assert.ok(!['offline', 'bare-502'].includes(gone), 'caddy dropped the block, got ' + gone); }
   assert.equal((await api('GET', `/api/apps/${ID}`)).status, 404);
 });
 
