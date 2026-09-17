@@ -14,17 +14,16 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { execFileSync } = require("child_process");
+const db = require(path.join(__dirname, "..", "db"));
 
 const H = os.homedir();
 const P = {
-  db:      path.join(H, "Sites/local-apps/local.db"),
-  favDir:  path.join(H, "Sites/local-apps/public/favicons"),
+  favDir:  path.join(__dirname, "..", "public", "favicons"),
   saiDir:  path.join(H, "Sites/stickies/public/app-icons"),
   reg:     path.join(H, "Sites/stickies/lib/app-icons.ts"),
   colors:  path.join(H, ".claude/tab-colors.json"),
   tabsh:   path.join(H, ".claude-tabs.sh"),
-  caddy:   "/opt/homebrew/etc/Caddyfile",
+  caddy:   process.env.CADDYFILE || "/opt/homebrew/etc/Caddyfile",
   laDir:   path.join(H, "Library/LaunchAgents"),
 };
 
@@ -35,21 +34,15 @@ const exists = (f) => fs.existsSync(f);
 
 function apps(oneId) {
   if (oneId) return [oneId];
-  try {
-    const out = execFileSync("sqlite3", [P.db, "SELECT id FROM apps ORDER BY id;"], { encoding: "utf8" });
-    return out.split("\n").map((s) => s.trim()).filter(Boolean);
-  } catch { return []; }
+  return db.getApps().map((a) => a.id).sort();
 }
 
+// Row straight from db.js (honours LOCAL_APPS_DB), mapped to the names the rules use.
 function dbRow(id) {
-  try {
-    const q = `SELECT COALESCE(about,'') about, COALESCE(features,'') features, ` +
-              `COALESCE(repo,'') repo, COALESCE(prod_url,'') prod, ` +
-              `COALESCE(local_path,'') local_path ` +
-              `FROM apps WHERE id='${id.replace(/'/g, "''")}';`;
-    const out = execFileSync("sqlite3", ["-json", P.db, q], { encoding: "utf8" }).trim();
-    return (out ? JSON.parse(out) : [])[0] || {};
-  } catch { return {}; }
+  const a = db.getApp(id);
+  if (!a) return {};
+  return { about: a.about || "", features: Array.isArray(a.features) ? JSON.stringify(a.features) : (a.features || ""),
+           repo: a.repo || "", prod: a.prodUrl || "", local_path: a.localPath || "", plist: a.launchAgentPath || "" };
 }
 
 // The rule set. Each returns true (ok) or false (miss). ORDER = display order.
@@ -83,7 +76,7 @@ function checkApp(id) {
     ["tab-color",     new RegExp(`"${id}"\\s*:`).test(colors)],
     ["tab-alias",     hasCanon && shortcuts.length === 0],
     ["caddy-host",    new RegExp(`${id}\\.localhost`).test(caddy)],
-    ["launch-agent",  exists(path.join(P.laDir, `com.bheng.${id}.plist`))],
+    ["launch-agent",  !!row.plist && exists(row.plist)],
     ["profile",       !!(row.about && row.features && row.features !== "[]")],
     ["repo",          !!row.repo],
     ["prod-url",      !isVercel || !!row.prod],
@@ -93,6 +86,15 @@ function checkApp(id) {
   return { checks, note };
 }
 
+function audit(id, iconsOnly = false) {
+  return apps(id).map((app) => {
+    const { checks, note } = checkApp(app);
+    const relevant = iconsOnly ? checks.filter(([k]) => ICON_RULES.has(k)) : checks;
+    const misses = relevant.filter(([, ok]) => !ok).map(([k]) => k);
+    return { id: app, ok: misses.length === 0, misses, note: misses.includes("tab-alias") ? note : "" };
+  });
+}
+
 function main() {
   const argv = process.argv.slice(2);
   const asJson = argv.includes("--json");
@@ -100,13 +102,7 @@ function main() {
   const id = argv.find((a) => !a.startsWith("--"));
   const list = apps(id);
   if (!list.length) { console.error("no apps found (is local.db present?)"); process.exit(2); }
-
-  const report = list.map((app) => {
-    const { checks, note } = checkApp(app);
-    const relevant = iconsOnly ? checks.filter(([k]) => ICON_RULES.has(k)) : checks;
-    const misses = relevant.filter(([, ok]) => !ok).map(([k]) => k);
-    return { id: app, ok: misses.length === 0, misses, note: misses.includes("tab-alias") ? note : "" };
-  });
+  const report = audit(id, iconsOnly);
 
   if (asJson) { console.log(JSON.stringify(report, null, 2)); process.exit(0); }
 
@@ -121,4 +117,5 @@ function main() {
   process.exit(id && dirty.length ? 1 : 0);
 }
 
-main();
+module.exports = { checkApp, audit };
+if (require.main === module) main();
