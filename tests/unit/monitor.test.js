@@ -3,10 +3,10 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const makeMonitor = require('../../lib/monitor');
 
-function boot({ apps, decision, probe }) {
+function boot({ apps, decision, probe, getApps }) {
   const calls = [], states = {};
   const m = makeMonitor({
-    getApps: () => apps, setAppDisabled: (id, v, why) => calls.push(`disable:${id}:${v}:${why || ''}`),
+    getApps: getApps || (() => apps), setAppDisabled: (id, v, why) => calls.push(`disable:${id}:${v}:${why || ''}`),
     probe: probe || (async () => false), getState: (id) => (states[id] ||= { status: 'unknown' }),
     decide: ({ s }) => { const d = typeof decision === 'function' ? decision(s) : decision; return { status: 'down', changed: false, rearm: null, trip: null, level: 0, recovered: null, ...d }; },
     runLevel: async (level, target) => calls.push(`runLevel:${level}:${target.id}:${target.port}`),
@@ -60,4 +60,15 @@ test('one app whose level throws does not abort the tick for the others', async 
   calls.push = (x) => { orig(x); if (x === 'runLevel:1:a:4000') throw new Error('boom'); return calls.length; };
   assert.equal(await m.checkAll(), true);
   assert.ok(calls.includes('runLevel:1:a:4000') && calls.includes('runLevel:1:b:4001'));
+});
+
+test('a throwing getApps or a rejecting probe rejects the tick but releases the guard, so the next tick runs', async () => {
+  let n = 0;
+  const a = boot({ apps: [{ ...APP }], decision: {}, getApps: () => { if (n++ === 0) throw new Error('SQLITE_BUSY'); return [{ ...APP }]; } });
+  await assert.rejects(a.m.checkAll(), /SQLITE_BUSY/);
+  assert.equal(await a.m.checkAll(), true, 'guard released after the failure');
+  let p = 0;
+  const b = boot({ apps: [{ ...APP }], decision: {}, probe: async () => { if (p++ === 0) throw new Error('probe died'); return true; } });
+  await assert.rejects(b.m.checkAll(), /probe died/);
+  assert.equal(await b.m.checkAll(), true);
 });
