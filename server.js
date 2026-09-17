@@ -408,7 +408,7 @@ async function checkAll() {
           // app-derived text, and the agent runs inside a directory the hub does not control.
           if (!autoRestartAgent) { console.log(`  [L4] agent disabled (set "agent": true in data/auto-restart.json): ${appCfg.id}`); }
           else {
-            const args = ['-p', prompt, '--allowedTools', 'Read,Grep,Glob,Bash(launchctl:*),Bash(npm install:*),Bash(npm run:*),Bash(curl:*),Bash(tail:*)'];
+            const args = ['-p', prompt, '--allowedTools', 'Read,Grep,Glob,Bash(launchctl:*),Bash(npm install:*),Bash(curl:*),Bash(tail:*)'];
             try {
               const out = fs.openSync(logPath, 'a');
               spawn('claude', args, { cwd: dir, detached: true, stdio: ['ignore', out, out] }).unref();
