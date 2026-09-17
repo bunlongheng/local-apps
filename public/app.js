@@ -123,7 +123,9 @@
     });
   }
   // Links come from this hub and from peers; only http(s) may become an href.
-  function safeUrl(u) { return typeof u === "string" && /^https?:\/\//i.test(u) ? u : "#"; }
+  function safeUrl(u) { return typeof u === "string" && /^https?:\/\//i.test(u) ? u : ""; }
+  // Anchor attributes for a url that may be missing: a real link, or an inert element with no target.
+  function linkAttrs(u) { var s = safeUrl(u); return s ? 'href="' + esc(s) + '" target="_blank" rel="noopener" data-stop' : 'role="link" aria-disabled="true" tabindex="-1"'; }
   function toast(msg, ms, kind) {
     S.toastKind = kind || "";
     S.toast = msg; render();
@@ -353,7 +355,7 @@
       h += '<td class="col-hostname"><a class="link-sm' + (app.disabled ? " disabled" : "") + '" href="' + esc(safeUrl(hostU)) + '" target="_blank" rel="noopener" data-stop>' + esc(stripProto(hostU)) + "</a></td>";
       h += '<td class="col-lan"><a class="link-sm' + (app.disabled ? " disabled" : "") + '" href="' + esc(safeUrl(lanU)) + '" target="_blank" rel="noopener" data-stop>' + esc(stripProto(lanU)) + "</a></td>";
       h += '<td class="col-actions"><div class="actions">';
-      if (isTail) h += '<a class="action-icon' + (app.tailscaleUrl ? "" : " dim") + '" href="' + esc(safeUrl(app.tailscaleUrl || "#")) + '" target="_blank" rel="noopener" data-stop title="Tailscale"><img src="/devices/tailscale.svg" width="16" height="16" alt="Tailscale" style="opacity:.85"></a>';
+      if (isTail) h += '<a class="action-icon' + (app.tailscaleUrl ? "" : " dim") + '" ' + linkAttrs(app.tailscaleUrl) + ' data-stop title="Tailscale"><img src="/devices/tailscale.svg" width="16" height="16" alt="Tailscale" style="opacity:.85"></a>';
       h += '<a class="action-icon' + (app.prodUrl ? "" : " dim") + '" href="' + esc(safeUrl(app.prodUrl || "#")) + '" target="_blank" rel="noopener" data-stop title="Vercel">' + vercelSvg() + "</a>";
       h += "</div></td></tr>";
     });
