@@ -56,14 +56,16 @@ test('startCmd silences stderr on both branches (callers rely on exit codes)', (
 });
 
 test('server.js has no bare app restart (kickstart -k) - all start paths use startCmd', () => {
-  const src = fs.readFileSync(path.join(__dirname, '../../server.js'), 'utf8');
+  // Routes live in routes/*.js since the split; the rule covers every file that can start an app.
+  const files = ['server.js', 'routes/apps.js', 'routes/meta.js', 'routes/machines.js'];
+  const src = files.map(f => fs.readFileSync(path.join(__dirname, '../..', f), 'utf8')).join('\n');
   // `kickstart` without -k (cron run-now) is fine; `kickstart -k` is the app
   // restart pattern and must always carry the bootstrap fallback via startCmd.
   assert.equal(src.match(/launchctl kickstart -k/g), null,
-    'found an inline `launchctl kickstart -k` in server.js - use startCmd() from launchctl-cmds.js so the bootstrap fallback is never lost');
-  assert.ok(src.includes("require('./launchctl-cmds')"), 'server.js must import startCmd');
+    'found an inline `launchctl kickstart -k` - use startCmd() from launchctl-cmds.js so the bootstrap fallback is never lost');
+  assert.ok(src.includes("require('./launchctl-cmds')"), 'startCmd must be imported from launchctl-cmds');
   const calls = src.match(/startCmd\(/g);
-  assert.ok(calls, 'expected startCmd() calls in server.js, found none');
+  assert.ok(calls, 'expected startCmd() calls, found none');
   assert.ok(calls.length >= 6,
     `expected startCmd() at the 6 start sites (toggle-ON, bulk-toggle, /api/start, auto-restart L1/L3, L4 agent prompt), found ${calls.length}`);
 });

@@ -150,6 +150,20 @@ const { createLaunchAgent, removeLaunchAgent } =
 const PORT_RANGE_START = 3000;
 const PORT_RANGE_END = 9875; // below monitor port
 
+
+// --- Port allocation (provisioning and POST /api/apps) ---
+function isPortTaken(port, excludeId) {
+  for (const a of db.getApps()) {
+    if (excludeId && a.id === excludeId) continue;
+    if (a.localUrl) {
+      try { if (parseInt(new URL(a.localUrl).port) === port) return a.id; } catch (e) { dbg('line585', e); }
+    }
+    if (a.healthUrl) {
+      try { if (parseInt(new URL(a.healthUrl).port) === port) return a.id; } catch (e) { dbg('line588', e); }
+    }
+  }
+  return null;
+}
 function getNextAvailablePort() {
   const usedPorts = new Set();
   for (const a of db.getApps()) {
@@ -269,7 +283,6 @@ const MACHINE_MODEL = (() => {
 })();
 
 // --- HTTP client (used across peer sync + health checks) ---
-const http = require('http');
 
 // --- SSE clients ---
 const sseClients = new Set();
@@ -448,7 +461,6 @@ async function checkAll() {
   } finally { checkAllRunning = false; }
 }
 
-// --- Status route (dashboard) ---
 
 app.get('/api/status', (req, res) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -481,486 +493,39 @@ app.get('/api/status', (req, res) => {
   res.json({ apps: apps.map(a => forViewer(req, a)), lanIp: LAN_IP, tailscaleIp: TAILSCALE_IP, machineModel: MACHINE_MODEL, machineRole: MACHINE_ROLE, monitorUrl: `http://${LAN_IP}:${PORT}` });
 });
 
-// --- Tab Colors ---
-app.get('/api/tab-colors', (req, res) => {
-  const out = {};
-  const toHex = (r, g, b) => '#' + [r, g, b].map((v) => (v | 0).toString(16).padStart(2, '0')).join('');
-  // Primary source: ~/.claude/tab-colors.json (the same file that drives the terminal
-  // _tab colors), so the dashboard chip and the claude tab always match.
-  try {
-    const json = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', 'tab-colors.json'), 'utf8'));
-    for (const k of Object.keys(json)) {
-      const e = json[k];
-      if (e && typeof e.r === 'number') out[k] = { label: e.label || k.toUpperCase(), color: toHex(e.r, e.g, e.b), icon: e.icon || '' };
-    }
-  } catch (e) { dbg('line476', e); }
-  // Fallback: DB tab colors for anything not defined in the json.
-  try {
-    const dbc = db.getTabColors() || {};
-    for (const k of Object.keys(dbc)) if (!out[k]) out[k] = dbc[k];
-  } catch (e) { dbg('line481', e); }
-  // Merge the shell alias (e.g. _bheng) per key from ~/.claude-tabs.sh.
-  try {
-    const sh = fs.readFileSync(path.join(os.homedir(), '.claude-tabs.sh'), 'utf8');
-    const re = /(_[A-Za-z0-9]+)\(\)\s*\{\s*_tab\s+"([^"]+)"/g;
-    let m;
-    while ((m = re.exec(sh))) if (out[m[2]] && !out[m[2]].alias) out[m[2]].alias = m[1];
-  } catch (e) { dbg('line488', e); }
-  res.json(out);
-});
 
-// --- CRUD: Apps ---
-app.get('/api/apps', (req, res) => {
-  res.json(db.getApps().map(a => forViewer(req, a)));
-});
 
-app.get('/api/apps/:id', (req, res) => {
-  const a = db.getApp(req.params.id);
-  if (!a) return res.status(404).json({ error: 'not found' });
-  res.json(forViewer(req, a));
-});
 
-// Consistency police: the same artifact matrix /onboard enforces (favicon, stickies
-// icon+registry, tab color+alias, caddy, launch-agent, profile, repo+prod). Backed by
-// scripts/consistency.js so onboard and the dashboard never drift. Optional ?id=<app>.
-app.get('/api/consistency', (req, res) => {
-  try {
-    const id = (req.query.id || '').replace(/[^a-z0-9-]/gi, '');
-    // In-process: the script reads the same db.js and does synchronous file checks only,
-    // a few ms per app, instead of a child node that shelled out to sqlite3 per app.
-    res.json(require('./scripts/consistency').audit(id || undefined));
-  } catch (e) {
-    res.status(500).json({ error: 'consistency check failed', detail: String(e.message || e) });
-  }
-});
 
-// Toggle app disabled state (excludes from auto-restart when disabled)
-app.post('/api/apps/:id/toggle', (req, res) => {
-  const a = db.getApp(req.params.id);
-  if (!a) return res.status(404).json({ error: 'not found' });
-  const newState = !a.disabled;
-  db.setAppDisabled(a.id, newState);
-  // If disabling, also stop the app
-  if (newState && a.launchAgent) {
-    const uid = process.getuid();
-    try { execSync(`launchctl bootout gui/${uid}/${a.launchAgent} 2>/dev/null`, { timeout: 10000 }); } catch (e) { dbg('line526', e); }
-    const s = getState(a.id);
-    s.status = 'down';
-    s.downSince = null;
-    s.restartAttempts = 0;
-    broadcast({ type: 'update', id: a.id, status: 'down' });
-  }
-  // If enabling, kick it back to life (bootstrap if the service isn't loaded in launchd)
-  if (!newState && a.launchAgent) {
-    const uid = process.getuid();
-    try { execSync(startCmd(uid, a.launchAgent, a.launchAgentPath), { timeout: 15000 }); } catch (e) { dbg('line536', e); }
-    setTimeout(() => checkSingle(a), 3000);
-    setTimeout(() => checkSingle(a), 8000);
-    setTimeout(() => checkSingle(a), 15000);
-  }
-  console.log(`  ${newState ? '⏸' : '▶'} ${a.id} ${newState ? 'disabled' : 'enabled'}`);
-  res.json({ id: a.id, disabled: newState });
-});
 
-// Bulk toggle: disable all except specified IDs
-app.post('/api/apps/bulk-toggle', async (req, res) => {
-  const jobs = [];
-  const { keep = [] } = req.body || {};
-  const apps = db.getApps();
-  const uid = process.getuid();
-  const results = [];
-  for (const a of apps) {
-    const shouldDisable = !keep.includes(a.id);
-    const wasDisabled = a.disabled;
-    db.setAppDisabled(a.id, shouldDisable);
-    // Stop newly disabled apps
-    if (shouldDisable && !wasDisabled && a.launchAgent) {
-      jobs.push(execAsync(`launchctl bootout gui/${uid}/${a.launchAgent} 2>/dev/null`, { timeout: 10000 }).catch(() => {}));
-      const s = getState(a.id);
-      s.status = 'down';
-      s.downSince = null;
-      s.restartAttempts = 0;
-      broadcast({ type: 'update', id: a.id, status: 'down' });
-    }
-    // Start newly enabled apps
-    if (!shouldDisable && wasDisabled && a.launchAgent) {
-      jobs.push(execAsync(startCmd(uid, a.launchAgent, a.launchAgentPath), { timeout: 15000 }).catch(() => {}));
-    }
-    results.push({ id: a.id, disabled: shouldDisable });
-  }
-  // launchctl calls run concurrently and awaited, never serial execSync on the event loop.
-  await Promise.all(jobs);
-  console.log(`  bulk-toggle: keeping ${keep.join(', ')}, disabled ${results.filter(r => r.disabled).length} apps`);
-  res.json({ ok: true, results });
-});
 
 // Validate app id: lowercase alphanumeric, hyphens only, 1-64 chars
 // isValidId, isSafePath, isSafeCommand, validateAppFields, xmlEscape -> lib/validate.js
 
-// --- Port conflict check ---
-function isPortTaken(port, excludeId) {
-  for (const a of db.getApps()) {
-    if (excludeId && a.id === excludeId) continue;
-    if (a.localUrl) {
-      try { if (parseInt(new URL(a.localUrl).port) === port) return a.id; } catch (e) { dbg('line585', e); }
-    }
-    if (a.healthUrl) {
-      try { if (parseInt(new URL(a.healthUrl).port) === port) return a.id; } catch (e) { dbg('line588', e); }
-    }
-  }
-  return null;
-}
-
-app.post('/api/apps', (req, res) => {
-  const { id } = req.body;
-  if (!id || typeof id !== 'string') return res.status(400).json({ error: 'id is required (string)' });
-  if (!isValidId(id)) return res.status(400).json({ error: 'id must be lowercase alphanumeric/hyphens, 1-64 chars' });
-  if (req.body.name && typeof req.body.name !== 'string') return res.status(400).json({ error: 'name must be a string' });
-  const vErr = validateAppFields(req.body);
-  if (vErr) return res.status(400).json({ error: vErr });
-  if (isChromeExtensionRepo(req.body.localPath)) return res.status(400).json({ error: CHROME_EXT_ERROR });
-
-  // Check for port conflict if a port is specified
-  const requestedUrl = req.body.localUrl || req.body.healthUrl;
-  if (requestedUrl) {
-    try {
-      const requestedPort = parseInt(new URL(requestedUrl).port);
-      const conflictApp = isPortTaken(requestedPort, id);
-      if (conflictApp) {
-        const suggested = getNextAvailablePort();
-        return res.status(409).json({
-          error: `Port ${requestedPort} is already used by "${conflictApp}"`,
-          suggestedPort: suggested,
-          suggestedUrl: suggested ? `http://localhost:${suggested}` : null
-        });
-      }
-    } catch (e) { dbg('line617', e); }
-  }
-
-  // Auto-setup infra (caddy, hosts, launch agent)
-  const infra = setupInfra(id, req.body);
-  const merged = { ...req.body, ...infra };
-
-  // Auto-set healthUrl from localUrl if not provided
-  if (!merged.healthUrl && merged.localUrl) merged.healthUrl = merged.localUrl;
-
-  const result = db.upsertApp(merged);
-  // Extract assigned port for clear response
-  let assignedPort = null;
-  try { assignedPort = parseInt(new URL(result.localUrl).port); } catch (e) { dbg('line630', e); }
-  broadcast({ type: 'reload' });
-  res.status(201).json({ ...result, assignedPort });
-});
 
 
-app.put('/api/apps/:id', (req, res) => {
-  const existing = db.getApp(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'not found' });
-  const vErr = validateAppFields(req.body);
-  if (vErr) return res.status(400).json({ error: vErr });
-  if (isChromeExtensionRepo(req.body.localPath)) return res.status(400).json({ error: CHROME_EXT_ERROR });
 
-  // Check for port conflict on update
-  const requestedUrl = req.body.localUrl || req.body.healthUrl;
-  if (requestedUrl) {
-    try {
-      const requestedPort = parseInt(new URL(requestedUrl).port);
-      const conflictApp = isPortTaken(requestedPort, req.params.id);
-      if (conflictApp) {
-        const suggested = getNextAvailablePort();
-        return res.status(409).json({
-          error: `Port ${requestedPort} is already used by "${conflictApp}"`,
-          suggestedPort: suggested,
-          suggestedUrl: suggested ? `http://localhost:${suggested}` : null
-        });
-      }
-    } catch (e) { dbg('line657', e); }
-  }
 
-  // Re-setup infra if localUrl or localPath changed
-  const data = { ...req.body, id: req.params.id };
-  if (data.localUrl || data.localPath) {
-    const infra = setupInfra(req.params.id, { ...existing, ...data });
-    Object.assign(data, infra);
-  }
 
-  // Sync tab-colors label when name changes
-  if (data.name && data.name !== existing.name) {
-    updateTabColors(req.params.id, data.name, data.caddyUrl || existing.caddyUrl);
-  }
 
-  // Sync Caddy hostname when caddyUrl changes
-  if (data.caddyUrl && data.caddyUrl !== existing.caddyUrl) {
-    const port = (() => { try { return new URL(data.localUrl || existing.localUrl).port; } catch { return null; } })();
-    if (port) {
-      // Extract new hostname from caddyUrl
-      const newHost = data.caddyUrl.replace(/^https?:\/\//, '').replace(/\.localhost.*/, '');
-      const oldHost = (existing.caddyUrl || '').replace(/^https?:\/\//, '').replace(/\.localhost.*/, '');
-      if (newHost !== oldHost && oldHost) {
-        renameCaddyEntry(oldHost, newHost, port);
-      } else if (!oldHost) {
-        addCaddyEntry(newHost, port);
-      }
-    }
-  }
 
-  const result = db.upsertApp(data);
-  broadcast({ type: 'reload' });
-  res.json(result);
-});
 
-app.delete('/api/apps/:id', (req, res) => {
-  const deleted = db.deleteApp(req.params.id);
-  if (!deleted) return res.status(404).json({ error: 'not found' });
-  teardownInfra(req.params.id);
-  clearState(req.params.id);
-  broadcast({ type: 'update', id: req.params.id, status: 'removed' });
-  res.json({ ok: true });
-});
 
-// --- Auto-generated FAVICONS map from /public/favicons/ ---
-app.get('/api/favicons', (req, res) => {
-  const dir = path.join(__dirname, 'public', 'favicons');
-  const map = {};
-  const priority = { png: 3, ico: 2, svg: 1 };
-  const chosen = {}; // track which ext won per id
-  try {
-    for (const f of fs.readdirSync(dir)) {
-      const m = f.match(/^(.+)\.(png|svg|ico)$/);
-      if (!m) continue;
-      const [, id, ext] = m;
-      if ((priority[ext] || 0) > (chosen[id] || 0)) {
-        chosen[id] = priority[ext];
-        const mtime = fs.statSync(path.join(dir, f)).mtimeMs;
-        map[id] = '/favicons/' + f + '?v=' + Math.floor(mtime);
-      }
-    }
-  } catch (e) { dbg('line718', e); }
-  res.setHeader('Cache-Control', 'no-cache');
-  res.json(map);
-});
 
-// --- App profiles (about, architect, deploy, security, performance) ---
-app.get('/api/app-profiles', (req, res) => {
-  const apps = db.getApps();
-  const profiles = {};
-  for (const a of apps) {
-    profiles[a.id] = {
-      about: a.about || null,
-      features: a.features || null,
-      architect: a.architect || null,
-      deploy: a.deploy || null,
-      security: a.security || null,
-      performance: a.performance || null,
-      prompt: a.prompt || null,
-    };
-  }
-  res.json(profiles);
-});
-app.put('/api/app-profiles/:id', (req, res) => {
-  const existing = db.getApp(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'not found' });
-  // Profile route writes profile columns only. Spreading req.body let a caller rewrite
-  // launchAgent, launchAgentPath, startCommand or localPath here, past validateAppFields.
-  const PROFILE_FIELDS = ['about', 'features', 'architect', 'deploy', 'security', 'performance', 'prompt', 'sortOrder'];
-  const patch = { id: req.params.id };
-  for (const k of PROFILE_FIELDS) if (k in (req.body || {})) patch[k] = req.body[k];
-  db.upsertApp(patch);
-  res.json({ ok: true });
-});
 
-// --- Dynamic manifest (adapts name based on access method) ---
-app.get('/api/manifest', (req, res) => {
-  const host = req.hostname || req.headers.host || '';
-  let label = 'Local Apps';
-  if (host.startsWith('100.')) label = 'Apps (Tailscale)';
-  else if (host.startsWith('10.') || host.startsWith('192.168.')) label = 'Apps (LAN)';
-  else if (host.endsWith('.localhost')) label = 'Apps (Caddy)';
 
-  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'manifest.json'), 'utf8'));
-  manifest.name = label;
-  manifest.short_name = label;
-  manifest.start_url = `http://${req.headers.host}/`;
-  res.setHeader('Content-Type', 'application/manifest+json');
-  res.json(manifest);
-});
 
-// --- Other routes ---
-app.get('/api/qr', async (req, res) => {
-  const url = `http://${LAN_IP}:${PORT}`;
-  const dataUrl = await QRCode.toDataURL(url, { width: 200, margin: 1, color: { dark: '#e2e8f0', light: '#1a1d27' } });
-  res.json({ url, dataUrl });
-});
 
-app.get('/api/events', (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
-  sseClients.add(res);
-  res.on('close', () => sseClients.delete(res));
-});
 
-app.get('/api/log/:id', (req, res) => {
-  const appCfg = db.getApp(req.params.id);
-  if (!appCfg) return res.status(404).json({ error: 'not found' });
-  if (!appCfg.logPath) return res.json({ lines: [] });
-  // Async, bounded tail (last 64KB) - no shell, does not block the event loop.
-  const MAX = 64 * 1024;
-  fs.open(appCfg.logPath, 'r', (err, fd) => {
-    if (err) return res.json({ lines: [] });
-    fs.fstat(fd, (e2, st) => {
-      if (e2) { fs.close(fd, () => {}); return res.json({ lines: [] }); }
-      const start = Math.max(0, st.size - MAX);
-      const buf = Buffer.alloc(st.size - start);
-      fs.read(fd, buf, 0, buf.length, start, () => {
-        fs.close(fd, () => {});
-        const lines = buf.toString('utf8').trimEnd().split('\n').filter(Boolean);
-        res.json({ lines: lines.slice(-30) });
-      });
-    });
-  });
-});
 
-app.post('/api/start/:id', (req, res) => {
-  const appCfg = db.getApp(req.params.id);
-  if (!appCfg) return res.status(404).json({ error: 'not found' });
-  if (!appCfg.launchAgent) return res.status(400).json({ error: 'no launchAgent configured' });
-  try {
-    const uid = process.getuid();
-    const label = appCfg.launchAgent;
-    const plist = appCfg.launchAgentPath;
-    // Kickstart in background (non-blocking), respond immediately; bootstrap if not loaded
-    spawn('bash', ['-c', startCmd(uid, label, plist)], { detached: true, stdio: 'ignore' }).unref();
-    // Recheck health at 3s, 8s, 15s so UI updates fast
-    setTimeout(() => checkSingle(appCfg), 3000);
-    setTimeout(() => checkSingle(appCfg), 8000);
-    setTimeout(() => checkSingle(appCfg), 15000);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
 
-app.post('/api/stop/:id', (req, res) => {
-  const appCfg = db.getApp(req.params.id);
-  if (!appCfg) return res.status(404).json({ error: 'not found' });
-  if (!appCfg.launchAgent) return res.status(400).json({ error: 'no launchAgent configured' });
-  try {
-    const uid = process.getuid();
-    const label = appCfg.launchAgent;
-    const port = appCfg.localUrl ? (() => { try { return new URL(appCfg.localUrl).port; } catch { return null; } })() : null;
-    // Kill port first (instant), then bootout in background
-    if (port) try { execSync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 3000 }); } catch (e) { dbg('line833', e); }
-    spawn('bash', ['-c', `launchctl bootout gui/${uid}/${label} 2>/dev/null`], { detached: true, stdio: 'ignore' }).unref();
-    // Update status immediately
-    const s = getState(appCfg.id);
-    s.status = 'down';
-    broadcast({ type: 'update', id: appCfg.id, status: 'down' });
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
 
-// --- Machines (peers) — auto-discovery ---
-let discoveredPeers = []; // live peers found on network
 
-function probeHost(ip, port = 9875) {
-  return fetchJson(`http://${ip}:${port}/api/machine`, 2000)
-    .then((info) => peerRecord(ip, port, info))
-    .catch(() => null);
-}
 
-async function discoverPeers() {
-  // Hub-only: an agent machine has no business sweeping the LAN every 30s.
-  if (!IS_HUB || LAN_IP === 'N/A') return;
-  discoveredPeers = await sweepSubnet(LAN_IP, probeHost, { concurrency: 32 });
-  // Sync to DB
-  for (const p of discoveredPeers) {
-    db.upsertMachine(p);
-  }
-  // Remove stale machines no longer on network
-  const liveIps = new Set(discoveredPeers.map(p => p.ip));
-  for (const m of db.getMachines()) {
-    if (!liveIps.has(m.ip)) {
-      db.deleteMachine(m.id);
-      db.deleteRemoteApps(m.id);
-    }
-  }
-  // Fetch and store apps from each peer
-  for (const p of discoveredPeers) {
-    try {
-      const data = await fetchJson(`http://${p.ip}:${p.port || 9875}/api/status`, 3000);
-      if (data.apps && Array.isArray(data.apps)) {
-        db.syncRemoteApps(p.id, data.apps);
-      }
-    } catch (e) { dbg('line877', e); }
-  }
-}
-
-// Discover on boot + every 30s
-if (IS_MAIN) {
-  discoverPeers();
-  setInterval(discoverPeers, 30000);
-}
-
-app.get('/api/machines', (req, res) => {
-  res.json(db.getMachines());
-});
-
-// All apps from all machines (local + remote, stored in DB)
-app.get('/api/all-apps', (req, res) => {
-  const local = db.getApps().map(a => ({ ...a, machineId: 'local', machine: os.hostname() }));
-  const remote = db.getRemoteApps().map(r => ({
-    id: r.id, name: r.name, healthUrl: r.health_url, localUrl: r.local_url,
-    caddyUrl: r.caddy_url, prodUrl: r.prod_url, repo: r.repo, icon: r.icon,
-    status: r.status, machineId: r.machine_id, syncedAt: r.synced_at,
-  }));
-  res.json({ local, remote, total: local.length + remote.length });
-});
-
-// Remote apps for a specific machine
-app.get('/api/machines/:id/apps', (req, res) => {
-  const apps = db.getRemoteApps(req.params.id);
-  res.json(apps.map(r => ({
-    id: r.id, name: r.name, healthUrl: r.health_url, localUrl: r.local_url,
-    caddyUrl: r.caddy_url, prodUrl: r.prod_url, repo: r.repo, icon: r.icon,
-    status: r.status, syncedAt: r.synced_at,
-  })));
-});
-
-// Proxy: fetch remote machine's /api/status server-side (avoids CORS)
-app.get('/api/machines/:id/status', async (req, res) => {
-  const m = db.getMachines().find(x => x.id === req.params.id);
-  if (!m) return res.status(404).json({ error: 'machine not found' });
-  const url = `http://${m.ip}:${m.port || 9875}/api/status`;
-  try {
-    const data = await fetchJson(url, 5000);
-    const hostname = data.apps?.[0]?.hostname || m.hostname;
-    const model = data.machineModel || m.model;
-    db.upsertMachine({ id: m.id, hostname, ip: m.ip, port: m.port, model });
-    res.json(data);
-  } catch (err) {
-    res.status(502).json({ error: `unreachable: ${err.message}` });
-  }
-});
 
 // --- Machine Sync API ---
 // Each machine exposes its app list + identity. Machines can pull from each other.
 
-// Identity: who is this machine? Peers read this server-side (http.get, no CORS needed), so
-// no wildcard Access-Control-Allow-Origin here - it only let a LAN browser snoop machine identity.
-app.get('/api/machine', (req, res) => {
-  res.json({
-    hostname: os.hostname(),
-    model: MACHINE_MODEL,
-    role: MACHINE_ROLE,
-    lanIp: LAN_IP,
-    port: PORT,
-    appCount: db.getApps().length,
-  });
-});
 
 // --- File watcher (public dir only) ---
 let reloadTimer = null;
@@ -969,19 +534,14 @@ if (IS_MAIN) fs.watch(path.join(__dirname, 'public'), { recursive: true }, () =>
   reloadTimer = setTimeout(() => broadcast({ type: 'reload' }), 200);
 });
 
-// --- Startup: ping known machines to update last_seen ---
-async function startupSync() {
-  const machines = db.getMachines();
-  for (const m of machines) {
-    try {
-      const info = await fetchJson(`http://${m.ip}:${m.port || 9875}/api/machine`, 3000);
-      db.upsertMachine({ id: m.id, hostname: info.hostname || m.hostname, ip: m.ip, port: m.port, model: info.model || m.model });
-      console.log(`  Online: ${info.hostname || m.ip} (${info.appCount} apps)`);
-    } catch {
-      // unreachable — skip silently
-    }
-  }
-}
+
+// --- Routes live in routes/*.js, registered against a small ctx. LAN_IP, TAILSCALE_IP and
+// MACHINE_MODEL are getters because they refresh on timers. ---
+const ctx = { getNextAvailablePort, AUTH_TOKEN, CHROME_EXT_ERROR, IS_HUB, IS_MAIN, MACHINE_ROLE, PORT, QRCode, addCaddyEntry, broadcast, checkSingle, clearState, db, dbg, execAsync, execSync, fetchJson, forViewer, getState, isChromeExtensionRepo, isValidId, peerRecord, renameCaddyEntry, setupInfra, spawn, sseClients, startCmd, sweepSubnet, teardownInfra, updateTabColors, validateAppFields,
+  LAN_IP: () => LAN_IP, TAILSCALE_IP: () => TAILSCALE_IP, MACHINE_MODEL: () => MACHINE_MODEL };
+require('./routes/apps')(app, ctx);
+require('./routes/meta')(app, ctx);
+const { startupSync } = require('./routes/machines')(app, ctx);
 
 // --- Boot ---
 if (IS_MAIN) {
@@ -989,108 +549,7 @@ if (IS_MAIN) {
   setInterval(checkAll, CHECK_INTERVAL);
 }
 
-// Icon sync check: compare local-apps favicon vs app's own icon
-app.get('/api/icon-sync', (req, res) => {
-  const apps = db.getApps();
-  const result = {};
-  for (const a of apps) {
-    const fav = path.join(__dirname, 'public', 'favicons', `${a.id}.png`);
-    const hasFav = fs.existsSync(fav);
-    let hasAppIcon = false;
-    let synced = false;
-    if (a.localPath) {
-      // app/icon.png first: generate-favicons.js writes the 512px PNG to app/ when
-      // an app/ dir exists (Next App Router), so checking public/favicon.png first
-      // compared a 512 icon against a 64px favicon and always read out of sync.
-      for (const p of ['app/icon.png', 'public/favicon.png', 'public/apple-touch-icon.png', 'public/icon.png']) {
-        const full = path.join(a.localPath, p);
-        if (fs.existsSync(full)) {
-          hasAppIcon = true;
-          try {
-            const favSize = fs.statSync(fav).size;
-            const appSize = fs.statSync(full).size;
-            synced = favSize === appSize;
-          } catch (e) { dbg('line992', e); }
-          break;
-        }
-      }
-    }
-    result[a.id] = { hasFavicon: hasFav, hasAppIcon, synced };
-  }
-  res.json(result);
-});
 
-// App capabilities: MCP, API, CLI detection
-app.get('/api/capabilities', (req, res) => {
-  const apps = db.getApps();
-  const globalMcp = (() => {
-    try { return JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', '.mcp.json'), 'utf8')); } catch { return {}; }
-  })();
-  const mcpServers = globalMcp.mcpServers || {};
-  const result = {};
-
-  const localBinDir = path.join(os.homedir(), '.local', 'bin');
-  const localBins = fs.existsSync(localBinDir) ? fs.readdirSync(localBinDir) : [];
-  // Read each ~/.local/bin script once per request, not once per app per request.
-  const localBinText = new Map();
-  for (const b of localBins) { try { localBinText.set(b, fs.readFileSync(path.join(localBinDir, b), 'utf8')); } catch (e) { dbg('capabilities', e); } }
-
-  for (const a of apps) {
-    const dir = a.localPath;
-    if (!dir || !fs.existsSync(dir)) continue;
-    const flags = {};
-
-    // MCP: project-level .mcp.json or referenced in global config or has mcp-server file
-    try {
-      const hasProjMcp = fs.existsSync(path.join(dir, '.mcp.json'));
-      const globalRef = Object.entries(mcpServers).find(([, v]) => {
-        const args = v.args || [];
-        return args.some(arg => typeof arg === 'string' && arg.includes(a.id));
-      });
-      let hasMcpFile = false;
-      try { hasMcpFile = fs.readdirSync(dir).some(f => f.includes('mcp') && (f.endsWith('.js') || f.endsWith('.ts'))); } catch (e) { dbg('line1027', e); }
-      // Also check ~/.claude/mcp-servers/ for files matching this app
-      const mcpServersDir = path.join(os.homedir(), '.claude', 'mcp-servers');
-      let hasMcpServerFile = false;
-      if (fs.existsSync(mcpServersDir)) {
-        try { hasMcpServerFile = fs.readdirSync(mcpServersDir).some(f => f.includes(a.id)); } catch (e) { dbg('line1032', e); }
-      }
-      if (hasProjMcp || globalRef || hasMcpFile || hasMcpServerFile) {
-        flags.mcp = true;
-        if (globalRef) flags.mcpName = globalRef[0];
-        if (hasProjMcp) flags.mcpPath = path.join(dir, '.mcp.json');
-      }
-    } catch (e) { dbg('line1039', e); }
-
-    // API: Next.js app/api, Express server, pages/api
-    try {
-      if (fs.existsSync(path.join(dir, 'app', 'api')) ||
-          fs.existsSync(path.join(dir, 'pages', 'api')) ||
-          fs.existsSync(path.join(dir, 'server.js')) ||
-          fs.existsSync(path.join(dir, 'src', 'server.ts'))) {
-        flags.api = true;
-      }
-    } catch (e) { dbg('line1049', e); }
-
-    // CLI: bin field in package.json or cli files or script in ~/.local/bin
-    try {
-      const pkgPath = path.join(dir, 'package.json');
-      if (fs.existsSync(pkgPath)) {
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-        if (pkg.bin) flags.cli = true;
-      }
-      if (fs.existsSync(path.join(dir, 'cli.js')) || fs.existsSync(path.join(dir, 'bin', 'cli.js'))) flags.cli = true;
-      for (const b of localBins) {
-        if (b === 'tabs' || b === 'tab') continue; // Skip tab manager (matches all apps)
-        const content = localBinText.get(b) || '';
-        if (content.includes(a.id) || content.includes(dir)) { flags.cli = true; flags.cliBin = b; break; }
-      }
-    } catch (e) { dbg('line1066', e); }
-
-    if (Object.keys(flags).length > 0) result[a.id] = flags;
-  }
-  res.json(result);
-});
 
 // NOTE (2026-05-21): A2A (agent-to-agent) was removed from local-apps and consolidated
 // into the dashboard app at :3003 (POST /api/a2a). local-apps is monitoring-only - do not
@@ -1111,6 +570,10 @@ app.use((err, req, res, _next) => {
 // localhost-only (and front it with Caddy). The mutating API was already LAN-reachable
 // via the old Next proxy, so this is the same surface. Gate it with LOCAL_APPS_TOKEN.
 const API_BIND = process.env.API_BIND || '0.0.0.0';
+
+module.exports = app;
+
+// --- Listen ---
 if (IS_MAIN) app.listen(PORT, API_BIND, () => {
   console.log(`\n  Local Apps (UI + control plane) running at:`);
   console.log(`  http://${API_BIND}:${PORT}`);
@@ -1121,5 +584,3 @@ if (IS_MAIN) app.listen(PORT, API_BIND, () => {
   console.log(`  Role:   ${MACHINE_ROLE.toUpperCase()}${IS_HUB ? ' (bots + auto-fix enabled)' : ' (status reporting only)'}\n`);
   startupSync();
 });
-
-module.exports = app;
