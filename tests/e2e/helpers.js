@@ -6,7 +6,8 @@
 const BASE = process.env.LOCAL_APPS_URL || 'http://localhost:9875';
 
 async function api(method, p, body) {
-  const opts = { method, headers: {} };
+  // Bounded: a wedged handler must fail in seconds with the server log, not at the job timeout.
+  const opts = { method, headers: {}, signal: AbortSignal.timeout(15000) };
   if (body !== undefined) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
