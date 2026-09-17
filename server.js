@@ -341,27 +341,35 @@ async function checkAll() {
       // Level 1: Quick kickstart (first attempt, or 60s since last try)
       // kickstart fails if the service was booted out (LaunchAgent purge) - bootstrap the plist as fallback
       if (attempts === 0 || (attempts === 1 && Date.now() - lastRestart > 60000)) {
+        // Count the attempt before it runs: a failing launchctl used to skip this, so a
+        // broken plist retried this level forever instead of escalating to the next.
+        s.lastRestart = Date.now();
+        s.restartAttempts = (s.restartAttempts || 0) + 1;
         try {
           await execAsync(startCmd(uid, label, plistPath), { timeout: 15000 });
-          s.lastRestart = Date.now();
-          s.restartAttempts = (s.restartAttempts || 0) + 1;
           console.log(`  [L1] kickstart: ${appCfg.id}`);
         } catch {}
       }
 
       // Level 2: Kill port + full reload (90s+ down, attempt 2)
       else if (attempts <= 2 && downDuration > 90000 && Date.now() - lastRestart > 60000) {
+        // Count the attempt before it runs: a failing launchctl used to skip this, so a
+        // broken plist retried this level forever instead of escalating to the next.
+        s.lastRestart = Date.now();
+        s.restartAttempts = (s.restartAttempts || 0) + 1;
         try {
           if (port) await execAsync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, { timeout: 5000 });
           await execAsync(`launchctl bootout gui/${uid}/${label} 2>/dev/null; sleep 1; launchctl bootstrap gui/${uid} "${plistPath}" 2>/dev/null`, { timeout: 15000 });
-          s.lastRestart = Date.now();
-          s.restartAttempts = (s.restartAttempts || 0) + 1;
           console.log(`  [L2] port-kill + reload: ${appCfg.id}`);
         } catch {}
       }
 
       // Level 3: Common fixes - npm install, clear .next cache (180s+ down)
       else if (attempts <= 3 && downDuration > 180000 && Date.now() - lastRestart > 60000) {
+        // Count the attempt before it runs: a failing launchctl used to skip this, so a
+        // broken plist retried this level forever instead of escalating to the next.
+        s.lastRestart = Date.now();
+        s.restartAttempts = (s.restartAttempts || 0) + 1;
         try {
           const dir = appCfg.localPath;
           if (dir && fs.existsSync(dir)) {
@@ -386,8 +394,6 @@ async function checkAll() {
           }
           // Restart after fixes
           await execAsync(startCmd(uid, label, plistPath), { timeout: 15000 });
-          s.lastRestart = Date.now();
-          s.restartAttempts = (s.restartAttempts || 0) + 1;
           console.log(`  [L3] fix + restart: ${appCfg.id}`);
         } catch {}
       }
