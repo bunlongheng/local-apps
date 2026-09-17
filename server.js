@@ -376,7 +376,7 @@ async function checkAll() {
         console.log(`  [L5] circuit breaker -> disabled ${appCfg.id} (${s.flapWindow.length} flaps, ${attempts} attempts)`);
         s.downSince = null; s.restartAttempts = 0; s.flapWindow = [];
         broadcast({ type: 'update', id: appCfg.id, status: 'down', disabled: true });
-        broadcast({ type: 'alert', id: appCfg.id, name: appCfg.name });
+        broadcast({ type: 'alert', id: appCfg.id, name: appCfg.name, disabled: true });
         continue;
       }
 
