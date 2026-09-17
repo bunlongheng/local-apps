@@ -523,7 +523,8 @@
   }
   // Rows and chips are clickable via data-act; make them reachable by keyboard too.
   function keyboardControls(root) {
-    var els = root.querySelectorAll("[data-act]:not(button):not(a):not(input)");
+    // Overlays and backdrops carry data-act for click-to-close; they are not controls.
+    var els = root.querySelectorAll('[data-act]:not(button):not(a):not(input):not([data-act^="overlay"]):not(.overlay):not(.modal)');
     for (var i = 0; i < els.length; i++) { els[i].tabIndex = 0; if (!els[i].getAttribute("role")) els[i].setAttribute("role", "button"); }
   }
   // A broken app-icon <img> turns its span back into the letter avatar.
