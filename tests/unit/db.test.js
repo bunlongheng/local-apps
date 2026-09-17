@@ -81,3 +81,10 @@ test('setAppDisabled records who turned it off and when; enabling clears both', 
   assert.equal(a.disabledAt, null);
   db.deleteApp('zzz-breaker');
 });
+
+test('upsertApp keeps profile fields on create, not only on update', () => {
+  const a = db.upsertApp({ id: 'zzz-prof-create', localPath: '/tmp/zzz', about: 'first', features: ['a', 'b'], sortOrder: 3 });
+  assert.equal(a.about, 'first');
+  assert.deepEqual(a.features, ['a', 'b']);
+  assert.equal(a.sortOrder, 3);
+});

@@ -306,6 +306,7 @@ function getApp(id) {
   return rowToApp(db.prepare('SELECT * FROM apps WHERE id = ?').get(id));
 }
 
+const PROFILE_KEYS = ['about', 'features', 'architect', 'deploy', 'security', 'performance', 'prompt', 'sortOrder'];
 function upsertApp(data) {
   // Security backstop (defense in depth): launch_agent + launch_agent_path flow into
   // `launchctl ... gui/<uid>/<label>` / `bootstrap ... "<path>"` shell strings at start/stop.
@@ -363,6 +364,9 @@ function upsertApp(data) {
       startCommand: data.startCommand || 'npm run dev',
       icon: data.icon || null,
     });
+    // Profile columns are not part of the INSERT; apply them through the UPDATE path so a
+    // POST that carries about/features/... (as the in-app AI Instruction asks) keeps them.
+    if (PROFILE_KEYS.some((k) => k in data)) return upsertApp(data);
   }
   return getApp(data.id);
 }
