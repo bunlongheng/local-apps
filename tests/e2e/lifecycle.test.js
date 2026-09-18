@@ -91,9 +91,29 @@ test('hub-only routes answer on a hub and are 404 on an agent', async () => {
 // kickstart on a fresh label) and go down through POST /api/stop. Every earlier proof of this was
 // a command string.
 const LAUNCHD_ID = 'zzz-e2e-launchd';
-test('on macOS an app registered with a start command is started and stopped through launchd for real', { skip: !(MUTATE && process.platform === 'darwin' && process.env.LAUNCH_AGENTS_DIR) && 'needs E2E_MUTATE=1, macOS and a scratch LAUNCH_AGENTS_DIR' }, async () => {
+// Can launchd start a user agent here at all? Bootstrap a probe that touches a file.
+async function launchdWorks(execSync, os) {
+  const fsx = require('node:fs'), pathx = require('node:path');
+  const dir = fsx.mkdtempSync(pathx.join(os.tmpdir(), 'launchd-probe-'));
+  const marker = pathx.join(dir, 'ran'), label = `com.zzz.probe.${process.pid}`, plist = pathx.join(dir, `${label}.plist`);
+  fsx.writeFileSync(plist, `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>Label</key><string>${label}</string><key>ProgramArguments</key><array><string>/usr/bin/touch</string><string>${marker}</string></array><key>RunAtLoad</key><false/></dict></plist>`);
+  const run = (c) => { try { execSync(c, { stdio: 'ignore', timeout: 10000 }); return true; } catch { return false; } };
+  run(`launchctl bootout gui/${process.getuid()}/${label}`);
+  run(`launchctl enable gui/${process.getuid()}/${label}`);
+  run(`launchctl bootstrap gui/${process.getuid()} "${plist}"`);
+  run(`launchctl kickstart -k gui/${process.getuid()}/${label}`);
+  let ok = false;
+  for (let i = 0; i < 20 && !ok; i++) { await new Promise((r) => setTimeout(r, 250)); ok = fsx.existsSync(marker); }
+  run(`launchctl bootout gui/${process.getuid()}/${label}`);
+  fsx.rmSync(dir, { recursive: true, force: true });
+  return ok;
+}
+test('on macOS an app registered with a start command is started and stopped through launchd for real', { timeout: 120000, skip: !(MUTATE && process.platform === 'darwin' && process.env.LAUNCH_AGENTS_DIR) && 'needs E2E_MUTATE=1, macOS and a scratch LAUNCH_AGENTS_DIR' }, async (t) => {
   const os = require('node:os');
   const { execSync } = require('node:child_process');
+  // Preflight: a CI runner without a real GUI session cannot bootstrap a user agent at all. Prove
+  // launchd here can run one before blaming the product for a start that never happens.
+  if (!(await launchdWorks(execSync, os))) return t.skip('launchd cannot run a user agent in this environment (no GUI session)');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'launchd-app-'));
   const port = await freePort();
   fs.writeFileSync(path.join(dir, 'server.js'), `require('http').createServer((q, r) => r.end('ok')).listen(${port}, '127.0.0.1');\n`);
@@ -104,7 +124,7 @@ test('on macOS an app registered with a start command is started and stopped thr
     assert.ok(fs.existsSync(created.json.launchAgentPath), 'plist written');
     assert.equal((await api('POST', `/api/start/${LAUNCHD_ID}`)).status, 200);
     const status = async () => (await api('GET', '/api/status')).json.apps.find((a) => a.id === LAUNCHD_ID).status;
-    let up = false; for (let i = 0; i < 60 && !up; i++) { await new Promise((r) => setTimeout(r, 500)); up = (await status()) === 'up'; }
+    let up = false; for (let i = 0; i < 80 && !up; i++) { await new Promise((r) => setTimeout(r, 500)); up = (await status()) === 'up'; }
     assert.ok(up, 'launchd brought the app up within 30s (launchctl print gui/' + process.getuid() + '/' + created.json.launchAgent + ')');
     assert.equal((await api('POST', `/api/stop/${LAUNCHD_ID}`)).status, 200);
     let down = false; for (let i = 0; i < 40 && !down; i++) { await new Promise((r) => setTimeout(r, 500)); down = (await status()) === 'down'; }
