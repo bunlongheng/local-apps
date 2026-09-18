@@ -30,8 +30,8 @@ export default [
     files: ['server.js', 'db.js', 'lib/**/*.js', 'routes/**/*.js', 'scripts/**/*.js'],
     rules: {
       'no-restricted-syntax': ['error',
-        { selector: 'Literal[value=/launchctl (kickstart|bootstrap)/]', message: 'inline launchctl kickstart/bootstrap: use startCmd() from launchctl-cmds.js so the enable + bootstrap + kickstart fallback is never lost' },
-        { selector: 'TemplateElement[value.raw=/launchctl (kickstart|bootstrap)/]', message: 'inline launchctl kickstart/bootstrap: use startCmd() from launchctl-cmds.js so the enable + bootstrap + kickstart fallback is never lost' },
+        { selector: 'Literal[value=/launchctl (kickstart|bootstrap|bootout)/]', message: 'inline launchctl kickstart/bootstrap/bootout: use startCmd()/bootoutCmd() from launchctl-cmds.js, the one place that knows the fallback and the domain' },
+        { selector: 'TemplateElement[value.raw=/launchctl (kickstart|bootstrap|bootout)/]', message: 'inline launchctl kickstart/bootstrap/bootout: use startCmd()/bootoutCmd() from launchctl-cmds.js, the one place that knows the fallback and the domain' },
       ],
     },
   },

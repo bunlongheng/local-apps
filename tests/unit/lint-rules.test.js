@@ -17,6 +17,8 @@ test('an inline kickstart or bootstrap in a start path is a lint error; launchct
   assert.equal(plain.errorCount, 1, 'a kickstart without -k is still an inline start');
   const allowed = await lint('module.exports = `launchctl kickstart -k gui/${1}/x || launchctl bootstrap gui/1 "p"`;\n', 'launchctl-cmds.js');
   assert.equal(allowed.errorCount, 0);
+  const bootout = await lint('module.exports = "launchctl bootout gui/1/x";\n', 'lib/launchd.js');
+  assert.equal(bootout.errorCount, 1, 'bootout goes through bootoutCmd()');
   const cron = await lint('module.exports = "launchctl list";\n', 'routes/x.js');
   assert.equal(cron.errorCount, 0, 'other launchctl verbs are fine');
 });
