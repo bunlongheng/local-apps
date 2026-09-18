@@ -253,9 +253,8 @@ const { startupSync } = require('./routes/machines')(app, ctx);
 
 // --- Boot ---
 if (IS_MAIN) {
-  // A tick that throws (SQLite busy, a probe that rejects) is logged, never an unhandled rejection
-  // that ends the process and has launchd spin it.
-  const tick = () => checkAll().catch((e) => console.warn(`  checkAll failed: ${e.message}`));
+  // A tick that throws (SQLite busy, a probe that rejects) is logged, never an unhandled rejection.
+  const tick = makeMonitor.guardedTick(checkAll, (m) => console.warn(m));
   tick();
   setInterval(tick, CHECK_INTERVAL);
 }

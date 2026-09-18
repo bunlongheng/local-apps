@@ -14,6 +14,7 @@ after(() => fs.rmSync(dir, { recursive: true, force: true }));
 const freePort = () => new Promise((r) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); });
 
 test('node server.js boots on PORT, prints the banner, serves /api/status, runs its first tick, and stops on SIGTERM', async () => {
+  // The tick's rejection guard is behaviourally tested in monitor.test.js (guardedTick).
   const port = await freePort();
   // Seed 1 app on a port nobody listens on: the first tick must observe it down.
   const dead = await freePort();
@@ -37,11 +38,4 @@ test('node server.js boots on PORT, prints the banner, serves /api/status, runs 
     assert.ok(!/checkAll failed/.test(out), 'the first tick ran clean:\n' + out);
   } finally { child.kill('SIGTERM'); }
   const { sig } = await exited; assert.equal(sig, 'SIGTERM');
-});
-
-test('the 30s tick is wrapped so a failing checkAll can never be an unhandled rejection', () => {
-  const src = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
-  assert.match(src, /const tick = \(\) => checkAll\(\)\.catch\(/);
-  assert.match(src, /setInterval\(tick, CHECK_INTERVAL\)/);
-  assert.ok(!/setInterval\(checkAll,/.test(src), 'the raw checkAll is never scheduled');
 });
