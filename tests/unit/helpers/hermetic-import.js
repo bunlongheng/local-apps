@@ -12,10 +12,17 @@ module.exports = function requireHermetic(scratchHome) {
   assert.equal(require.cache[require.resolve('../../../server')], undefined, 'server must not be preloaded: this file needs its own process');
   const shell = ['execSync', 'exec', 'execFile', 'spawn', 'spawnSync'].map((f) => mock.method(cp, f));
   // Sync, callback and promise forms: a call is recorded at import even when its I/O completes later.
-  const BASE = ['mkdir', 'writeFile', 'appendFile', 'copyFile', 'rename', 'rm', 'rmdir', 'unlink', 'open'];
+  const BASE = ['mkdir', 'mkdtemp', 'writeFile', 'appendFile', 'copyFile', 'cp', 'rename', 'rm', 'rmdir', 'unlink', 'symlink', 'link', 'truncate', 'chmod', 'chown', 'lchmod', 'lchown', 'utimes', 'lutimes', 'open'];
+  const FD_BASE = ['write', 'writev', 'fchmod', 'fchown', 'ftruncate', 'futimes'];   // take an fd, not a path: must not be called at all
+  // Closed by construction: every fs export that mutates must be in one of the 2 lists, so a new
+  // Node mutator fails here instead of slipping past the spies.
+  const MUTATOR = /^(mkdir|mkdtemp|write|writev|append|copy|cp|rename|rm|unlink|symlink|link|truncate|chmod|chown|lchmod|lchown|utimes|lutimes|open|fchmod|fchown|ftruncate|futimes)/;
+  const known = new Set([...BASE, ...FD_BASE, 'createWriteStream', 'openAsBlob', 'opendir']);   // openAsBlob/opendir read
+  for (const k of Object.keys(fs)) if (MUTATOR.test(k) && typeof fs[k] === 'function') assert.ok(known.has(k.replace(/Sync$/, '')), `fs.${k} is not covered by the hermetic import spies`);
   const WRITE_APIS = [...BASE.map((f) => f + 'Sync'), ...BASE, 'createWriteStream'];
   const writes = WRITE_APIS.map((f) => mock.method(fs, f));
-  const promised = BASE.map((f) => mock.method(fs.promises, f));
+  const fdWrites = [...FD_BASE.map((f) => f + 'Sync'), ...FD_BASE].filter((f) => typeof fs[f] === 'function').map((f) => mock.method(fs, f));
+  const promised = BASE.filter((f) => typeof fs.promises[f] === 'function').map((f) => mock.method(fs.promises, f));
   const app = require('../../../server');
   for (const sp of shell) assert.equal(sp.mock.callCount(), 0, 'importing server.js must not shell out');
   const readOnlyOpen = (flags) => flags === undefined || flags === 'r' || flags === 'rs' || flags === fs.constants.O_RDONLY;   // anything else, string or numeric, is a write
@@ -25,7 +32,9 @@ module.exports = function requireHermetic(scratchHome) {
     assert.ok(p === scratchHome || p.startsWith(scratchHome + path.sep), `import wrote outside the scratch home (${name}): ${p}`);   // directory boundary, not a bare prefix
   } };
   writes.forEach((sp, i) => check(WRITE_APIS[i], sp.mock.calls));
-  promised.forEach((sp, i) => check('promises.' + BASE[i], sp.mock.calls));
-  [...shell, ...writes, ...promised].forEach((sp) => sp.mock.restore());
+  for (const sp of fdWrites) assert.equal(sp.mock.callCount(), 0, 'import must not write through a file descriptor');
+  const promisedNames = BASE.filter((f) => typeof fs.promises[f] === 'function');
+  promised.forEach((sp, i) => check('promises.' + promisedNames[i], sp.mock.calls));
+  [...shell, ...writes, ...fdWrites, ...promised].forEach((sp) => sp.mock.restore());
   return app;
 };
