@@ -10,12 +10,13 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const makeLaunchd = require('../../lib/launchd');
+const { bootoutCmd } = require('../../launchctl-cmds');
 const { xmlEscape } = require('../../lib/validate');
 
 function fresh() {
   const launchAgentsDir = TMP_DIRS[TMP_DIRS.push(fs.mkdtempSync(path.join(os.tmpdir(), 'launchd-test-'))) - 1];
   const execCalls = [];
-  const launchd = makeLaunchd({
+  const launchd = makeLaunchd({ bootoutCmd,
     username: 'tester',
     launchAgentsDir,
     npmPath: '/opt/homebrew/bin/npm',
@@ -90,10 +91,14 @@ test('removeLaunchAgent unloads via the injected exec and deletes the plist file
 test('createLaunchAgent is an upsert: a changed start command rewrites the plist', () => {
   const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
   const dir = TMP_DIRS[TMP_DIRS.push(fs.mkdtempSync(path.join(os.tmpdir(), 'la-up-'))) - 1]; const calls = [];
-  const ld = require('../../lib/launchd')({ username: 'you', launchAgentsDir: dir, npmPath: '/usr/bin/npm', xmlEscape: (s) => String(s), exec: (c) => calls.push(c) });
+  const ld = require('../../lib/launchd')({ username: 'you', launchAgentsDir: dir, npmPath: '/usr/bin/npm', xmlEscape: (s) => String(s), exec: (c) => calls.push(c), bootoutCmd });
   ld.createLaunchAgent('zzz-up', '/tmp/zzz-up', '/tmp/zzz-up.log', 'npm run dev');
   ld.createLaunchAgent('zzz-up', '/tmp/zzz-up', '/tmp/zzz-up.log', 'npm start');
   const plist = fs.readFileSync(path.join(dir, 'com.you.zzz-up.plist'), 'utf8');
   assert.match(plist, /start/); assert.doesNotMatch(plist, /run dev/);
-  assert.ok(calls.some(c => /bootout/.test(c)), 'old service booted out before the rewrite');
+  assert.deepEqual(calls, [bootoutCmd(process.getuid(), 'com.you.zzz-up')], 'the old service is booted out through the shared builder, exactly once, before the rewrite');
+});
+
+test('makeLaunchd fails loudly when a dependency is missing, instead of swallowing it later', () => {
+  assert.throws(() => require('../../lib/launchd')({ username: 'you', launchAgentsDir: '/tmp', npmPath: '/usr/bin/npm', xmlEscape: String, exec: () => {} }), /missing dependency bootoutCmd/);
 });
