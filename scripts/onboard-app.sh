@@ -1,6 +1,7 @@
 #!/bin/bash
 # Onboard a new app into the local-apps ecosystem
-# Usage: ./onboard-app.sh <app-id> <app-name> <local-path> [--color R,G,B]
+# Usage: ./onboard-app.sh <app-id> <app-name> <local-path> [--color R,G,B] [--dry-run]
+#   --dry-run prints the plan (the 9 steps with their resolved arguments) and exits before any side effect.
 #
 # What it does:
 #   1. Create GitHub repo (private)
@@ -30,6 +31,7 @@ APP_ID="$1"
 APP_NAME="$2"
 LOCAL_PATH="$3"
 COLOR="130,130,130"
+DRY_RUN=0
 
 if [ -z "$APP_ID" ] || [ -z "$APP_NAME" ] || [ -z "$LOCAL_PATH" ]; then
   echo -e "${RED}Usage: ./onboard-app.sh <app-id> <app-name> <local-path> [--color R,G,B]${NC}"
@@ -42,6 +44,7 @@ shift 3
 while [[ $# -gt 0 ]]; do
   case $1 in
     --color) COLOR="$2"; shift 2 ;;
+    --dry-run) DRY_RUN=1; shift ;;
     *) shift ;;
   esac
 done
@@ -49,6 +52,21 @@ done
 IFS=',' read -r CR CG CB <<< "$COLOR"
 
 echo -e "\n${CYAN}=== Onboarding: $APP_NAME ($APP_ID) ===${NC}\n"
+
+# --- Dry run: the plan, nothing else ---
+if [ "$DRY_RUN" = "1" ]; then
+  echo "DRY RUN for $APP_ID ($APP_NAME) at $LOCAL_PATH, color $COLOR, monitor $MONITOR"
+  echo "  1. gh repo create bunlongheng/$APP_ID --private"
+  echo "  2. POST $MONITOR/api/apps {id: $APP_ID, name: $APP_NAME, localPath: $LOCAL_PATH}"
+  echo "  3. vercel deploy from $LOCAL_PATH"
+  echo "  4. scaffold $LOCAL_PATH/vercel.json (ignoreCommand)"
+  echo "  5. generate favicon -> $MONITOR_DIR/public/favicons/$APP_ID.png"
+  echo "  6. tab registry entry $APP_ID ($COLOR) in ~/.claude/tab-colors.json"
+  echo "  7. gh repo edit (description, topics, homepage)"
+  echo "  8. disable Dependabot"
+  echo "  9. npm audit in $LOCAL_PATH"
+  exit 0
+fi
 
 # --- Checks ---
 if [ ! -d "$LOCAL_PATH" ]; then
