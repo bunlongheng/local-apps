@@ -55,22 +55,8 @@ test('startCmd silences stderr on both branches (callers rely on exit codes)', (
   }
 });
 
-test('no inline launchctl kickstart -k anywhere an app can be started; routes/apps.js and lib/chain.js keep their startCmd() sites', () => {
-  // Routes live in routes/*.js since the split; the rule covers every file that can start an app.
-  const files = ['server.js', 'lib/chain.js', 'routes/apps.js', 'routes/meta.js', 'routes/machines.js'];
-  const src = files.map(f => fs.readFileSync(path.join(__dirname, '../..', f), 'utf8')).join('\n');
-  // `kickstart` without -k (cron run-now) is fine; `kickstart -k` is the app
-  // restart pattern and must always carry the bootstrap fallback via startCmd.
-  assert.equal(src.match(/launchctl kickstart -k/g), null,
-    'found an inline `launchctl kickstart -k` - use startCmd() from launchctl-cmds.js so the bootstrap fallback is never lost');
-  assert.ok(src.includes("require('./launchctl-cmds')"), 'startCmd must be imported from launchctl-cmds');
-  // Per file, so a site dropped in one file cannot be masked by another file's count.
-  const expected = { 'routes/apps.js': 3, 'lib/chain.js': 3 };   // toggle-ON, bulk-toggle, /api/start; L1, L3, L4 prompt
-  for (const [f, n] of Object.entries(expected)) {
-    const count = (fs.readFileSync(path.join(__dirname, '../..', f), 'utf8').match(/startCmd\(/g) || []).length;
-    assert.ok(count >= n, `${f}: expected at least ${n} startCmd() sites, found ${count}`);
-  }
-});
+// The 'no inline launchctl kickstart -k' rule is enforced by eslint (no-restricted-syntax in the
+// eslint config); start behaviour is asserted through ctx.startCmd in routes-apps and chain tests.
 
 test('killPort frees a real listener without a shell and resolves 0 on a free port', async () => {
   const { killPort } = require('../../launchctl-cmds');
