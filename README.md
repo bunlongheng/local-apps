@@ -2,7 +2,7 @@
 
 Self-healing dashboard for a fleet of local dev apps.
 
-Register an app once. Local Apps assigns it a port, writes its Caddy reverse proxy and macOS LaunchAgent, health-checks it every 30 seconds, restarts it when it crashes, and exposes it by name over LAN and Tailscale. One page instead of a wall of `npm run dev` tabs. It runs 65 apps on a base M4 Mac Mini, about 6 awake at a time, the rest parked at zero cost.
+Register an app once. Local Apps assigns it a port, writes its Caddy reverse proxy and macOS LaunchAgent, health-checks it every 30 seconds, restarts it when it crashes, and exposes it by name over LAN and Tailscale. One page instead of a wall of `npm run dev` tabs. Apps you are not using stay parked at zero cost until you start them; the monitor itself is 1 Node process with 2 runtime dependencies.
 
 ![Local Apps dashboard](docs/screenshots/dashboard.png)
 
@@ -103,11 +103,9 @@ lib/            every module has a matching tests/unit/<name>.test.js (http-app,
 db.js           SQLite data layer
 public/         vanilla-JS dashboard, service worker, offline page
 scripts/        generate-favicons, consistency, onboard-app.sh, storage-guard.sh (the owner's own tooling, kept for reference)
-tests/          unit/ (lib modules, db, db-migrate, consistency, launchctl-cmds, routes-apps, routes-machines, routes-meta, routes-security,
-                sw and dashboard under jsdom) and e2e/
+tests/          unit/ (every lib module, db, routes, the service worker and the dashboard under jsdom) and e2e/
                 npm test (unit), npm run test:e2e (needs the app on :9875), npm run test:all, npm run lint
-                the coverage gate covers server code and public/app.js (run under jsdom as a vm.Script in tests/unit/dashboard.test.js);
-                npm run test:coverage:dashboard enforces a per-file floor on public/app.js
+                npm run test:coverage gates every runtime file; npm run test:coverage:dashboard adds a per-file floor on public/app.js
 ```
 
 ## License
