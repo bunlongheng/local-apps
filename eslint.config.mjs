@@ -24,6 +24,18 @@ export default [
     },
   },
   {
+    // The app-restart rule, enforced by lint rather than a grep test: everywhere an app can be
+    // started, the command must come from startCmd() in launchctl-cmds.js (the one place that
+    // carries the bootstrap fallback). launchctl-cmds.js itself is the only file allowed the literal.
+    files: ['server.js', 'db.js', 'lib/**/*.js', 'routes/**/*.js', 'scripts/**/*.js'],
+    rules: {
+      'no-restricted-syntax': ['error',
+        { selector: 'Literal[value=/launchctl kickstart -k/]', message: 'inline `launchctl kickstart -k`: use startCmd() from launchctl-cmds.js so the bootstrap fallback is never lost' },
+        { selector: 'TemplateElement[value.raw=/launchctl kickstart -k/]', message: 'inline `launchctl kickstart -k`: use startCmd() from launchctl-cmds.js so the bootstrap fallback is never lost' },
+      ],
+    },
+  },
+  {
     // The dashboard and the service worker run in the browser: script-scope, browser globals.
     files: ['public/**/*.js'],
     languageOptions: {
