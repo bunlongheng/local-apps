@@ -64,10 +64,12 @@ test('server.js has no bare app restart (kickstart -k) - all start paths use sta
   assert.equal(src.match(/launchctl kickstart -k/g), null,
     'found an inline `launchctl kickstart -k` - use startCmd() from launchctl-cmds.js so the bootstrap fallback is never lost');
   assert.ok(src.includes("require('./launchctl-cmds')"), 'startCmd must be imported from launchctl-cmds');
-  const calls = src.match(/startCmd\(/g);
-  assert.ok(calls, 'expected startCmd() calls, found none');
-  assert.ok(calls.length >= 6,
-    `expected startCmd() at the 6 start sites (toggle-ON, bulk-toggle, /api/start, auto-restart L1/L3, L4 agent prompt), found ${calls.length}`);
+  // Per file, so a site dropped in one file cannot be masked by another file's count.
+  const expected = { 'routes/apps.js': 3, 'lib/chain.js': 3 };   // toggle-ON, bulk-toggle, /api/start; L1, L3, L4 prompt
+  for (const [f, n] of Object.entries(expected)) {
+    const count = (fs.readFileSync(path.join(__dirname, '../..', f), 'utf8').match(/startCmd\(/g) || []).length;
+    assert.ok(count >= n, `${f}: expected at least ${n} startCmd() sites, found ${count}`);
+  }
 });
 
 test('killPort frees a real listener without a shell and resolves 0 on a free port', async () => {
