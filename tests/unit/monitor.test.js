@@ -2,6 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 const makeMonitor = require('../../lib/monitor');
+const { guardedTick } = makeMonitor;
 
 function boot({ apps, decision, probe, getApps, killPort, exec }) {
   const calls = [], states = {};
@@ -81,4 +82,16 @@ test('a breaker trip still boots out and disables when freeing the port throws, 
   const b = boot({ apps: [{ ...APP }], decision: { trip: { flaps: 3, attempts: 2 } }, exec: async () => { throw new Error('bootout failed'); } });
   assert.equal(await b.m.checkAll(), true);
   assert.ok(b.calls.includes('killPort:4000')); assert.ok(b.calls.includes('disable:a:true:breaker'), b.calls.join());
+});
+
+test('guardedTick turns a rejecting tick into a warning and never an unhandled rejection', async () => {
+  const warned = []; let unhandled = 0;
+  const onUnhandled = () => { unhandled++; }; process.on('unhandledRejection', onUnhandled);
+  try {
+    const tick = guardedTick(async () => { throw new Error('SQLITE_BUSY'); }, (m) => warned.push(m));
+    tick(); await new Promise((r) => setImmediate(r)); await new Promise((r) => setImmediate(r));
+    assert.deepEqual(warned, ['  checkAll failed: SQLITE_BUSY']); assert.equal(unhandled, 0);
+    const ok = guardedTick(async () => true, (m) => warned.push(m)); await ok();
+    assert.equal(warned.length, 1, 'a clean tick warns nothing');
+  } finally { process.off('unhandledRejection', onUnhandled); }
 });
