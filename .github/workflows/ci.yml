@@ -26,13 +26,16 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
-      # Gate policy (this step and the per-file floor below): thresholds sit about 1 point under what
-      # the ubuntu runner measures (it reads a little lower than a Mac). Raise them only in a dedicated
-      # ci: commit after a test-adding PR, never loosen them inside a feature PR.
+      # Gate policy (this step and the 2 floors below): the aggregate and the app.js floor sit about 1
+      # point under what the ubuntu runner measures (it reads a little lower than a Mac); the every-file
+      # floor (80 lines / 50 branches) is a safety net a few points under the weakest file. Raise them
+      # only in a dedicated ci: commit after a test-adding PR, never loosen them inside a feature PR.
       - name: Unit tests + coverage gate
         run: npm run test:coverage
       - name: Dashboard per-file coverage floor (public/app.js)
         run: npm run test:coverage:dashboard
+      - name: Per-file coverage floor, every runtime file
+        run: npm run test:coverage:files
       - name: E2E against a booted instance (hub role so the hub-only routes get a pass; no LAN sweep, loopback only)
         run: |
           MACHINE_ROLE=hub LOCAL_APPS_NO_SWEEP=1 LOCAL_APPS_HOME=$RUNNER_TEMP/home API_BIND=127.0.0.1 LOCAL_APPS_DB=/tmp/ci-local.db node server.js > /tmp/ci-server.log 2>&1 &
