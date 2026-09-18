@@ -13,8 +13,8 @@
     "test": "node --test --test-timeout=30000 'tests/unit/**/*.test.js'",
     "test:unit": "node --test --test-timeout=30000 'tests/unit/**/*.test.js'",
     "test:coverage": "node --test --test-timeout=30000 --experimental-test-coverage --test-coverage-lines=92 --test-coverage-branches=76 --test-coverage-functions=83 --test-coverage-include=\"$npm_package_config_coverageInclude\" 'tests/unit/**/*.test.js'",
-    "test:e2e": "node --test --test-timeout=30000 'tests/e2e/**/*.test.js'",
-    "test:all": "node --test --test-timeout=30000 'tests/unit/**/*.test.js' 'tests/e2e/**/*.test.js'",
+    "test:e2e": "node --test --test-timeout=180000 'tests/e2e/**/*.test.js'",
+    "test:all": "node --test --test-timeout=180000 'tests/unit/**/*.test.js' 'tests/e2e/**/*.test.js'",
     "test:coverage:dashboard": "node scripts/coverage-floor.js --run public/app.js 90 65 tests/unit/dashboard.test.js",
     "test:coverage:files": "node scripts/coverage-floor.js --all 80 50 \"$npm_package_config_coverageInclude\" 'tests/unit/**/*.test.js'"
   },

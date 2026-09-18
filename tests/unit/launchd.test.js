@@ -102,3 +102,16 @@ test('createLaunchAgent is an upsert: a changed start command rewrites the plist
 test('makeLaunchd fails loudly when a dependency is missing, instead of swallowing it later', () => {
   assert.throws(() => require('../../lib/launchd')({ username: 'you', launchAgentsDir: '/tmp', npmPath: '/usr/bin/npm', xmlEscape: String, exec: () => {} }), /missing dependency bootoutCmd/);
 });
+
+test('a bare binary in the start command is resolved to an absolute path (launchd never searches PATH)', () => {
+  const { launchd, launchAgentsDir } = fresh();
+  launchd.createLaunchAgent('zzz-bin', '/tmp/zzz-bin', '/tmp/zzz-bin.log', 'node server.js');
+  const plist = fs.readFileSync(path.join(launchAgentsDir, 'com.tester.zzz-bin.plist'), 'utf8');
+  const first = (plist.match(/<array>\s*<string>([^<]+)<\/string>/) || [])[1];
+  assert.ok(first && first.startsWith('/') && fs.existsSync(first), `ProgramArguments[0] must be an absolute, existing binary, got ${first}`);
+  assert.match(plist, /<string>server\.js<\/string>/, 'the arguments survive');
+  launchd.createLaunchAgent('zzz-abs', '/tmp/zzz-abs', '/tmp/zzz-abs.log', '/usr/bin/env node app.js');
+  assert.match(fs.readFileSync(path.join(launchAgentsDir, 'com.tester.zzz-abs.plist'), 'utf8'), /<string>\/usr\/bin\/env<\/string>/, 'an absolute command is left alone');
+  launchd.createLaunchAgent('zzz-unknown', '/tmp/zzz-unknown', '/tmp/zzz-unknown.log', 'zzz-not-a-real-binary x');
+  assert.match(fs.readFileSync(path.join(launchAgentsDir, 'com.tester.zzz-unknown.plist'), 'utf8'), /<string>zzz-not-a-real-binary<\/string>/, 'an unknown binary is passed through for launchd to report');
+});
