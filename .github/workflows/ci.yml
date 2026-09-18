@@ -26,6 +26,8 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Shell scripts parse and pass shellcheck
+        run: bash -n scripts/*.sh start.sh && shellcheck -S error scripts/*.sh start.sh
       # Gate policy (this step and the 2 floors below): the aggregate and the app.js floor sit about 1
       # point under what the ubuntu runner measures (it reads a little lower than a Mac); the every-file
       # floor (80 lines / 50 branches) is a safety net a few points under the weakest file. Raise them
