@@ -55,7 +55,7 @@ test('startCmd silences stderr on both branches (callers rely on exit codes)', (
   }
 });
 
-test('server.js has no bare app restart (kickstart -k) - all start paths use startCmd', () => {
+test('no inline launchctl kickstart -k anywhere an app can be started; routes/apps.js and lib/chain.js keep their startCmd() sites', () => {
   // Routes live in routes/*.js since the split; the rule covers every file that can start an app.
   const files = ['server.js', 'lib/chain.js', 'routes/apps.js', 'routes/meta.js', 'routes/machines.js'];
   const src = files.map(f => fs.readFileSync(path.join(__dirname, '../..', f), 'utf8')).join('\n');
