@@ -1,7 +1,7 @@
 // Unit: routes/apps.js - the mutating handlers with every host effect faked: toggle OFF boots out then
 // frees the port, ON kickstarts, bulk-toggle keeps ids, PUT re-provisions, DELETE tears down before
 // the row is gone, POST merges the provisioned infra, stop kills the port and marks down.
-const { test, mock } = require('node:test');
+const { test } = require('node:test');
 const assert = require('node:assert');
 
 function fakeDb(apps) {
@@ -44,8 +44,8 @@ function boot(apps, { taken = null, nextPort = 3999, tailscale = null } = {}) {
 const A = { id: 'a', name: 'A', localUrl: 'http://localhost:4000', launchAgent: 'com.t.a', launchAgentPath: '/tmp/a.plist', disabled: false };
 const B = { id: 'b', name: 'B', localUrl: 'http://localhost:4001', launchAgent: 'com.t.b', launchAgentPath: '/tmp/b.plist', disabled: false };
 
-test('toggle OFF boots out, then frees the port, marks down and broadcasts; toggle ON kickstarts', async () => {
-  mock.timers.enable({ apis: ['setTimeout'] });
+test('toggle OFF boots out, then frees the port, marks down and broadcasts; toggle ON kickstarts', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });   // the context's tracker: restored whether the test passes or fails
   const { routes, calls, db, states } = boot([A]);
   const off = await call(routes['POST /api/apps/:id/toggle'], { params: { id: 'a' } });
   assert.deepEqual(off.body, { id: 'a', disabled: true }); assert.equal(db.getApp('a').disabled, true);
@@ -53,9 +53,8 @@ test('toggle OFF boots out, then frees the port, marks down and broadcasts; togg
   calls.length = 0;
   const on = await call(routes['POST /api/apps/:id/toggle'], { params: { id: 'a' } });
   assert.deepEqual(on.body, { id: 'a', disabled: false }); assert.deepEqual(calls, ['exec:start com.t.a']);
-  mock.timers.tick(15000); assert.equal(calls.filter(c => c === 'recheck:a').length, 3, 'toggle ON rechecks like start');
+  t.mock.timers.tick(15000); assert.equal(calls.filter(c => c === 'recheck:a').length, 3, 'toggle ON rechecks like start');
   assert.equal((await call(routes['POST /api/apps/:id/toggle'], { params: { id: 'zzz' } })).status, 404);
-  mock.timers.reset();
 });
 
 test('bulk-toggle keeps the listed ids, boots out + frees only newly disabled apps, kickstarts newly enabled ones', async () => {
@@ -89,18 +88,17 @@ test('DELETE tears down while the row still exists, then removes it and clears s
   assert.equal((await call(routes['DELETE /api/apps/:id'], { params: { id: 'a' } })).status, 404);
 });
 
-test('stop kills the port, boots out in the background and marks down; start kickstarts; both 400 without a LaunchAgent', async () => {
-  mock.timers.enable({ apis: ['setTimeout'] });
+test('stop kills the port, boots out in the background and marks down; start kickstarts; both 400 without a LaunchAgent', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const { routes, calls, states } = boot([A, { id: 'c', name: 'C' }]);
   assert.deepEqual((await call(routes['POST /api/stop/:id'], { params: { id: 'a' } })).body, { ok: true });
   assert.deepEqual(calls, ['killPort:4000', 'spawn:bootout com.t.a', 'sse:update:a:down']); assert.equal(states.a.status, 'down');
   calls.length = 0;
   assert.deepEqual((await call(routes['POST /api/start/:id'], { params: { id: 'a' } })).body, { ok: true }); assert.deepEqual(calls, ['spawn:start com.t.a']);
-  mock.timers.tick(15000);
+  t.mock.timers.tick(15000);
   assert.equal(calls.filter(c => c === 'recheck:a').length, 3, 'health is rechecked at 3s, 8s and 15s after a start');
   assert.equal((await call(routes['POST /api/start/:id'], { params: { id: 'c' } })).status, 400);
   assert.equal((await call(routes['POST /api/stop/:id'], { params: { id: 'c' } })).status, 400);
-  mock.timers.reset();
 });
 
 test('PUT renames the Caddy block when caddyUrl changes, adds one when there was none, and syncs the tab label on a rename', async () => {
@@ -139,19 +137,19 @@ test('GET /api/status derives mode from the start command and rewrites LAN and T
   assert.equal(off.body.apps[0].tailscaleUrl, null, 'no tailnet, no tailscale url');
 });
 
-test('an SSE client is tracked while connected; its heartbeat stops and it leaves the set on close', async () => {
-  mock.timers.enable({ apis: ['setInterval'] });
-  try {
+test('an SSE client is tracked while connected; its heartbeat stops and it leaves the set on close', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  {
     const { EventEmitter } = require('node:events');
     const { routes } = boot([A]);
-    const sseClients = routes.__sse;   // exposed by boot below
+    const sseClients = routes.__sse;   // boot() attaches ctx.sseClients here
     const writes = [];
     const res = Object.assign(new EventEmitter(), { setHeader() {}, flushHeaders() {}, write: (c) => writes.push(c) });
     routes['GET /api/events']({ params: {}, query: {}, headers: {}, get: () => undefined, socket: { remoteAddress: '127.0.0.1' } }, res);
     assert.equal(sseClients.size, 1, 'connected client tracked');
-    mock.timers.tick(25000); assert.deepEqual(writes, [': ping\n\n'], 'heartbeat after 25s');
+    t.mock.timers.tick(25000); assert.deepEqual(writes, [': ping\n\n'], 'heartbeat after 25s');
     res.emit('close');
     assert.equal(sseClients.size, 0, 'gone on close');
-    mock.timers.tick(50000); assert.equal(writes.length, 1, 'no heartbeat after close: the interval was cleared');
-  } finally { mock.timers.reset(); }
+    t.mock.timers.tick(50000); assert.equal(writes.length, 1, 'no heartbeat after close: the interval was cleared');
+  }
 });
