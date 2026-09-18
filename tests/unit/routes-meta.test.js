@@ -23,9 +23,9 @@ function call(fn, { params = {}, query = {}, headers = {} } = {}) {
     Promise.resolve(fn({ params, query, headers, hostname: (headers.host || '').split(':')[0], body: {} }, res)).catch(reject);
   });
 }
-function boot(apps, tabColors = {}) {
+function boot(apps, tabColors = {}, hub = true) {
   const { app, routes } = fakeApp();
-  require('../../routes/meta')(app, { LAN_IP: () => '10.0.0.5', IS_HUB: true, db: { getApps: () => apps, getApp: (id) => apps.find(a => a.id === id) || null, getTabColors: () => tabColors, upsertApp: () => {} }, dbg: () => {}, QRCode: require('qrcode'), PORT: 9875, home, faviconsDir });
+  require('../../routes/meta')(app, { LAN_IP: () => '10.0.0.5', IS_HUB: hub, db: { getApps: () => apps, getApp: (id) => apps.find(a => a.id === id) || null, getTabColors: () => tabColors, upsertApp: () => {} }, dbg: () => {}, QRCode: require('qrcode'), PORT: 9875, home, faviconsDir });
   return routes;
 }
 
@@ -65,4 +65,11 @@ test('capabilities detects MCP (project .mcp.json or global ref), API dirs, and 
   assert.deepEqual(r.body['zzz-api'], { api: true, cli: true });
   assert.deepEqual(r.body['zzz-plain'], { mcp: true, mcpName: 'plainsrv', cli: true, cliBin: 'zzz-plain-cli' });
   assert.equal(r.body['zzz-gone'], undefined, 'a missing dir is skipped');
+});
+
+test('on an agent the 6 hub-only routes are not registered at all; the dashboard support routes are', () => {
+  const routes = boot([], {}, false);
+  for (const r of ['GET /api/tab-colors', 'GET /api/consistency', 'GET /api/app-profiles', 'PUT /api/app-profiles/:id', 'GET /api/icon-sync', 'GET /api/capabilities']) assert.equal(routes[r], undefined, `${r} must not exist on an agent`);
+  for (const r of ['GET /api/favicons', 'GET /api/manifest', 'GET /api/qr']) assert.equal(typeof routes[r], 'function', `${r} serves every role`);
+  const hub = boot([]); assert.equal(typeof hub['PUT /api/app-profiles/:id'], 'function');
 });
