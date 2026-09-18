@@ -18,10 +18,10 @@ test('L1 only kickstarts', async () => {
   assert.deepEqual(calls, [startCmd(501, 'com.example.x', '/tmp/x.plist')]);
 });
 
-test('L2 frees the port, then bootout + bootstrap', async () => {
+test('L2 frees the port, boots out, then starts through the shared start command (a bare bootstrap would load but never start)', async () => {
   const { calls, deps } = fakeDeps(); await runLevel(2, APP, deps);
   assert.equal(calls[0], 'killPort:4000');
-  assert.match(calls[1], /^launchctl bootout gui\/501\/com\.example\.x .*; sleep 1; launchctl bootstrap gui\/501 "\/tmp\/x\.plist"/);
+  assert.equal(calls[1], `${bootoutCmd(501, 'com.example.x')}; sleep 1; ${startCmd(501, 'com.example.x', '/tmp/x.plist')}`);
   assert.equal(calls.length, 2);
 });
 
