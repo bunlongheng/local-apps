@@ -38,6 +38,7 @@ function boot(apps, { taken = null, nextPort = 3999, tailscale = null } = {}) {
     validateAppFields: () => null, isValidId: (id) => /^[a-z0-9-]+$/.test(id), isChromeExtensionRepo: () => false, CHROME_EXT_ERROR: 'ext', addCaddyEntry: (h, p) => calls.push(`caddy:add:${h}:${p}`), renameCaddyEntry: (o, n, p) => calls.push(`caddy:rename:${o}:${n}:${p}`),
   };
   require('../../routes/apps')(app, ctx);
+  routes.__sse = ctx.sseClients;
   return { routes, calls, db, states };
 }
 const A = { id: 'a', name: 'A', localUrl: 'http://localhost:4000', launchAgent: 'com.t.a', launchAgentPath: '/tmp/a.plist', disabled: false };
@@ -136,4 +137,21 @@ test('GET /api/status derives mode from the start command and rewrites LAN and T
   assert.equal(r.body.tailscaleIp, '100.64.0.9'); assert.equal(r.body.monitorUrl, 'http://10.0.0.5:9875');
   const off = await call(boot(apps).routes['GET /api/status']);
   assert.equal(off.body.apps[0].tailscaleUrl, null, 'no tailnet, no tailscale url');
+});
+
+test('an SSE client is tracked while connected; its heartbeat stops and it leaves the set on close', async () => {
+  mock.timers.enable({ apis: ['setInterval'] });
+  try {
+    const { EventEmitter } = require('node:events');
+    const { routes } = boot([A]);
+    const sseClients = routes.__sse;   // exposed by boot below
+    const writes = [];
+    const res = Object.assign(new EventEmitter(), { setHeader() {}, flushHeaders() {}, write: (c) => writes.push(c) });
+    routes['GET /api/events']({ params: {}, query: {}, headers: {}, get: () => undefined, socket: { remoteAddress: '127.0.0.1' } }, res);
+    assert.equal(sseClients.size, 1, 'connected client tracked');
+    mock.timers.tick(25000); assert.deepEqual(writes, [': ping\n\n'], 'heartbeat after 25s');
+    res.emit('close');
+    assert.equal(sseClients.size, 0, 'gone on close');
+    mock.timers.tick(50000); assert.equal(writes.length, 1, 'no heartbeat after close: the interval was cleared');
+  } finally { mock.timers.reset(); }
 });
