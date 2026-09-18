@@ -4,6 +4,7 @@
 // and routes-notoken.
 const assert = require('node:assert');
 const fs = require('node:fs');
+const path = require('node:path');
 const cp = require('node:child_process');
 const { mock } = require('node:test');
 
@@ -17,9 +18,11 @@ module.exports = function requireHermetic(scratchHome) {
   const promised = BASE.map((f) => mock.method(fs.promises, f));
   const app = require('../../../server');
   for (const sp of shell) assert.equal(sp.mock.callCount(), 0, 'importing server.js must not shell out');
+  const readOnlyOpen = (flags) => flags === undefined || flags === 'r' || flags === 'rs' || flags === fs.constants.O_RDONLY;   // anything else, string or numeric, is a write
   const check = (name, calls) => { for (const c of calls) {
-    if (/^open/.test(name) && !/[wa+]/.test(String(typeof c.arguments[1] === 'string' ? c.arguments[1] : 'r'))) continue;   // a read-only open is not a write
-    assert.ok(String(c.arguments[0]).startsWith(scratchHome), `import wrote outside the scratch home (${name}): ${c.arguments[0]}`);
+    if (/^(promises\.)?open(Sync)?$/.test(name) && readOnlyOpen(c.arguments[1])) continue;
+    const p = String(c.arguments[0]);
+    assert.ok(p === scratchHome || p.startsWith(scratchHome + path.sep), `import wrote outside the scratch home (${name}): ${p}`);   // directory boundary, not a bare prefix
   } };
   writes.forEach((sp, i) => check(WRITE_APIS[i], sp.mock.calls));
   promised.forEach((sp, i) => check('promises.' + BASE[i], sp.mock.calls));
