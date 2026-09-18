@@ -121,23 +121,20 @@ test('meta: /api/consistency?id= is sanitised to [a-z0-9-] and audits that app o
   assert.equal(body[0].id, 'zzz-profrm', 'shell metacharacters are stripped from the id before any file check');
 });
 
-test('/api/status says whether the viewer is on the box; the SSE stream pings every 25s', async () => {
-  const { mock } = require('node:test');
+test('/api/status says whether the viewer is on the box; the SSE stream pings every 25s', async (t) => {
   assert.equal((await (await fetch(base + '/api/status')).json()).viewer, 'loopback');
   assert.equal((await (await fetch(base + '/api/status', { headers: { 'x-forwarded-for': '1.2.3.4' } })).json()).viewer, 'offbox');
-  mock.timers.enable({ apis: ['setInterval'] });
-  try {
-    const http = require('node:http');
-    const frame = await new Promise((resolve, reject) => {
-      const rq = http.get(base + '/api/events', (r) => {
-        assert.match(r.headers['content-type'], /text\/event-stream/);
-        r.once('data', (c) => { resolve(String(c)); rq.destroy(); });
-        setImmediate(() => mock.timers.tick(25000));   // the handler's interval is registered once headers are out
-      });
-      rq.on('error', reject);
+  t.mock.timers.enable({ apis: ['setInterval'] });   // the context's tracker: restored pass or fail
+  const http = require('node:http');
+  const { headers, frame } = await new Promise((resolve, reject) => {
+    const rq = http.get(base + '/api/events', (r) => {
+      r.once('data', (c) => { resolve({ headers: r.headers, frame: String(c) }); rq.destroy(); });
+      setImmediate(() => t.mock.timers.tick(25000));   // the handler's interval is registered once headers are out
     });
-    assert.equal(frame, ': ping\n\n');
-  } finally { mock.timers.reset(); }
+    rq.on('error', reject);
+  });
+  assert.match(headers['content-type'], /text\/event-stream/);
+  assert.equal(frame, ': ping\n\n');
 });
 
 test('/api/log/:id returns exactly the last 30 lines of a log larger than the 64KB tail, and [] for a missing file', async () => {
@@ -190,15 +187,13 @@ test('POST and PUT /api/apps refuse a localPath whose repo root holds a Chrome e
   assert.equal((await (await fetch(base + '/api/apps/zzz-prof')).json()).localPath, '/tmp/zzz-prof', 'row unchanged');
 });
 
-test('the global error handler answers 500 with a fixed message: no exception detail leaks', async () => {
-  const { mock } = require('node:test');
+test('the global error handler answers 500 with a fixed message: no exception detail leaks', async (t) => {
   const db = require('../../db');
-  const m = mock.method(db, 'getApps', () => { throw new Error('secret detail'); });
-  const err = mock.method(console, 'error', () => {});
-  try {
-    const r = await fetch(base + '/api/status');
-    assert.equal(r.status, 500); assert.deepEqual(await r.json(), { error: 'Internal error' });
-    assert.equal(err.mock.callCount(), 1); assert.match(String(err.mock.calls[0].arguments[0]), /secret detail/, 'the detail goes to the server log only');
-  } finally { m.mock.restore(); err.mock.restore(); }
+  const m = t.mock.method(db, 'getApps', () => { throw new Error('secret detail'); });
+  const err = t.mock.method(console, 'error', () => {});
+  const r = await fetch(base + '/api/status');
+  assert.equal(r.status, 500); assert.deepEqual(await r.json(), { error: 'Internal error' });
+  assert.equal(err.mock.callCount(), 1); assert.match(String(err.mock.calls[0].arguments[0]), /secret detail/, 'the detail goes to the server log only');
+  m.mock.restore(); err.mock.restore();
   assert.equal((await fetch(base + '/api/status')).status, 200, 'the server is fine afterwards');
 });
