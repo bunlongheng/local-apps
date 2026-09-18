@@ -10,14 +10,19 @@ const { mock } = require('node:test');
 module.exports = function requireHermetic(scratchHome) {
   assert.equal(require.cache[require.resolve('../../../server')], undefined, 'server must not be preloaded: this file needs its own process');
   const shell = ['execSync', 'exec', 'execFile', 'spawn', 'spawnSync'].map((f) => mock.method(cp, f));
-  const WRITE_APIS = ['mkdirSync', 'writeFileSync', 'appendFileSync', 'copyFileSync', 'renameSync', 'rmSync', 'rmdirSync', 'unlinkSync', 'openSync'];
+  // Sync, callback and promise forms: a call is recorded at import even when its I/O completes later.
+  const BASE = ['mkdir', 'writeFile', 'appendFile', 'copyFile', 'rename', 'rm', 'rmdir', 'unlink', 'open'];
+  const WRITE_APIS = [...BASE.map((f) => f + 'Sync'), ...BASE, 'createWriteStream'];
   const writes = WRITE_APIS.map((f) => mock.method(fs, f));
+  const promised = BASE.map((f) => mock.method(fs.promises, f));
   const app = require('../../../server');
   for (const sp of shell) assert.equal(sp.mock.callCount(), 0, 'importing server.js must not shell out');
-  for (const [i, sp] of writes.entries()) for (const c of sp.mock.calls) {
-    if (WRITE_APIS[i] === 'openSync' && !/[wa+]/.test(String(c.arguments[1] || 'r'))) continue;   // a read-only open is not a write
-    assert.ok(String(c.arguments[0]).startsWith(scratchHome), `import wrote outside the scratch home (${WRITE_APIS[i]}): ${c.arguments[0]}`);
-  }
-  [...shell, ...writes].forEach((sp) => sp.mock.restore());
+  const check = (name, calls) => { for (const c of calls) {
+    if (/^open/.test(name) && !/[wa+]/.test(String(typeof c.arguments[1] === 'string' ? c.arguments[1] : 'r'))) continue;   // a read-only open is not a write
+    assert.ok(String(c.arguments[0]).startsWith(scratchHome), `import wrote outside the scratch home (${name}): ${c.arguments[0]}`);
+  } };
+  writes.forEach((sp, i) => check(WRITE_APIS[i], sp.mock.calls));
+  promised.forEach((sp, i) => check('promises.' + BASE[i], sp.mock.calls));
+  [...shell, ...writes, ...promised].forEach((sp) => sp.mock.restore());
   return app;
 };
