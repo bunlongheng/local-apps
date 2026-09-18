@@ -19,7 +19,8 @@ module.exports = function requireHermetic(scratchHome) {
   const MUTATOR = /^(mkdir|mkdtemp|write|writev|append|copy|cp|rename|rm|unlink|symlink|link|truncate|chmod|chown|lchmod|lchown|utimes|lutimes|open|fchmod|fchown|ftruncate|futimes)/;
   const known = new Set([...BASE, ...FD_BASE, 'createWriteStream', 'openAsBlob', 'opendir']);   // openAsBlob/opendir read
   for (const k of Object.keys(fs)) if (MUTATOR.test(k) && typeof fs[k] === 'function') assert.ok(known.has(k.replace(/Sync$/, '')), `fs.${k} is not covered by the hermetic import spies`);
-  const WRITE_APIS = [...BASE.map((f) => f + 'Sync'), ...BASE, 'createWriteStream'];
+  // Some mutators are platform-specific (lchmod is macOS-only), so spy what this fs exports.
+  const WRITE_APIS = [...BASE.map((f) => f + 'Sync'), ...BASE, 'createWriteStream'].filter((f) => typeof fs[f] === 'function');
   const writes = WRITE_APIS.map((f) => mock.method(fs, f));
   const fdWrites = [...FD_BASE.map((f) => f + 'Sync'), ...FD_BASE].filter((f) => typeof fs[f] === 'function').map((f) => mock.method(fs, f));
   const promised = BASE.filter((f) => typeof fs.promises[f] === 'function').map((f) => mock.method(fs.promises, f));
