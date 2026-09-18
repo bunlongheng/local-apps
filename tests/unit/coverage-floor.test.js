@@ -33,3 +33,15 @@ test('--run measures the file itself into a private temp dir and applies the flo
   assert.equal(fs.readdirSync(dir).filter(f => f.startsWith('coverage-floor-')).length, 0, 'temp dir removed');
   assert.equal(spawnSync(process.execPath, [SCRIPT, '--run', 'public/sw.js', '101', '0', path.join(__dirname, 'sw.test.js')], { encoding: 'utf8', timeout: 120000 }).status, 1, 'floor applies to --run too');
 });
+
+test('--check judges every record of a report: one file under the floor fails even when the rest are fine; --all measures then judges', () => {
+  const lcov2 = path.join(dir, 'all.info');
+  fs.writeFileSync(lcov2, ['SF:/repo/lib/good.js', 'LF:100', 'LH:98', 'BRF:10', 'BRH:9', 'end_of_record', 'SF:/repo/lib/weak.js', 'LF:100', 'LH:60', 'BRF:10', 'BRH:9', 'end_of_record', ''].join('\n'));
+  const low = spawnSync(process.execPath, [SCRIPT, '--check', lcov2, '70', '50'], { encoding: 'utf8' });
+  assert.equal(low.status, 1); assert.match(low.stdout, /LOW .*weak\.js/); assert.match(low.stdout, /ok .*good\.js/);
+  assert.equal(spawnSync(process.execPath, [SCRIPT, '--check', lcov2, '50', '50'], { encoding: 'utf8' }).status, 0);
+  assert.equal(spawnSync(process.execPath, [SCRIPT, '--check', path.join(dir, 'missing.info'), '0', '0'], { encoding: 'utf8' }).status, 2);
+  const all = spawnSync(process.execPath, [SCRIPT, '--all', '101', '0', 'public/sw.js', path.join(__dirname, 'sw.test.js')], { encoding: 'utf8', timeout: 120000, env: { ...process.env, TMPDIR: dir } });
+  assert.equal(all.status, 1, all.stdout); assert.match(all.stdout, /LOW .*public\/sw\.js/);
+  assert.equal(spawnSync(process.execPath, [SCRIPT, '--all', '0', '0', 'public/sw.js', path.join(__dirname, 'sw.test.js')], { encoding: 'utf8', timeout: 120000, env: { ...process.env, TMPDIR: dir } }).status, 0);
+});

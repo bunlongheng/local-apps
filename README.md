@@ -105,7 +105,7 @@ public/         vanilla-JS dashboard, service worker, offline page
 scripts/        generate-favicons, consistency, onboard-app.sh, storage-guard.sh (the owner's own tooling, kept for reference)
 tests/          unit/ (every lib module, db, routes, the service worker and the dashboard under jsdom) and e2e/
                 npm test (unit), npm run test:e2e (needs the app on :9875), npm run test:all, npm run lint
-                npm run test:coverage gates every runtime file; npm run test:coverage:dashboard adds a per-file floor on public/app.js
+                npm run test:coverage gates the aggregate; npm run test:coverage:files floors every runtime file; npm run test:coverage:dashboard floors public/app.js
 ```
 
 ## License
