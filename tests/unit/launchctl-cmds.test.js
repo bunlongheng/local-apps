@@ -8,8 +8,6 @@
 // Every start path must enable, bootstrap, then kickstart on the fallback.
 const { test } = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const path = require('node:path');
 const { startCmd, bootoutCmd } = require('../../launchctl-cmds');
 
 const UID = 501;
