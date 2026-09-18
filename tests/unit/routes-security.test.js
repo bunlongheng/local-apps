@@ -19,16 +19,8 @@ process.env.LOCAL_APPS_TOKEN = 'zzz-tok';   // exercises the header wiring; loop
 const FAV_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'favs-'));
 fs.writeFileSync(path.join(FAV_DIR, 'zzz-fav.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
 process.env.LOCAL_APPS_FAVICONS_DIR = FAV_DIR;
-// The import must be hermetic: server.js captures child_process at load, so spies installed here
-// are the functions it would call. Any top-level shell-out outside an IS_MAIN guard fails this.
-const cp = require('node:child_process');
-const importSpies = ['execSync', 'exec', 'execFile', 'spawn', 'spawnSync'].map((f) => require('node:test').mock.method(cp, f));
-// ...and every write at import must land under the scratch home, never the real one.
-const writeSpies = ['mkdirSync', 'writeFileSync'].map((f) => require('node:test').mock.method(fs, f));
-const app = require('../../server');
-for (const sp of importSpies) assert.equal(sp.mock.callCount(), 0, 'importing server.js must not shell out');
-for (const sp of writeSpies) for (const c of sp.mock.calls) assert.ok(String(c.arguments[0]).startsWith(SCRATCH_HOME) || String(c.arguments[0]).startsWith(os.tmpdir()), `import wrote outside the scratch home: ${c.arguments[0]}`);
-[...importSpies, ...writeSpies].forEach((sp) => sp.mock.restore());
+// The import must be hermetic (no shell-out, writes only under the scratch home): see the helper.
+const app = require('./helpers/hermetic-import')(SCRATCH_HOME);
 
 let server, base;
 before(async () => {

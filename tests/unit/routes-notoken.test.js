@@ -7,15 +7,13 @@ const os = require('node:os');
 const path = require('node:path');
 
 const TMP_DB = path.join(os.tmpdir(), `local-apps-notoken-${process.pid}.db`);
-// node:test runs each file in its own process by default; should that ever change (an isolation flag,
-// a shared runner), the cached server module from routes-security would carry its token, so fail loudly.
-assert.equal(require.cache[require.resolve('../../server')], undefined, 'server must not be preloaded: this file needs its own process');
 delete process.env.LOCAL_APPS_TOKEN;
 process.env.LOCAL_APPS_DB = TMP_DB;
 process.env.MACHINE_ROLE = 'hub';
 const SCRATCH_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'home-'));
 process.env.LOCAL_APPS_HOME = SCRATCH_HOME; process.env.LOCAL_APPS_LOG_DIR = path.join(SCRATCH_HOME, 'logs');
-const app = require('../../server');
+// Same hermetic import as routes-security (no shell-out, writes only under the scratch home, not preloaded).
+const app = require('./helpers/hermetic-import')(SCRATCH_HOME);
 
 let server, base;
 before(async () => {
