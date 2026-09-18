@@ -4,6 +4,7 @@ const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const net = require('node:net');
 const fs = require('node:fs');
+const path = require('node:path');
 const http = require('node:http');
 const { api, serverUp } = require('./helpers');
 
@@ -72,11 +73,45 @@ test('GET /api/machine and /api/machines answer with their shapes', async () => 
   assert.equal((await api('GET', '/api/machines/zzz-no-such-machine/status')).status, 404);
 });
 
-test('hub-only routes answer when the instance is a hub (skipped on an agent)', async (t) => {
+test('hub-only routes answer on a hub and are 404 on an agent', async () => {
   const role = (await api('GET', '/api/status')).json.machineRole;
-  if (role !== 'hub') return t.skip('instance is not a hub');
+  if (role !== 'hub') {
+    for (const p of ['/api/tab-colors', '/api/consistency', '/api/app-profiles', '/api/icon-sync', '/api/capabilities']) assert.equal((await api('GET', p)).status, 404, `${p} is not registered on an agent`);
+    assert.equal((await api('PUT', '/api/app-profiles/zzz', { about: 'x' })).status, 404);
+    return;
+  }
   const tc = await api('GET', '/api/tab-colors'); assert.equal(tc.status, 200); assert.equal(typeof tc.json, 'object');
   const c = await api('GET', '/api/consistency?id=zzz-not-real'); assert.equal(c.status, 200); assert.ok(Array.isArray(c.json) && c.json.length === 1 && c.json[0].id === 'zzz-not-real');
   const prof = await api('GET', '/api/app-profiles'); assert.equal(prof.status, 200);
   assert.equal((await api('GET', '/api/machines')).status, 200);
+});
+
+// The launchd contract for real, macOS only: a tiny node server registered with its own start
+// command must come up through POST /api/start (kickstart -k, falling back to enable + bootstrap +
+// kickstart on a fresh label) and go down through POST /api/stop. Every earlier proof of this was
+// a command string.
+const LAUNCHD_ID = 'zzz-e2e-launchd';
+test('on macOS an app registered with a start command is started and stopped through launchd for real', { skip: !(MUTATE && process.platform === 'darwin' && process.env.LAUNCH_AGENTS_DIR) && 'needs E2E_MUTATE=1, macOS and a scratch LAUNCH_AGENTS_DIR' }, async () => {
+  const os = require('node:os');
+  const { execSync } = require('node:child_process');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'launchd-app-'));
+  const port = await freePort();
+  fs.writeFileSync(path.join(dir, 'server.js'), `require('http').createServer((q, r) => r.end('ok')).listen(${port}, '127.0.0.1');\n`);
+  await api('DELETE', `/api/apps/${LAUNCHD_ID}`);
+  try {
+    const created = await api('POST', '/api/apps', { id: LAUNCHD_ID, name: 'Launchd', localPath: dir, localUrl: `http://127.0.0.1:${port}`, healthUrl: `http://127.0.0.1:${port}`, startCommand: 'node server.js' });
+    assert.equal(created.status, 201, JSON.stringify(created.json));
+    assert.ok(fs.existsSync(created.json.launchAgentPath), 'plist written');
+    assert.equal((await api('POST', `/api/start/${LAUNCHD_ID}`)).status, 200);
+    const status = async () => (await api('GET', '/api/status')).json.apps.find((a) => a.id === LAUNCHD_ID).status;
+    let up = false; for (let i = 0; i < 60 && !up; i++) { await new Promise((r) => setTimeout(r, 500)); up = (await status()) === 'up'; }
+    assert.ok(up, 'launchd brought the app up within 30s (launchctl print gui/' + process.getuid() + '/' + created.json.launchAgent + ')');
+    assert.equal((await api('POST', `/api/stop/${LAUNCHD_ID}`)).status, 200);
+    let down = false; for (let i = 0; i < 40 && !down; i++) { await new Promise((r) => setTimeout(r, 500)); down = (await status()) === 'down'; }
+    assert.ok(down, 'stop brought it down');
+    assert.throws(() => execSync(`launchctl print gui/${process.getuid()}/${created.json.launchAgent}`, { stdio: 'ignore' }), 'the service is no longer loaded after stop');
+  } finally {
+    await api('DELETE', `/api/apps/${LAUNCHD_ID}`);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
