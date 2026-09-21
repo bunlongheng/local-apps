@@ -108,10 +108,6 @@ tests/          unit/ (every lib module, db, routes, the service worker and the 
                 npm run test:coverage gates the aggregate; npm run test:coverage:files floors every runtime file; npm run test:coverage:dashboard floors public/app.js
 ```
 
-## License
-
-[MIT](LICENSE) (c) Bunlong Heng
-
 ---
 
 <div align="center">
