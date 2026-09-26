@@ -344,12 +344,13 @@
     else if (S.error) h += '<tr><td class="empty" colspan="4">' + (S.activeMachine ? "Machine unreachable - retrying..." : "Monitor unreachable - retrying...") + "</td></tr>";
     else if (!apps.length) h += '<tr><td class="empty" colspan="4">No apps</td></tr>';
     else apps.forEach(function (app) {
-      var best = isTail ? (app.tailscaleUrl || app.lanUrl || "#") : lanish ? (app.lanUrl || "#") : (app.localUrl || "#");
-      var hostU = lanish ? (app.lanUrl || app.localUrl || "#") : (app.caddyUrl || app.localUrl || "#");
+      var peer = !!S.activeMachine;   // a peer's localhost is not this box: name, icon and hostname all open its LAN ip
+      var best = isTail ? (app.tailscaleUrl || app.lanUrl || "#") : (lanish || peer) ? (app.lanUrl || "#") : (app.localUrl || "#");
+      var hostU = (lanish || peer) ? (app.lanUrl || app.localUrl || "#") : (app.caddyUrl || app.localUrl || "#");
       var lanU = isTail ? (app.tailscaleUrl || "#") : (app.lanUrl || app.localUrl || "#");
       h += '<tr data-act="open" data-id="' + esc(app.id) + '" tabindex="0">';
       h += '<td class="col-app"><div class="app-cell">' + dotHTML(app) + '' +
-        appIcon(app.id, app.name, app.icon, 32, app.status !== "up") +
+        '<a class="app-icon-link" ' + linkAttrs(best) + '>' + appIcon(app.id, app.name, app.icon, 32, app.status !== "up") + "</a>" +
         '<div class="app-meta"><a class="app-name' + (app.disabled ? " disabled" : "") + '" ' + linkAttrs(best) + '>' + esc(app.name) + "</a>";
       if (S.startingApps[app.id]) {
         var s = S.startupState[app.id] || { phase: "wait", label: "Starting...", percent: 5 };

@@ -178,6 +178,9 @@ test('modal tabs switch the active pane; a discovered peer renders a machine tab
   assert.equal(tabs.length, 2, 'local + 1 peer');
   tabs[1].click(); await t.settle();
   assert.match(t.root().querySelector('tr[data-act="open"]').textContent, /Remote A/);
+  assert.equal(t.root().querySelector('a.app-name').getAttribute('href'), 'http://10.0.0.7:5000', 'peer app name opens its LAN ip, never the hub localhost');
+  assert.equal(t.root().querySelector('a.app-icon-link').getAttribute('href'), 'http://10.0.0.7:5000', 'peer app icon opens the same LAN ip');
+  assert.equal(t.root().querySelector('td.col-hostname a').getAttribute('href'), 'http://10.0.0.7:5000');
   t.root().querySelector('tr[data-act="open"]').click(); await t.settle();
   assert.equal(t.root().querySelector('[data-act="toggle"]'), null); assert.match(t.root().textContent, /read-only on a peer/);
 });
