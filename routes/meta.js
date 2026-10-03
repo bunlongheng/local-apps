@@ -222,11 +222,28 @@ module.exports = function register(app, ctx) {
           if (pkg.bin) flags.cli = true;
         }
         if (fs.existsSync(path.join(dir, 'cli.js')) || fs.existsSync(path.join(dir, 'bin', 'cli.js'))) flags.cli = true;
+        // A ~/.local/bin script counts only when its NAME is the app's own command.
+        // Matching on file CONTENT was wrong: "double precision" in a SQL script claimed the
+        // precision app, "escape sequences" claimed sequences, and any script that merely
+        // read another app's .env claimed that app too.
+        const base = (b) => b.replace(/\.(sh|js|mjs|py|ts)$/, '');
         for (const b of localBins) {
           if (b === 'tabs' || b === 'tab') continue; // Skip tab manager (matches all apps)
-          const content = localBinText.get(b) || '';
-          if (content.includes(a.id) || content.includes(dir)) { flags.cli = true; flags.cliBin = b; break; }
+          const n = base(b);
+          if (n === a.id || n.startsWith(a.id + '-') || a.id.startsWith(n + '-')) { flags.cli = true; flags.cliBin = b; break; }
         }
+      } catch (e) { dbg('meta', e); }
+
+      // Headless: a real project (package.json / Cargo.toml) with no web UI dir, or one that calls itself headless
+      try {
+        const pkgPath = path.join(dir, 'package.json'), cargoPath = path.join(dir, 'Cargo.toml');
+        let desc = '';
+        if (fs.existsSync(pkgPath)) desc += (JSON.parse(fs.readFileSync(pkgPath, 'utf8')).description || '');
+        if (fs.existsSync(cargoPath)) desc += ' ' + ((fs.readFileSync(cargoPath, 'utf8').match(/^description\s*=\s*"([^"]*)"/m) || [])[1] || '');
+        const isProject = fs.existsSync(pkgPath) || fs.existsSync(cargoPath);
+        const hasUi = ['public/index.html', 'app', 'pages', 'src/app', 'src/pages', 'index.html', 'views', 'templates', 'resources/views', 'web'].some(f => fs.existsSync(path.join(dir, f)))
+          || fs.readdirSync(dir).some(f => f.endsWith('.html'));
+        if (isProject && (!hasUi || /\bheadless\b|\bno ui\b/i.test(desc))) flags.headless = true;
       } catch (e) { dbg('meta', e); }
 
       if (Object.keys(flags).length > 0) result[a.id] = flags;

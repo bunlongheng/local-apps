@@ -135,6 +135,8 @@ a.badge-link { text-decoration: none; display: inline-flex; align-items: center;
 .modal-tab-title { font-size: 14px; font-weight: 700; color: var(--text-strong); }
 .tab-chip { margin-left: auto; margin-right: 30px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; cursor: pointer; flex-shrink: 0; box-shadow: 0 1px 6px rgba(0,0,0,0.35); transition: filter 0.15s; }
 .tab-chip:hover { filter: brightness(1.12); }
+.headless-badge { margin-left: auto; margin-right: 30px; flex-shrink: 0; }
+.headless-badge + .tab-chip { margin-left: 0; }
 .tab-chip-icon { font-size: 12px; line-height: 1; }
 .tab-chip-logo { width: 16px; height: 16px; border-radius: 4px; object-fit: contain; display: block; background: rgba(255,255,255,0.18); }
 .tab-chip-alias { font-size: 12px; font-weight: 700; color: var(--text-strong); letter-spacing: 0.02em; }

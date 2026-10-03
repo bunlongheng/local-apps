@@ -57,13 +57,20 @@ test('capabilities detects MCP (project .mcp.json or global ref), API dirs, and 
   const mcp = mk('zzz-mcp', { '.mcp.json': '{}', 'package.json': '{}' });
   const api = mk('zzz-api', { 'app/api/route.js': '', 'package.json': '{"bin":"cli.js"}' });
   const plain = mk('zzz-plain', { 'index.js': '' });
+  const rust = mk('zzz-rust', { 'Cargo.toml': '[package]\nname = "zzz-rust"\n', 'src/main.rs': '' });
+  const relay = mk('zzz-relay', { 'package.json': '{"description":"1 headless relay"}', 'public/index.html': '' });
   write('.claude/.mcp.json', JSON.stringify({ mcpServers: { plainsrv: { args: ['/x/zzz-plain/server.js'] } } }));
   write('.local/bin/zzz-plain-cli', '#!/bin/sh\nnode /x/zzz-plain/cli.js\n');
-  const routes = boot([{ id: 'zzz-mcp', localPath: mcp }, { id: 'zzz-api', localPath: api }, { id: 'zzz-plain', localPath: plain }, { id: 'zzz-gone', localPath: path.join(home, 'nope') }]);
+  write('.local/bin/unrelated-tool', '#!/bin/sh\n# merely mentions zzz-mcp in a comment\n');
+  const routes = boot([{ id: 'zzz-mcp', localPath: mcp }, { id: 'zzz-api', localPath: api }, { id: 'zzz-plain', localPath: plain }, { id: 'zzz-rust', localPath: rust }, { id: 'zzz-relay', localPath: relay }, { id: 'zzz-gone', localPath: path.join(home, 'nope') }]);
   const r = await call(routes['GET /api/capabilities']);
-  assert.deepEqual(r.body['zzz-mcp'], { mcp: true, mcpPath: path.join(mcp, '.mcp.json') });
+  assert.deepEqual(r.body['zzz-mcp'], { mcp: true, mcpPath: path.join(mcp, '.mcp.json'), headless: true }, 'a package with no web UI dir is headless');
+  assert.equal(r.body['zzz-mcp'].cli, undefined, 'a bin script that only mentions the app in its text is not that app CLI');
   assert.deepEqual(r.body['zzz-api'], { api: true, cli: true });
   assert.deepEqual(r.body['zzz-plain'], { mcp: true, mcpName: 'plainsrv', cli: true, cliBin: 'zzz-plain-cli' });
+  assert.deepEqual(r.body['zzz-rust'], { headless: true }, 'a manifest with no web UI dir is headless');
+  assert.deepEqual(r.body['zzz-relay'], { headless: true }, 'a package that calls itself headless is headless even with a public/ dir');
+  assert.equal(r.body['zzz-plain'].headless, undefined, 'no manifest, no verdict');
   assert.equal(r.body['zzz-gone'], undefined, 'a missing dir is skipped');
 });
 

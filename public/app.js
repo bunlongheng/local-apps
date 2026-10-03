@@ -453,11 +453,13 @@
     h += '<button class="modal-close" data-act="close" aria-label="Close">✕</button>';
     h += '<div class="modal-head"><div class="modal-head-inner">' + dotHTML(app) + '' + appIcon(app.id, app.name, app.icon, 32, app.status !== "up") +
       '<span class="modal-title">' + esc(app.name) + "</span>";
-    h += '<div class="badges">' + badges.map(function (b) {
+    h += '<div class="badges">' + badges.filter(function (b) { return b.active; }).map(function (b) {
       var span = '<span class="badge' + (b.active ? " active" : "") + '" title="' + esc(b.title) + '">' + b.label + "</span>";
       return b.href ? '<a class="badge-link" ' + linkAttrs(b.href) + '>' + span + "</a>" : span;
     }).join("") + "</div>";
     h += "</div>"; // close modal-head-inner
+    // HEADLESS sits on its own at the right edge: it describes what the app is, not a capability it has
+    if (caps.headless) h += '<span class="badge active headless-badge" title="Headless: no web UI, reach it by CLI, API or MCP">HEADLESS</span>';
     // claude-tab chip (top-right): the app's _alias, its color, click-to-copy the full launch command
     var tc = S.tabColors[app.id];
     if (tc && tc.alias) {

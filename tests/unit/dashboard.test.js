@@ -252,13 +252,13 @@ test('start posts, shows the startup phase from the 2s log poll, and gives up af
 });
 
 test('on a hub the modal renders the profile panel, capability badges and the tab chip; the stored token is forwarded on control calls', async () => {
-  const hub = { 'app-profiles': { alpha: { about: 'Alpha is the reference app', architect: 'One process' } }, capabilities: { alpha: { mcp: true, mcpName: 'alpha-mcp', api: true } }, 'icon-sync': { alpha: { hasFavicon: true, hasAppIcon: true, synced: true } }, 'tab-colors': { alpha: { label: 'ALPHA', color: '#123456', alias: '_alpha' } } };
+  const hub = { 'app-profiles': { alpha: { about: 'Alpha is the reference app', architect: 'One process' } }, capabilities: { alpha: { mcp: true, mcpName: 'alpha-mcp', api: true, headless: true } }, 'icon-sync': { alpha: { hasFavicon: true, hasAppIcon: true, synced: true } }, 'tab-colors': { alpha: { label: 'ALPHA', color: '#123456', alias: '_alpha' } } };
   const t = boot({ status: { ...ON, machineRole: 'hub' }, hub, token: 'tok-123' });
   await t.settle(() => t.gets.includes('/api/tab-colors'));
   await t.settle();
   t.root().querySelector('tr[data-act="open"]').click(); await t.settle();
   const chip = t.root().querySelector('.tab-chip'); assert.ok(chip, 'tab chip from tab-colors'); assert.equal(chip.getAttribute('data-copy'), '_alpha');
-  assert.match(t.root().querySelector('.modal').textContent, /MCP/); assert.match(t.root().querySelector('.modal').innerHTML, /alpha-mcp/);
+  assert.match(t.root().querySelector('.modal').textContent, /MCP/); assert.match(t.root().querySelector('.modal').innerHTML, /alpha-mcp/); assert.match(t.root().querySelector('.modal').textContent, /HEADLESS/); assert.doesNotMatch(t.root().querySelector('.modal .badges').textContent, /CLI/, 'inactive capabilities are not rendered');
   t.root().querySelector('[data-act="tab"][data-tab="about"]').click(); await t.settle();
   assert.match(t.root().querySelector('.panel').textContent, /Alpha is the reference app/, 'profile panel from app-profiles');
   t.root().querySelector('[data-act="tab"][data-tab="info"]').click(); await t.settle();
