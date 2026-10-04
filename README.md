@@ -42,6 +42,10 @@ Caddy proxies and LaunchAgents are macOS features (Homebrew Caddy). Elsewhere th
 
 ## How it works
 
+[![Local Apps architecture](docs/screenshots/architecture.gif)](https://flows-bheng.vercel.app/?name=local-apps-hub-5-apps-up-self-healing)
+
+<sub>Who opens it, the hub process, the host, the apps it supervises, and the L1 to L5 healing ladder. Click through for the interactive version.</sub>
+
 One Node 22 process on `node:http`, no framework, no build step. `server.js` serves the vanilla-JS dashboard in `public/` and owns the API, backed by SQLite. When an app goes down:
 
 | Level | After | Action |
