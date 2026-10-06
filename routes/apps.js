@@ -50,6 +50,7 @@ module.exports = function register(app, ctx) {
         hostname: os.hostname(),
         tabColor: a.tabColor || null,
         tabIcon: a.tabIcon || null,
+        sortOrder: a.sortOrder || 0,
       };
     });
     res.json({ apps: apps.map(a => forViewer(req, a)), viewer: isLoopback(clientAddress(req)) ? 'loopback' : 'offbox', lanIp: ctx.LAN_IP(), tailscaleIp: ctx.TAILSCALE_IP(), machineModel: ctx.MACHINE_MODEL(), machineRole: MACHINE_ROLE, monitorUrl: `http://${ctx.LAN_IP()}:${PORT}` });

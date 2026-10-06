@@ -334,6 +334,9 @@
     var isTail = access.mode === "tailscale", lanish = access.mode === "lan" || access.mode === "remote";
     var apps = S.apps.slice().sort(function (a, b) {
       if (!!a.disabled !== !!b.disabled) return a.disabled ? 1 : -1;
+      // Pinned apps (sort_order > 0) hold a fixed spot at the top whatever their status; 0 = unpinned.
+      var ap = a.sortOrder || 0, bp = b.sortOrder || 0;
+      if (ap !== bp) return (ap || 1e9) - (bp || 1e9);
       var o = { up: 0, starting: 1, unknown: 2, down: 3 };
       return (o[a.status] == null ? 2 : o[a.status]) - (o[b.status] == null ? 2 : o[b.status]);
     });
@@ -558,7 +561,11 @@
           return (a.name || a.id).localeCompare(b.name || b.id);
         });
     } else {
-      apps.sort(function (a, b) { return (a.name || a.id).localeCompare(b.name || b.id); });
+      apps.sort(function (a, b) {
+        var ap = a.sortOrder || 0, bp = b.sortOrder || 0;
+        if (ap !== bp) return (ap || 1e9) - (bp || 1e9);
+        return (a.name || a.id).localeCompare(b.name || b.id);
+      });
     }
     cmdk.matches = apps.slice(0, 8);
     if (cmdk.i >= cmdk.matches.length) cmdk.i = Math.max(0, cmdk.matches.length - 1);
