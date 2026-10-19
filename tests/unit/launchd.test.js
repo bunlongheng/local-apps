@@ -115,3 +115,21 @@ test('a bare binary in the start command is resolved to an absolute path (launch
   launchd.createLaunchAgent('zzz-unknown', '/tmp/zzz-unknown', '/tmp/zzz-unknown.log', 'zzz-not-a-real-binary x');
   assert.match(fs.readFileSync(path.join(launchAgentsDir, 'com.tester.zzz-unknown.plist'), 'utf8'), /<string>zzz-not-a-real-binary<\/string>/, 'an unknown binary is passed through for launchd to report');
 });
+
+test('createLaunchAgent sets RunAtLoad true when autoStart is on, KeepAlive stays false', () => {
+  const { launchd } = fresh();
+  const res = launchd.createLaunchAgent('my-app', '/tmp/my-app', '/tmp/my-app.log', 'npm run dev', true);
+  const plist = fs.readFileSync(res.launchAgentPath, 'utf8');
+  assert.match(plist, /<key>RunAtLoad<\/key>\s*<true\/>/);
+  assert.match(plist, /<key>KeepAlive<\/key>\s*<false\/>/);
+});
+
+test('createLaunchAgent flips RunAtLoad without booting out the running app', () => {
+  const { launchd, execCalls } = fresh();
+  launchd.createLaunchAgent('my-app', '/tmp/my-app', '/tmp/my-app.log', 'npm run dev', false);
+  const res = launchd.createLaunchAgent('my-app', '/tmp/my-app', '/tmp/my-app.log', 'npm run dev', true);
+  assert.match(fs.readFileSync(res.launchAgentPath, 'utf8'), /<key>RunAtLoad<\/key>\s*<true\/>/);
+  assert.equal(execCalls.length, 0, 'a RunAtLoad-only change must not stop the app');
+  launchd.createLaunchAgent('my-app', '/tmp/my-app', '/tmp/my-app.log', 'npm start', true);
+  assert.equal(execCalls.length, 1, 'a command change still reloads the service');
+});

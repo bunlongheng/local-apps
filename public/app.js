@@ -258,6 +258,14 @@
       toast(d.disabled ? name + " disabled" : name + " enabled"); render();
     }).catch(function () { toast("Toggle failed", 3000, "error"); render(); });
   }
+  function autoStartApp(id, name) {
+    var app = S.apps.filter(function (a) { return a.id === id; })[0] || {};
+    api("/api/apps/" + id, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ autoStart: !app.autoStart }) }).then(function (d) {
+      S.apps = S.apps.map(function (a) { return a.id === id ? Object.assign({}, a, { autoStart: d.autoStart }) : a; });
+      if (S.modalApp && S.modalApp.id === id) S.modalApp = Object.assign({}, S.modalApp, { autoStart: d.autoStart });
+      toast(name + (d.autoStart ? " starts at login" : " no longer starts at login")); render();
+    }).catch(function () { toast("Auto-start change failed", 3000, "error"); render(); });
+  }
   function deleteApp(id, name) {
     if (!confirm('Delete "' + name + '" and all its data? This removes:\n- Database entry\n- LaunchAgent\n- Caddy proxy\n- Kills running process\n\nThis cannot be undone.')) return;
     api("/api/apps/" + id, { method: "DELETE" }).then(function () {
@@ -479,7 +487,9 @@
     // toggle row: active-tab title on the left, ON/OFF label + switch grouped on the right
     var tabLabel = (PROFILE_TABS.filter(function (t) { return t.key === S.modalTab; })[0] || { label: "" }).label;
     h += '<div class="toggle-row"><span class="modal-tab-title">' + esc(tabLabel) + "</span>" +
-      '<div class="toggle-group"><span class="toggle-label ' + (app.disabled ? "off" : "on") + '">' + (app.disabled ? "OFF" : "ON") + "</span>" +
+      '<div class="toggle-group">' +
+      ((S.activeMachine || S.viewer === "offbox") ? "" : '<button class="chip autostart' + (app.autoStart ? " on" : "") + '" role="switch" aria-checked="' + (app.autoStart ? "true" : "false") + '" title="Start this app at login" data-act="autostart" data-id="' + esc(app.id) + '" data-name="' + esc(app.name) + '">Boot ' + (app.autoStart ? "ON" : "OFF") + "</button>") +
+      '<span class="toggle-label ' + (app.disabled ? "off" : "on") + '">' + (app.disabled ? "OFF" : "ON") + "</span>" +
       ((S.activeMachine || S.viewer === "offbox") ? '<span class="muted">' + (S.activeMachine ? 'read-only on a peer' : 'read-only off-box') + '</span>' : '<button class="toggle ' + (app.disabled ? "off" : "on") + '" role="switch" aria-checked="' + (app.disabled ? "false" : "true") + '" aria-label="' + esc(app.name) + ' enabled" data-act="toggle" data-id="' + esc(app.id) + '" data-name="' + esc(app.name) + '"><span class="toggle-knob" style="left:' + (app.disabled ? 2 : 18) + 'px"></span></button>') + '</div></div>';
     // tabs
     h += '<div class="tabs">' + PROFILE_TABS.map(function (t) {
@@ -496,7 +506,7 @@
     return h;
   }
 
-  var HELP_TEXT = "Register this app with the local-apps monitor.\nInclude ALL fields so the modal is fully populated.\n\nPOST http://local-apps.localhost/api/apps\nContent-Type: application/json\n\nRequired:\n- \"id\": app slug (lowercase, kebab-case)\n- \"name\": display name\n- \"localPath\": absolute path to project root\n\nInfrastructure (auto-generated if omitted):\n- \"localUrl\": defaults to next available port\n- \"healthUrl\": defaults to localUrl\n- \"repo\": GitHub URL\n- \"startCommand\": defaults to \"npm run dev\"\n- \"logPath\": defaults to /tmp/{id}.log\n- \"prodUrl\": production URL\n\nApp Profile (AI should generate these):\n- \"about\": one compelling sentence describing the app\n- \"features\": JSON array of 3-5 top features\n- \"architect\": paragraph on tech stack and architecture\n- \"deploy\": paragraph on how to deploy and run\n- \"security\": JSON array of 3-4 security measures\n- \"performance\": JSON array of 3-4 performance optimizations\n\nThe monitor will automatically:\n1. Assign a dedicated port if not provided\n2. Create a Caddy reverse proxy at http://{id}.localhost\n3. Create a macOS LaunchAgent plist\n4. Begin health-checking\n5. Show the app on the dashboard with its full profile";
+  var HELP_TEXT = "Register this app with the local-apps monitor.\nInclude ALL fields so the modal is fully populated.\n\nPOST http://local-apps.localhost/api/apps\nContent-Type: application/json\n\nRequired:\n- \"id\": app slug (lowercase, kebab-case)\n- \"name\": display name\n- \"localPath\": absolute path to project root\n\nInfrastructure (auto-generated if omitted):\n- \"localUrl\": defaults to next available port\n- \"healthUrl\": defaults to localUrl\n- \"repo\": GitHub URL\n- \"startCommand\": defaults to \"npm run dev\"\n- \"autoStart\": true to start the app at login (default false)\n- \"logPath\": defaults to /tmp/{id}.log\n- \"prodUrl\": production URL\n\nApp Profile (AI should generate these):\n- \"about\": one compelling sentence describing the app\n- \"features\": JSON array of 3-5 top features\n- \"architect\": paragraph on tech stack and architecture\n- \"deploy\": paragraph on how to deploy and run\n- \"security\": JSON array of 3-4 security measures\n- \"performance\": JSON array of 3-4 performance optimizations\n\nThe monitor will automatically:\n1. Assign a dedicated port if not provided\n2. Create a Caddy reverse proxy at http://{id}.localhost\n3. Create a macOS LaunchAgent plist\n4. Begin health-checking\n5. Show the app on the dashboard with its full profile";
 
   function helpHTML() {
     if (!S.helpOpen) return "";
@@ -627,7 +637,7 @@
     if (!el) { if (S.qrOpen) { S.qrOpen = false; render(); } return; }
     var act = el.getAttribute("data-act"), id = el.getAttribute("data-id"), name = el.getAttribute("data-name");
     // A peer's apps are read-only from the hub: those buttons are not rendered, and this guards the rest.
-    if ((S.activeMachine || S.viewer === "offbox") && ["start", "stop", "toggle", "delete"].indexOf(act) >= 0) { toast(S.activeMachine ? "Peer apps are read-only from the hub" : "Read-only off-box: control needs the token on the hub", 3000, "error"); render(); return; }
+    if ((S.activeMachine || S.viewer === "offbox") && ["start", "stop", "toggle", "autostart", "delete"].indexOf(act) >= 0) { toast(S.activeMachine ? "Peer apps are read-only from the hub" : "Read-only off-box: control needs the token on the hub", 3000, "error"); render(); return; }
     switch (act) {
       case "open": openModal(id); break;
       case "close": closeModal(); break;
@@ -637,6 +647,7 @@
       case "start": startApp(id); break;
       case "stop": stopApp(id); break;
       case "toggle": toggleApp(id, name); break;
+      case "autostart": autoStartApp(id, name); break;
       case "delete": deleteApp(id, name); break;
       case "copy": copy(el.getAttribute("data-copy")); break;
       case "search": e.stopPropagation(); openCmdK(); break;

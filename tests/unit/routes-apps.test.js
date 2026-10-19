@@ -153,3 +153,12 @@ test('an SSE client is tracked while connected; its heartbeat stops and it leave
     t.mock.timers.tick(50000); assert.equal(writes.length, 1, 'no heartbeat after close: the interval was cleared');
   }
 });
+
+test('PUT autoStart re-provisions the LaunchAgent and persists the flag', async () => {
+  const { routes, calls, db } = boot([A]);
+  const u = await call(routes['PUT /api/apps/:id'], { params: { id: 'a' }, body: { autoStart: true } });
+  assert.equal(u.status, 200); assert.equal(db.getApp('a').autoStart, true);
+  assert.ok(calls.some(x => x.startsWith('setupInfra:a')), 'toggling autoStart rewrites the plist');
+  await call(routes['PUT /api/apps/:id'], { params: { id: 'a' }, body: { autoStart: false } });
+  assert.equal(db.getApp('a').autoStart, false);
+});

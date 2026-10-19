@@ -167,9 +167,9 @@ module.exports = function register(app, ctx) {
     const conflict = portConflict(req.body, req.params.id);
     if (conflict) return res.status(409).json(conflict);
 
-    // Re-setup infra if localUrl or localPath changed
+    // Re-setup infra if localUrl, localPath, startCommand or autoStart changed
     const data = { ...req.body, id: req.params.id };
-    if (data.localUrl || data.localPath) {
+    if (data.localUrl || data.localPath || data.startCommand || 'autoStart' in data) {
       const infra = setupInfra(req.params.id, { ...existing, ...data });
       Object.assign(data, infra);
     }

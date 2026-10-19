@@ -88,3 +88,10 @@ test('manifestLabel names the PWA by how the dashboard was reached', () => {
   assert.equal(manifestLabel('local-apps.localhost'), 'Apps (Caddy)'); assert.equal(manifestLabel('local-apps.localhost:9875'), 'Apps (Caddy)');
   assert.equal(manifestLabel('localhost:9875'), 'Local Apps'); assert.equal(manifestLabel(''), 'Local Apps');
 });
+
+test('validateAppFields accepts a boolean autoStart and rejects anything else', () => {
+  assert.equal(validateAppFields({ autoStart: true }), null);
+  assert.equal(validateAppFields({ autoStart: false }), null);
+  assert.match(validateAppFields({ autoStart: 'yes' }), /autoStart/);
+  assert.match(validateAppFields({ autoStart: 1 }), /autoStart/);
+});
