@@ -41,6 +41,8 @@ try { db.exec(`ALTER TABLE apps ADD COLUMN start_command TEXT DEFAULT 'npm run d
 // Migration: add login flag (apps whose prod URL requires a login - shows a lock badge)
 try { db.exec(`ALTER TABLE apps ADD COLUMN login INTEGER DEFAULT 0`); } catch { /* already exists */ }
 try { db.exec(`ALTER TABLE apps ADD COLUMN icon TEXT`); } catch { /* already exists */ }
+// Migration: per-app auto-start at login (LaunchAgent RunAtLoad)
+try { db.exec(`ALTER TABLE apps ADD COLUMN auto_start INTEGER DEFAULT 0`); } catch { /* already exists */ }
 
 // Migration: add disabled toggle
 try { db.exec(`ALTER TABLE apps ADD COLUMN disabled INTEGER DEFAULT 0`); } catch { /* already exists */ }
@@ -157,8 +159,8 @@ db.exec(`
 
 // The one INSERT shape for apps, shared by the JSON seeder and addApp so a new column is
 // added in exactly 1 place.
-const APP_INSERT = `(id, name, health_url, local_url, process_check, caddy_url, prod_url, prod_url2, local_path, log_path, repo, launch_agent, launch_agent_path, start_command, icon, tab_color, tab_icon)
-  VALUES (@id, @name, @healthUrl, @localUrl, @processCheck, @caddyUrl, @prodUrl, @prodUrl2, @localPath, @logPath, @repo, @launchAgent, @launchAgentPath, @startCommand, @icon, @tabColor, @tabIcon)`;
+const APP_INSERT = `(id, name, health_url, local_url, process_check, caddy_url, prod_url, prod_url2, local_path, log_path, repo, launch_agent, launch_agent_path, start_command, icon, tab_color, tab_icon, auto_start)
+  VALUES (@id, @name, @healthUrl, @localUrl, @processCheck, @caddyUrl, @prodUrl, @prodUrl2, @localPath, @logPath, @repo, @launchAgent, @launchAgentPath, @startCommand, @icon, @tabColor, @tabIcon, @autoStart)`;
 function appInsertParams(a) {
   return {
     id: a.id,
@@ -178,6 +180,7 @@ function appInsertParams(a) {
     icon: a.icon || null,
     tabColor: a.tabColor ?? null,
     tabIcon: a.tabIcon ?? null,
+    autoStart: a.autoStart ? 1 : 0,
   };
 }
 
@@ -288,6 +291,7 @@ function rowToApp(row) {
     startCommand: row.start_command,
     icon: row.icon,
     login: !!row.login,
+    autoStart: !!row.auto_start,
     disabled: !!row.disabled,
     disabledReason: row.disabled_reason || null,
     disabledAt: row.disabled_at || null,
@@ -341,13 +345,14 @@ function upsertApp(data) {
       about: 'about', features: 'features', architect: 'architect',
       deploy: 'deploy', security: 'security', performance: 'performance',
       prompt: 'prompt', sortOrder: 'sort_order',
-      tabColor: 'tab_color', tabIcon: 'tab_icon',
+      tabColor: 'tab_color', tabIcon: 'tab_icon', autoStart: 'auto_start',
     };
     const jsonFields = new Set(['features', 'security', 'performance']);
     for (const [camel, col] of Object.entries(map)) {
       if (camel in data) {
         fields.push(`${col} = @${camel}`);
         if (jsonFields.has(camel) && Array.isArray(data[camel])) params[camel] = JSON.stringify(data[camel]);
+        else if (camel === 'autoStart') params[camel] = data[camel] ? 1 : 0;
         else params[camel] = data[camel];
       }
     }

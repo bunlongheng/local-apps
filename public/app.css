@@ -143,6 +143,8 @@ a.badge-link { text-decoration: none; display: inline-flex; align-items: center;
 .toggle-label { font-size: 11px; font-weight: 600; }
 .toggle-label.on { color: var(--up); }
 .toggle-label.off { color: var(--down); }
+.chip.autostart { font-size: 11px; font-weight: 600; line-height: 1; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; }
+.chip.autostart.on { color: var(--up); border-color: var(--up); }
 .toggle { position: relative; width: 36px; height: 20px; border-radius: 10px; border: none; cursor: pointer; transition: background 0.2s; }
 .toggle.on { background: #22c55e; }
 .toggle.off { background: rgba(255,255,255,0.1); }
